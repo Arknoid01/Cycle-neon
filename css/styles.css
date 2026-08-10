@@ -1,0 +1,60 @@
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; user-select: none; }
+#game { display: block; width: 100%; height: 100%; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#hud-top { position: absolute; top: env(safe-area-inset-top, 12px); left: 12px; right: 12px; display: flex; justify-content: space-between; padding-top: 8px; }
+#arena-name { font-size: 11px; color: rgba(255,136,0,.85); text-shadow: 0 0 8px rgba(255,100,0,.6); max-width: 42%; }
+#timer { font-size: 13px; color: rgba(255,255,255,.92); text-align: right; }
+#score { position: absolute; top: env(safe-area-inset-top, 16px); left: 0; right: 0; text-align: center; font-size: 28px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 10px #0ff, 0 0 20px #0ff; padding-top: 28px; }
+#high-score { position: absolute; top: env(safe-area-inset-top, 52px); left: 12px; font-size: 10px; color: rgba(0,255,120,.55); }
+#rivals { position: absolute; top: env(safe-area-inset-top, 52px); right: 12px; font-size: 10px; color: rgba(255,100,180,.7); text-align: right; }
+#challenge-hud { position: absolute; top: env(safe-area-inset-top, 68px); left: 0; right: 0; text-align: center; font-size: 10px; color: rgba(255,220,80,.65); pointer-events: none; }
+#overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.55); pointer-events: auto; }
+#overlay.hidden { display: none; }
+#overlay-title { font-size: 14px; color: rgba(255,136,0,.8); margin-bottom: 8px; }
+#overlay-score { font-size: 48px; font-weight: bold; color: #f0f; text-shadow: 0 0 15px #f0f, 0 0 30px #f0f; }
+#overlay-best { font-size: 13px; color: rgba(255,255,0,.55); margin-top: 8px; }
+#overlay-record { font-size: 18px; color: #ff0; text-shadow: 0 0 10px #ff0; margin-top: 12px; }
+#overlay-challenge { font-size: 14px; color: #0f8; text-shadow: 0 0 8px #0f8; margin-top: 10px; }
+#overlay-challenge.hidden { display: none; }
+#overlay-next { font-size: 12px; color: rgba(0,255,255,.45); margin-top: 8px; }
+#overlay-hint { font-size: 14px; color: rgba(255,255,255,.5); margin-top: 24px; }
+#arena-intro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.7); pointer-events: none; transition: opacity 0.4s; }
+#arena-intro.hidden { opacity: 0; pointer-events: none; }
+#arena-intro-label { font-size: 12px; color: rgba(255,136,0,.7); letter-spacing: 3px; margin-bottom: 12px; }
+#arena-intro-name { font-size: 32px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 20px #0ff, 0 0 40px #08f; letter-spacing: 2px; }
+#arena-intro-desc { font-size: 13px; color: rgba(255,255,255,.45); margin-top: 16px; max-width: 80%; text-align: center; line-height: 1.4; }
+#controls { position: absolute; bottom: env(safe-area-inset-bottom, 20px); left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 20px; pointer-events: auto; }
+#controls.hidden { display: none; }
+.control-btn { width: 88px; height: 88px; border: 2px solid rgba(0,255,255,.22); border-radius: 18px; background: rgba(0,255,255,.06); color: rgba(0,255,255,.45); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
+.control-btn svg { width: 36px; height: 36px; fill: currentColor; filter: drop-shadow(0 0 6px rgba(0,255,255,.5)); }
+.control-btn:active, .control-btn.pressed { background: rgba(0,255,255,.18); border-color: rgba(0,255,255,.55); color: rgba(0,255,255,.95); transform: scale(.94); }
+#arena-menu { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.82); pointer-events: auto; padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px); overflow-y: auto; }
+#arena-menu.hidden { display: none; }
+#arena-menu-title { font-size: 22px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 20px #0ff; letter-spacing: 3px; margin-bottom: 4px; }
+#arena-menu-sub { font-size: 12px; color: rgba(255,136,0,.75); letter-spacing: 2px; margin-bottom: 20px; }
+#arena-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; }
+.arena-btn { width: 100%; padding: 14px 16px; border: 1px solid rgba(0,255,255,.25); border-radius: 12px; background: rgba(0,255,255,.05); color: #fff; text-align: left; cursor: pointer; touch-action: manipulation; transition: background .15s, border-color .15s, transform .1s; }
+.arena-btn:active { background: rgba(0,255,255,.14); border-color: rgba(0,255,255,.55); transform: scale(.98); }
+.arena-btn-name { font-size: 15px; font-weight: bold; color: #7df9ff; margin-bottom: 4px; }
+.arena-btn-desc { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.35; }
+.arena-btn-best { font-size: 10px; color: rgba(0,255,120,.55); margin-top: 6px; }
+.arena-random { margin-top: 14px; text-align: center; border-color: rgba(255,136,0,.35); background: rgba(255,136,0,.06); }
+.arena-random .arena-btn-name { color: rgba(255,180,80,.95); }
+#cosmetic-section { width: 100%; max-width: 360px; margin-bottom: 18px; }
+#challenges-section { width: 100%; max-width: 360px; margin-bottom: 16px; }
+#challenges-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
+#challenges-list { display: flex; flex-direction: column; gap: 6px; }
+.challenge-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.5); }
+.challenge-item.done { border-color: rgba(0,255,120,.25); color: rgba(0,255,120,.75); }
+.challenge-item.active { border-color: rgba(255,220,80,.45); background: rgba(255,220,80,.06); cursor: pointer; }
+.challenge-item:not(.done) { cursor: pointer; }
+.challenge-check { width: 14px; flex-shrink: 0; text-align: center; opacity: .35; }
+.challenge-item.done .challenge-check { opacity: 1; color: #0f8; }
+.challenge-name { font-weight: bold; color: rgba(255,220,80,.85); margin-bottom: 1px; }
+.challenge-item.done .challenge-name { color: rgba(0,255,120,.85); }
+#cosmetic-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 10px; text-align: center; }
+#cosmetic-picker { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.color-swatch { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); cursor: pointer; touch-action: manipulation; position: relative; box-shadow: 0 0 10px var(--swatch-glow, #0ff); }
+.color-swatch.selected { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 16px var(--swatch-glow, #0ff); }
+.color-swatch:active { transform: scale(.95); }
