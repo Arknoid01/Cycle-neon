@@ -3,7 +3,7 @@ import { MovingWallSystem, createWallConfigs, getStaticWalls } from './moving-wa
 import { getRiderDefs } from './cosmetics.js';
 import { chooseBotTurn } from './bots.js';
 import {
-  DX, DY, CAM_DIR_ANGLES, trailVal, getTickInterval,
+  DX, DY, CAM_DIR_ANGLES, BIKE_DIR_ANGLES, trailVal, getTickInterval,
   ARENA_BORDER, CELL_WALL, KILL_BONUS, WIN_BONUS, NEAR_MISS_BONUS, MULTIPLIER_MAX,
   CHAMPIONSHIP_RIDERS,
 } from './constants.js';
@@ -51,7 +51,7 @@ export class Simulation {
     this.mode = options.mode || 'arcade';
     this.walls.reset(createWallConfigs(arenaId, w, h, ARENA_BORDER), this.grid, w, h, ARENA_BORDER);
     const defs = options.riderDefs || getRiderDefs();
-    this.riders = this._spawnRiders(w, h, defs);
+    this.riders = this._spawnRiders(w, h, defs, this.grid);
     this.score = 0;
     this.kills = 0;
     this.multiplier = 1;
@@ -70,9 +70,10 @@ export class Simulation {
     this.survivalBumpAt = 15;
   }
 
-  _spawnRiders(gridW, gridH, defs) {
+  _spawnRiders(gridW, gridH, defs, grid) {
     const n = defs.length;
-    const spawns = this._spawnPoints(gridW, gridH, n);
+    const spawns = this._spawnPoints(gridW, gridH, n, this.arenaId)
+      .map(s => this._resolveSpawn(grid, s));
     return defs.map((def, i) => {
       const s = spawns[i];
       return {
@@ -80,13 +81,55 @@ export class Simulation {
         personality: def.personality, difficulty: def.difficulty,
         alive: true, x: s.x, y: s.y, dir: s.dir,
         prevX: s.x, prevY: s.y, renderX: s.x, renderY: s.y,
-        smoothAngle: CAM_DIR_ANGLES[s.dir],
+        smoothAngle: BIKE_DIR_ANGLES[s.dir],
       };
     });
   }
 
-  _spawnPoints(gridW, gridH, n) {
+  _isValidSpawn(grid, { x, y, dir }) {
+    if (!grid.inBounds(x, y) || grid.isBlocked(x, y)) return false;
+    const nx = x + DX[dir], ny = y + DY[dir];
+    if (!grid.inBounds(nx, ny) || grid.isBlocked(nx, ny)) return false;
+    return true;
+  }
+
+  _resolveSpawn(grid, spawn) {
+    if (this._isValidSpawn(grid, spawn)) return spawn;
+    for (let r = 0; r < 24; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          for (let dir = 0; dir < 4; dir++) {
+            const cand = { x: spawn.x + dx, y: spawn.y + dy, dir };
+            if (this._isValidSpawn(grid, cand)) return cand;
+          }
+        }
+      }
+    }
+    return spawn;
+  }
+
+  _spawnPoints(gridW, gridH, n, arenaId) {
     const b = ARENA_BORDER;
+    const cx = Math.floor(gridW / 2);
+    if (arenaId === 'labyrinthe') {
+      const bottomY = gridH - b - 9;
+      const topY = b + 7;
+      if (n >= CHAMPIONSHIP_RIDERS) {
+        return [
+          { x: cx, y: bottomY, dir: 0 },
+          { x: cx - 12, y: topY, dir: 2 },
+          { x: cx + 12, y: topY, dir: 2 },
+          { x: cx - 20, y: bottomY, dir: 0 },
+          { x: cx + 20, y: bottomY, dir: 0 },
+          { x: cx, y: topY, dir: 2 },
+        ];
+      }
+      return [
+        { x: cx, y: bottomY, dir: 0 },
+        { x: cx - 12, y: topY, dir: 2 },
+        { x: cx + 12, y: topY, dir: 2 },
+      ];
+    }
     if (n >= CHAMPIONSHIP_RIDERS) {
       return [
         { x: Math.floor(gridW / 2), y: gridH - b - 6, dir: 0 },

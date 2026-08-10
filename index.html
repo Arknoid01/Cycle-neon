@@ -15,6 +15,7 @@
 <body>
   <canvas id="game"></canvas>
   <div id="ui">
+    <div id="game-hud">
     <div id="hud-top"><div id="arena-name"></div><div id="timer">T : 0.00</div></div>
     <div id="score">0</div>
     <div id="high-score"></div>
@@ -30,6 +31,17 @@
       <div id="overlay-challenge" class="hidden"></div>
       <div id="overlay-next"></div>
       <div id="overlay-hint">Toucher pour revenir au menu</div>
+    </div>
+
+    <div id="arena-intro" class="hidden">
+      <div id="arena-intro-label">ARÈNE</div>
+      <div id="arena-intro-name"></div>
+      <div id="arena-intro-desc"></div>
+    </div>
+    <div id="controls" class="hidden">
+      <button type="button" id="btn-left" class="control-btn" aria-label="Gauche"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+      <button type="button" id="btn-right" class="control-btn" aria-label="Droite"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+    </div>
     </div>
 
     <div id="home-menu">
@@ -113,16 +125,6 @@
           </label>
         </div>
       </div>
-    </div>
-
-    <div id="arena-intro" class="hidden">
-      <div id="arena-intro-label">ARÈNE</div>
-      <div id="arena-intro-name"></div>
-      <div id="arena-intro-desc"></div>
-    </div>
-    <div id="controls" class="hidden">
-      <button type="button" id="btn-left" class="control-btn" aria-label="Gauche"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
-      <button type="button" id="btn-right" class="control-btn" aria-label="Droite"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
     </div>
   </div>
   <script type="importmap">
