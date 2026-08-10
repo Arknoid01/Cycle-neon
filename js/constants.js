@@ -16,9 +16,10 @@ export const SIM_BASE_INTERVAL = 130;
 export const SIM_MIN_INTERVAL = 62;
 
 export const CELL_SIZE = 1;
-export const WALL_H = 1.5;
-export const TRAIL_H = 1.1;
-export const PERIM_H = 1.8;
+export const WALL_H = 1.45;
+export const TRAIL_H = 1.38;
+export const TRAIL_PANEL = 0.11;
+export const PERIM_H = 1.95;
 
 export const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
 
