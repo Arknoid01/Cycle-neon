@@ -118,7 +118,7 @@ export class Simulation {
 
     const dead = new Set();
     for (const m of moves) {
-      if (this._isMoveBlocked(m.nx, m.ny, m.rider, moves)) dead.add(m.rider);
+      if (this._willBeBlocked(m.nx, m.ny, m.rider)) dead.add(m.rider);
       else if ((targets.get(m.nx + ',' + m.ny) || []).length > 1) dead.add(m.rider);
     }
 
@@ -139,7 +139,11 @@ export class Simulation {
       m.rider.prevX = m.rider.x;
       m.rider.prevY = m.rider.y;
       m.rider.dir = m.newDir;
-      this.grid.set(m.rider.x, m.rider.y, trailVal(m.rider.id));
+    }
+
+    for (const m of moves) {
+      if (dead.has(m.rider)) continue;
+      this.grid.set(m.rider.prevX, m.rider.prevY, trailVal(m.rider.id));
       m.rider.x = m.nx;
       m.rider.y = m.ny;
       if (m.rider.isPlayer) events.push({ type: 'scoreTick' });
@@ -152,14 +156,12 @@ export class Simulation {
     }
   }
 
-  _isMoveBlocked(x, y, rider, moves) {
+  /** True if (x,y) is fatal this tick: wall/trail, occupant, or trail left by a departing rider. */
+  _willBeBlocked(x, y, rider) {
     if (this.grid.isBlocked(x, y)) return true;
     for (const r of this.riders) {
       if (!r.alive || r === rider) continue;
-      if (r.x !== x || r.y !== y) continue;
-      const mv = moves.find(m => m.rider === r);
-      if (mv && (mv.nx !== r.x || mv.ny !== r.y)) continue;
-      return true;
+      if (r.x === x && r.y === y) return true;
     }
     return false;
   }
@@ -171,7 +173,7 @@ export class Simulation {
 
     const canGo = (dir) => {
       const nx = rider.x + DX[dir], ny = rider.y + DY[dir];
-      return !this._isMoveBlocked(nx, ny, rider, moves);
+      return !this._willBeBlocked(nx, ny, rider);
     };
 
     const spaceInDir = (dir, maxLook = 8) => {
