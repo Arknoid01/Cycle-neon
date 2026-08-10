@@ -57,13 +57,13 @@ export class Renderer {
     this.segGeo = new THREE.BoxGeometry(1, 1, CELL_SIZE * 0.14);
 
     this.matWall = createElectricMaterial({
-      color: 0x7c3aed, sparkColor: 0xc4b5fd, speed: 0.9, intensity: 1.15, scale: 1.0, body: 0.2,
+      color: 0x7c3aed, sparkColor: 0xc4b5fd, speed: 0.5, intensity: 1.15, scale: 1.0, body: 0.2,
     });
     this.matMobile = createElectricMaterial({
-      color: 0xff6600, sparkColor: 0xffcc88, speed: 1.4, intensity: 1.25, scale: 1.2, body: 0.22,
+      color: 0xff6600, sparkColor: 0xffcc88, speed: 0.75, intensity: 1.25, scale: 1.2, body: 0.22,
     });
     this.matPerimeter = createElectricMaterial({
-      color: 0x9333ea, sparkColor: 0xddd6fe, speed: 0.7, intensity: 1.05, scale: 0.85, body: 0.24,
+      color: 0x9333ea, sparkColor: 0xddd6fe, speed: 0.4, intensity: 1.05, scale: 0.85, body: 0.24,
     });
     this._rebuildTrailMats();
 
@@ -91,7 +91,7 @@ export class Renderer {
     this.trailMats = list.map(d => {
       const mat = createElectricMaterial({
         color: d.trailGlow, sparkColor: d.trail,
-        speed: 1.8, intensity: 1.5, scale: 1.15, body: 0.2,
+        speed: 1.0, intensity: 1.5, scale: 1.15, body: 0.2,
       });
       this._trackElectric(mat);
       return mat;
@@ -205,18 +205,18 @@ export class Renderer {
     let speed = this.matMobile.userData.baseSpeed;
     let intensity = this.matMobile.userData.baseIntensity;
 
-    if (lvl === 1) { speed = 2.0; intensity = 0.95; }
+    if (lvl === 1) { speed = 1.0; intensity = 0.95; }
     else if (lvl === 2) {
-      speed = 3.0 + Math.sin(now / 60) * 1.0;
+      speed = 1.5 + Math.sin(now / 60) * 0.5;
       intensity = 1.1 + Math.sin(now / 45) * 0.25;
     }
     else if (lvl === 3) {
-      speed = 5.0 + Math.sin(now / 28) * 1.5;
+      speed = 2.2 + Math.sin(now / 28) * 0.7;
       intensity = 1.25 + Math.sin(now / 22) * 0.35;
     }
 
     if (now < this.mobileBurstUntil) {
-      speed = 8.0;
+      speed = 3.5;
       intensity = 1.5;
     }
 
@@ -234,7 +234,7 @@ export class Renderer {
   _buildBike(def) {
     const g = new THREE.Group();
     const stripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, speed: 3.5, intensity: 1.0, scale: 3.2, body: 0.35,
+      color: def.glow, sparkColor: def.wheel, speed: 1.5, intensity: 1.0, scale: 3.2, body: 0.35,
     });
     this._trackElectric(stripMat);
 
@@ -277,7 +277,7 @@ export class Renderer {
     });
 
     const emitterMat = createElectricMaterial({
-      color: def.trailGlow, sparkColor: def.wheel, speed: 5, intensity: 1.2, scale: 4.5, body: 0.4,
+      color: def.trailGlow, sparkColor: def.wheel, speed: 2.0, intensity: 1.2, scale: 4.5, body: 0.4,
     });
     this._trackElectric(emitterMat);
     const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.14), emitterMat);
