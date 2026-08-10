@@ -8,6 +8,7 @@ import {
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
+import { createElectricMaterial, updateElectricMaterial } from './electric-shader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -21,11 +22,14 @@ export class Renderer {
     this.riderMeshes = new Map();
     this.liveTrails = new Map();
     this.trailMats = [];
+    this.electricMats = [];
     this.explosions = [];
     this.matWall = null;
     this.matMobile = null;
     this.matPerimeter = null;
-    this.boxGeo = null;
+    this.panelGeo = null;
+    this.segGeo = null;
+    this.mobileBurstUntil = 0;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
     this.smoothCamAngle = -Math.PI / 2;
@@ -45,47 +49,55 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.14;
 
-    this.scene.add(new THREE.AmbientLight(0x223355, 0.4));
-    const dl = new THREE.DirectionalLight(0xaaccff, 0.3);
-    dl.position.set(8, 22, 6);
-    this.scene.add(dl);
+    this.scene.add(new THREE.AmbientLight(0x223355, 0.25));
 
-    this.boxGeo = new THREE.BoxGeometry(CELL_SIZE * 0.92, 1, CELL_SIZE * 0.92);
+    this.panelGeo = new THREE.BoxGeometry(CELL_SIZE * 0.9, 1, CELL_SIZE * 0.14);
+    this.segGeo = new THREE.BoxGeometry(1, 1, CELL_SIZE * 0.14);
 
-    this.matWall = this._makeNeonMat(0x9b7bff, 0x6d28d9, { opacity: 0.72, intensity: 1.2 });
-    this.matMobile = this._makeNeonMat(0xffbb66, 0xff6600, { opacity: 0.78, intensity: 1.35 });
-    this.matPerimeter = this._makeNeonMat(0xd8ccff, 0x9333ea, { opacity: 0.82, intensity: 1.5 });
+    this.matWall = createElectricMaterial({
+      color: 0x7c3aed, sparkColor: 0xddd6fe, speed: 0.9, intensity: 1.0, scale: 1.0, body: 0.5,
+    });
+    this.matMobile = createElectricMaterial({
+      color: 0xff6600, sparkColor: 0xffffcc, speed: 1.4, intensity: 1.25, scale: 1.2, body: 0.55,
+    });
+    this.matPerimeter = createElectricMaterial({
+      color: 0x9333ea, sparkColor: 0xf5f3ff, speed: 0.7, intensity: 1.15, scale: 0.85, body: 0.6,
+    });
     this._rebuildTrailMats();
 
     const floorSize = Math.max(w, h);
     const floor = new THREE.GridHelper(floorSize, w, 0x00ff88, 0x002211);
     floor.position.y = 0.005;
     floor.material.transparent = true;
-    floor.material.opacity = 0.45;
+    floor.material.opacity = 0.4;
     this.scene.add(floor);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.62, 0.38, 0.12
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.68, 0.4, 0.1
     );
     this.composer.addPass(this.bloomPass);
   }
 
-  _rebuildTrailMats() {
-    this.trailMats = getRiderDefs().map(d =>
-      this._makeNeonMat(d.trail, d.trailGlow, { opacity: 0.68, intensity: 1.65 })
-    );
+  _trackElectric(mat) {
+    if (!this.electricMats.includes(mat)) this.electricMats.push(mat);
   }
 
-  _makeNeonMat(color, emissive, { intensity = 1.3, opacity = 0.75 } = {}) {
-    return new THREE.MeshStandardMaterial({
-      color, emissive, emissiveIntensity: intensity,
-      transparent: opacity < 1, opacity,
-      metalness: 0.2, roughness: 0.35,
+  _rebuildTrailMats() {
+    this.trailMats = getRiderDefs().map(d => {
+      const mat = createElectricMaterial({
+        color: d.trailGlow, sparkColor: 0xffffff,
+        speed: 2.0, intensity: 1.45, scale: 1.15, body: 0.52,
+      });
+      this._trackElectric(mat);
+      return mat;
     });
+    this.electricMats = [
+      this.matWall, this.matMobile, this.matPerimeter, ...this.trailMats,
+    ].filter(Boolean);
   }
 
   _cellKey(x, y) { return x + ',' + y; }
@@ -110,6 +122,8 @@ export class Renderer {
       e.points.material.dispose();
     });
     this.explosions = [];
+    this.mobileBurstUntil = 0;
+    this.electricMats = [];
     this._rebuildTrailMats();
     this.camReady = false;
   }
@@ -154,48 +168,78 @@ export class Renderer {
       this.cellMeshes.delete(key);
     }
 
-    let mat, geo, h;
+    let mat, h;
     if (isTrail(type)) {
       mat = this.trailMats[type - TRAIL_BASE];
-      geo = this.boxGeo;
       h = TRAIL_H;
     } else if (type === CELL_WALL && grid.isPerimeter(x, y)) {
       mat = this.matPerimeter;
-      geo = this.boxGeo;
       h = PERIM_H;
     } else if (type === CELL_WALL && this._isMobileCell(x, y, wallSystem)) {
       mat = this.matMobile;
-      geo = this.boxGeo;
       h = WALL_H;
     } else {
       mat = this.matWall;
-      geo = this.boxGeo;
       h = WALL_H;
     }
 
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(this.panelGeo, mat);
     const p = this.gridToWorld(x, y);
     mesh.position.set(p.x, h / 2, p.z);
     mesh.scale.y = h;
-    if (isTrail(type)) mesh.userData.trailIdx = type - TRAIL_BASE;
     this.scene.add(mesh);
     this.cellMeshes.set(key, mesh);
   }
 
+  triggerMobileBurst(now) {
+    this.mobileBurstUntil = now + 450;
+  }
+
   syncMobileWarnings(wallSystem, now) {
     const lvl = Math.max(0, ...wallSystem.walls.map(w => w.warningLevel));
-    let pulse = 1.2;
-    if (lvl === 1) pulse = 0.8;
-    else if (lvl === 2) pulse = 0.9 + Math.sin(now / 65) * 0.45;
-    else if (lvl === 3) pulse = 1.45 + Math.sin(now / 35) * 0.35;
-    this.matMobile.emissiveIntensity = pulse;
+    let speed = this.matMobile.userData.baseSpeed;
+    let intensity = this.matMobile.userData.baseIntensity;
+
+    if (lvl === 1) { speed = 2.2; intensity = 1.1; }
+    else if (lvl === 2) {
+      speed = 3.5 + Math.sin(now / 60) * 1.2;
+      intensity = 1.35 + Math.sin(now / 45) * 0.35;
+    }
+    else if (lvl === 3) {
+      speed = 6.0 + Math.sin(now / 28) * 2.0;
+      intensity = 1.7 + Math.sin(now / 22) * 0.5;
+    }
+
+    if (now < this.mobileBurstUntil) {
+      speed = 10.0;
+      intensity = 2.4;
+    }
+
+    updateElectricMaterial(this.matMobile, now * 0.001, { speed, intensity });
+  }
+
+  updateShaders(now) {
+    const t = now * 0.001;
+    for (const mat of this.electricMats) {
+      if (mat === this.matMobile) continue;
+      updateElectricMaterial(mat, t);
+    }
   }
 
   _buildBike(def) {
     const g = new THREE.Group();
-    const stripMat = this._makeNeonMat(def.glow, def.wheel, { intensity: 2.2, opacity: 0.95 });
-    const bodyMat = this._makeNeonMat(def.body, def.glow, { intensity: 1.4, opacity: 0.92 });
-    const darkMat = this._makeNeonMat(0x0a0a18, def.glow, { intensity: 0.3, opacity: 0.95 });
+    const stripMat = createElectricMaterial({
+      color: def.glow, sparkColor: def.wheel, speed: 3.5, intensity: 1.6, scale: 4, body: 0.35,
+    });
+    this._trackElectric(stripMat);
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: def.body, emissive: def.glow, emissiveIntensity: 1.3,
+      metalness: 0.3, roughness: 0.35,
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0a18, emissive: def.glow, emissiveIntensity: 0.25,
+    });
 
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.16, 0.78), darkMat);
     chassis.position.y = 0.2;
@@ -205,19 +249,21 @@ export class Renderer {
     nose.position.set(0, 0.26, -0.28);
     g.add(nose);
 
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.08, 0.22), stripMat);
-    canopy.position.set(0, 0.34, -0.18);
-    g.add(canopy);
+    const stripGeo = new THREE.BoxGeometry(0.5, 0.06, 0.12);
+    const roofStrip = new THREE.Mesh(stripGeo, stripMat);
+    roofStrip.position.set(0, 0.32, 0);
+    g.add(roofStrip);
 
-    const sideGeo = new THREE.BoxGeometry(0.035, 0.12, 0.62);
     [-0.2, 0.2].forEach(s => {
-      const side = new THREE.Mesh(sideGeo, stripMat);
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.12, 0.62), stripMat);
       side.position.set(s, 0.22, 0.02);
       g.add(side);
     });
 
-    const ringGeo = new THREE.TorusGeometry(0.13, 0.028, 8, 20);
-    const wheelMat = this._makeNeonMat(def.wheel, def.wheel, { intensity: 2.4, opacity: 1 });
+    const ringGeo = new THREE.TorusGeometry(0.13, 0.028, 8, 16);
+    const wheelMat = new THREE.MeshStandardMaterial({
+      color: def.wheel, emissive: def.wheel, emissiveIntensity: 2.2,
+    });
     [-0.24, 0.24].forEach(s => {
       const ring = new THREE.Mesh(ringGeo, wheelMat);
       ring.rotation.y = Math.PI / 2;
@@ -225,22 +271,22 @@ export class Renderer {
       g.add(ring);
     });
 
-    const emitter = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 10, 10),
-      this._makeNeonMat(def.trailGlow, def.trailGlow, { intensity: 2.8, opacity: 1 })
-    );
-    emitter.position.set(0, 0.26, 0.36);
+    const emitterMat = createElectricMaterial({
+      color: def.trailGlow, sparkColor: 0xffffff, speed: 5, intensity: 2, scale: 6, body: 0.4,
+    });
+    this._trackElectric(emitterMat);
+    const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.14), emitterMat);
+    emitter.position.set(0, 0.28, 0.36);
     g.add(emitter);
 
-    g.userData.emitter = emitter;
+    g.userData.emitterMat = emitterMat;
     return g;
   }
 
   _buildLiveTrail(mat) {
-    const head = new THREE.Mesh(this.boxGeo, mat);
+    const head = new THREE.Mesh(this.panelGeo, mat);
     head.scale.y = TRAIL_H;
-    const segGeo = new THREE.BoxGeometry(1, 1, CELL_SIZE * 0.92);
-    const segment = new THREE.Mesh(segGeo, mat);
+    const segment = new THREE.Mesh(this.segGeo, mat);
     segment.scale.y = TRAIL_H;
     segment.visible = false;
     const g = new THREE.Group();
@@ -297,10 +343,6 @@ export class Renderer {
       while (diff < -Math.PI) diff += Math.PI * 2;
       r.smoothAngle += diff * 0.28;
       mesh.rotation.y = r.smoothAngle;
-
-      if (mesh.userData.emitter) {
-        mesh.userData.emitter.scale.setScalar(0.9 + Math.sin(now / 120 + r.id) * 0.1);
-      }
 
       if (playing) {
         let lt = this.liveTrails.get(r.id);

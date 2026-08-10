@@ -51,7 +51,10 @@ function onTurn(side) {
 function handleEvents(events, now) {
   for (const e of events) {
     switch (e.type) {
-      case 'wallMove': playWallShift(); break;
+      case 'wallMove':
+        playWallShift();
+        renderer.triggerMobileBurst(now);
+        break;
       case 'wallWarn': playWallWarn(); break;
       case 'turn': break;
       case 'scoreTick': updateEngineSound(sim.score); break;
@@ -78,6 +81,7 @@ function handleEvents(events, now) {
 function gameLoop(now) {
   if (renderer.scene) {
     sim.updateRenderPositions(now);
+    renderer.updateShaders(now);
     renderer.syncRiders(sim.riders, sim.playing, now);
     renderer.updateCamera(sim.getPlayer());
     renderer.syncMobileWarnings(sim.walls, now);
