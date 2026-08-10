@@ -56,12 +56,12 @@
       line-height: 1.3;
     }
 
-    #high-score {
-      font-size: 11px;
-      color: rgba(255, 255, 0, 0.6);
-      text-shadow: 0 0 6px rgba(255, 255, 0, 0.4);
+    #timer {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.92);
       letter-spacing: 1px;
       text-align: right;
+      font-weight: normal;
     }
 
     #score {
@@ -70,12 +70,22 @@
       left: 0;
       right: 0;
       text-align: center;
-      font-size: 32px;
+      font-size: 28px;
       font-weight: bold;
-      color: #0ff;
+      color: #7df9ff;
       text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #08f;
       padding-top: 28px;
       letter-spacing: 2px;
+    }
+
+    #high-score {
+      position: absolute;
+      top: env(safe-area-inset-top, 52px);
+      left: 12px;
+      font-size: 10px;
+      color: rgba(0, 255, 120, 0.55);
+      text-shadow: 0 0 6px rgba(0, 255, 100, 0.35);
+      letter-spacing: 1px;
     }
 
     #overlay {
@@ -204,9 +214,10 @@
   <div id="ui">
     <div id="hud-top">
       <div id="arena-name"></div>
-      <div id="high-score"></div>
+      <div id="timer">T : 0.00</div>
     </div>
     <div id="score">0</div>
+    <div id="high-score"></div>
     <div id="overlay" class="hidden">
       <div id="overlay-title"></div>
       <div id="overlay-score"></div>
@@ -242,15 +253,17 @@
     const DY = [-1, 0, 1, 0];
 
     const COLORS = {
-      trail: '#0ff',
-      trailGlow: '#08f',
-      player: '#f0f',
-      playerGlow: '#80f',
-      wall: '#f44',
-      wallGlow: '#f00',
-      mobileWall: '#ff8800',
-      mobileWallGlow: '#ff4400',
-      grid: 'rgba(0, 40, 60, 0.35)',
+      trail: '#b8f8ff',
+      trailGlow: '#00eeff',
+      trailDeep: '#0891b2',
+      player: '#ffe566',
+      playerGlow: '#ffcc00',
+      wall: '#b794f6',
+      wallGlow: '#d8b4fe',
+      wallDeep: '#7c3aed',
+      mobileWall: '#ffaa44',
+      mobileWallGlow: '#ff8800',
+      grid: 'rgba(0, 255, 90, 0.5)',
     };
 
     const BASE_TICK = 130;
@@ -260,6 +273,7 @@
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
     const arenaNameEl = document.getElementById('arena-name');
+    const timerEl = document.getElementById('timer');
     const highScoreEl = document.getElementById('high-score');
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
@@ -283,6 +297,7 @@
     let turnQueue;
     let particles;
     let shakeTimer;
+    let gameStartTime;
     let audioCtx;
     let engineOsc;
     let engineGain;
@@ -543,9 +558,9 @@
       gridW = Math.floor(availW / baseCellSize);
       gridH = Math.floor(availH / baseCellSize);
 
-      groundY = canvas.height * 0.76;
-      horizonY = canvas.height * 0.24;
-      focalLength = 5.8;
+      groundY = canvas.height * 0.84;
+      horizonY = canvas.height * 0.36;
+      focalLength = 7.8;
     }
 
     function lerpAngle(current, target, t) {
@@ -557,11 +572,11 @@
 
     function updateCamera() {
       if (!player) return;
-      displayX += (player.x - displayX) * 0.3;
-      displayY += (player.y - displayY) * 0.3;
-      camAngle = lerpAngle(camAngle, CAM_ANGLES[player.dir], 0.16);
+      displayX += (player.x - displayX) * 0.26;
+      displayY += (player.y - displayY) * 0.26;
+      camAngle = lerpAngle(camAngle, CAM_ANGLES[player.dir], 0.14);
       const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      focalLength = 5.6 + speed * 1.1;
+      focalLength = 7.4 + speed * 0.9;
     }
 
     function worldToCamera(gx, gy) {
@@ -586,7 +601,7 @@
       const persp = focalLength / depth;
       const size = baseCellSize * persp * 1.05;
       const screenX = canvas.width / 2 + side * baseCellSize * persp;
-      const screenY = groundY - forward * baseCellSize * persp * 0.94;
+      const screenY = groundY - forward * baseCellSize * persp * 0.62;
 
       if (screenY < horizonY - 30 || screenY > canvas.height + size) return null;
 
@@ -632,6 +647,10 @@
       arenaNameEl.textContent = currentArena.name;
       highScoreEl.textContent = 'BEST ' + highScore.toLocaleString('fr-FR');
       scoreEl.textContent = score.toLocaleString('fr-FR');
+      if (playing) {
+        const t = (performance.now() - gameStartTime) / 1000;
+        timerEl.textContent = 'T : ' + t.toFixed(2);
+      }
     }
 
     function resetGame(rotateArena) {
@@ -647,6 +666,7 @@
       particles = [];
       shakeTimer = 0;
       playing = true;
+      gameStartTime = performance.now();
       camAngle = CAM_ANGLES[player.dir];
       displayX = player.x;
       displayY = player.y;
@@ -796,83 +816,196 @@
       }
     }
 
-    function drawTile(proj, color, glowColor, alpha) {
-      const pad = 0.08;
-      const s = proj.size;
-      ctx.globalAlpha = alpha ?? 1;
-      ctx.shadowColor = glowColor;
-      ctx.shadowBlur = s * 0.7;
-      ctx.fillStyle = color;
-      ctx.fillRect(proj.screenX - s / 2 + s * pad, proj.screenY - s / 2 + s * pad, s * (1 - pad * 2), s * (1 - pad * 2));
+    function buildWallFace(gx, gy, heightMul) {
+      const floor = project(gx, gy);
+      if (!floor) return null;
+
+      const wallH = floor.size * heightMul;
+      const hw = floor.size * 0.5;
+      const hwTop = hw * 0.9;
+      const depth = hw * 0.14;
+
+      const bl = { x: floor.screenX - hw, y: floor.screenY };
+      const br = { x: floor.screenX + hw, y: floor.screenY };
+      const tr = { x: floor.screenX + hwTop, y: floor.screenY - wallH };
+      const tl = { x: floor.screenX - hwTop, y: floor.screenY - wallH };
+
+      return {
+        forward: floor.forward,
+        bl, br, tr, tl,
+        depth,
+        wallH,
+        cx: floor.screenX,
+        yTop: tl.y,
+        yBot: bl.y,
+      };
+    }
+
+    function drawWallPattern(face, glowColor) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(face.tl.x, face.tl.y);
+      ctx.lineTo(face.tr.x, face.tr.y);
+      ctx.lineTo(face.br.x, face.br.y);
+      ctx.lineTo(face.bl.x, face.bl.y);
+      ctx.closePath();
+      ctx.clip();
+
+      const h = face.yBot - face.yTop;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.07})`;
+      ctx.lineWidth = 1;
+      const step = Math.max(6, h / 10);
+      for (let y = face.yTop; y < face.yBot; y += step) {
+        ctx.beginPath();
+        let x = face.tl.x;
+        for (let i = 0; i < 6; i++) {
+          const nx = x + (face.tr.x - face.tl.x) / 3;
+          const ny = y + (i % 2 === 0 ? step * 0.35 : -step * 0.15);
+          if (i === 0) ctx.moveTo(x, ny);
+          else ctx.lineTo(nx, ny);
+          x = nx;
+        }
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = 'rgba(200, 255, 255, 0.12)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(face.tl.x, face.tl.y);
+      ctx.lineTo(face.tr.x, face.tr.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawVerticalWall(face, fill, deep, glow, alpha, pattern) {
+      ctx.save();
+
+      ctx.beginPath();
+      ctx.moveTo(face.tl.x, face.tl.y);
+      ctx.lineTo(face.tr.x, face.tr.y);
+      ctx.lineTo(face.br.x, face.br.y);
+      ctx.lineTo(face.bl.x, face.bl.y);
+      ctx.closePath();
+
+      const grad = ctx.createLinearGradient(face.cx, face.yTop, face.cx, face.yBot);
+      grad.addColorStop(0, fill);
+      grad.addColorStop(1, deep);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = grad;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = face.wallH * 0.35;
+      ctx.fill();
       ctx.shadowBlur = 0;
+
+      if (pattern) drawWallPattern(face, glow);
+
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.beginPath();
+      ctx.moveTo(face.br.x, face.br.y);
+      ctx.lineTo(face.br.x + face.depth, face.br.y - face.wallH * 0.06);
+      ctx.lineTo(face.tr.x + face.depth, face.tr.y - face.wallH * 0.06);
+      ctx.lineTo(face.tr.x, face.tr.y);
+      ctx.closePath();
+      ctx.fillStyle = deep;
+      ctx.fill();
+
+      ctx.globalAlpha = Math.min(1, alpha + 0.15);
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(face.tl.x, face.tl.y);
+      ctx.lineTo(face.tr.x, face.tr.y);
+      ctx.stroke();
+
+      ctx.restore();
       ctx.globalAlpha = 1;
     }
 
-    function collectTiles() {
-      const tiles = [];
+    function collectWalls() {
+      const walls = [];
 
       for (let y = 0; y < gridH; y++) {
         for (let x = 0; x < gridW; x++) {
           const cell = grid[y * gridW + x];
           if (cell === CELL_EMPTY) continue;
-          const proj = project(x, y);
-          if (!proj) continue;
+          const face = buildWallFace(x, y, cell === CELL_TRAIL ? 1.15 : 1.45);
+          if (!face) continue;
 
           if (cell === CELL_TRAIL) {
-            tiles.push({ proj, color: COLORS.trail, glow: COLORS.trailGlow, alpha: 0.82 });
+            walls.push({
+              face,
+              fill: COLORS.trail,
+              deep: COLORS.trailDeep,
+              glow: COLORS.trailGlow,
+              alpha: 0.42,
+              pattern: true,
+            });
           } else if (cell === CELL_WALL) {
-            tiles.push({ proj, color: COLORS.wall, glow: COLORS.wallGlow, alpha: 0.72 });
+            walls.push({
+              face,
+              fill: COLORS.wall,
+              deep: COLORS.wallDeep,
+              glow: COLORS.wallGlow,
+              alpha: 0.78,
+              pattern: true,
+            });
           }
         }
       }
 
       for (const w of mobileWalls) {
-        const proj = project(w.x, w.y);
-        if (!proj) continue;
-        const alpha = w.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.9;
-        tiles.push({ proj, color: COLORS.mobileWall, glow: COLORS.mobileWallGlow, alpha });
+        const face = buildWallFace(w.x, w.y, 1.28);
+        if (!face) continue;
+        const alpha = w.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.82;
+        walls.push({
+          face,
+          fill: COLORS.mobileWall,
+          deep: '#cc6600',
+          glow: COLORS.mobileWallGlow,
+          alpha,
+          pattern: true,
+        });
       }
 
       if (currentArena.id === 'piege' && arenaState.gates) {
         for (const g of arenaState.gates) {
           if (g.open) continue;
-          const alpha = g.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.85;
+          const alpha = g.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.82;
           for (let y = g.yMin; y <= g.yMax; y++) {
-            const proj = project(g.x, y);
-            if (!proj) continue;
-            tiles.push({ proj, color: COLORS.mobileWall, glow: COLORS.mobileWallGlow, alpha });
+            const face = buildWallFace(g.x, y, 1.28);
+            if (!face) continue;
+            walls.push({
+              face,
+              fill: COLORS.mobileWall,
+              deep: '#cc6600',
+              glow: COLORS.mobileWallGlow,
+              alpha,
+              pattern: true,
+            });
           }
         }
       }
 
-      tiles.sort((a, b) => b.proj.forward - a.proj.forward);
-      return tiles;
+      walls.sort((a, b) => b.face.forward - a.face.forward);
+      return walls;
     }
 
     function drawSky() {
       const grad = ctx.createLinearGradient(0, 0, 0, groundY);
-      grad.addColorStop(0, '#080018');
-      grad.addColorStop(0.45, '#0a1428');
+      grad.addColorStop(0, '#050510');
+      grad.addColorStop(0.55, '#080818');
       grad.addColorStop(1, '#000000');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, canvas.width, groundY + 4);
-
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, horizonY);
-      ctx.lineTo(canvas.width, horizonY);
-      ctx.stroke();
+      ctx.fillRect(0, 0, canvas.width, groundY + 6);
     }
 
     function drawFloorGrid() {
-      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
       ctx.lineWidth = 1;
 
       for (let f = -VIEW_BACK; f <= VIEW_FORWARD; f += 1) {
         const persp = focalLength / (f + 4);
-        const alpha = Math.max(0.04, (0.22 - f * 0.008) * persp * 0.35);
-        ctx.strokeStyle = `rgba(0, 180, 220, ${alpha})`;
+        const alpha = Math.max(0.06, (0.35 - f * 0.01) * persp * 0.55);
+        ctx.strokeStyle = `rgba(0, 255, 90, ${alpha})`;
         ctx.beginPath();
         let started = false;
 
@@ -907,8 +1040,7 @@
           }
         }
         if (started) {
-          const persp = focalLength / (VIEW_FORWARD / 2 + 4);
-          ctx.strokeStyle = `rgba(0, 140, 200, ${0.06 + speed * 0.04})`;
+          ctx.strokeStyle = 'rgba(0, 220, 80, 0.12)';
           ctx.stroke();
         }
       }
@@ -943,56 +1075,42 @@
       ctx.shadowBlur = 0;
     }
 
-    function drawSpeedLines() {
-      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      if (speed < 0.25) return;
-      const count = Math.floor(speed * 10);
-      ctx.strokeStyle = `rgba(0, 255, 255, ${0.04 + speed * 0.08})`;
-      ctx.lineWidth = 1;
-      for (let i = 0; i < count; i++) {
-        const side = (Math.random() - 0.5) * VIEW_SIDE * 1.6;
-        const forward = Math.random() * VIEW_FORWARD * 0.7;
-        const gx = displayX + Math.cos(camAngle) * forward + Math.sin(camAngle) * side;
-        const gy = displayY + Math.sin(camAngle) * forward - Math.cos(camAngle) * side;
-        const proj = project(gx, gy);
-        if (!proj) continue;
-        const len = baseCellSize * proj.persp * (0.4 + speed);
-        ctx.beginPath();
-        ctx.moveTo(proj.screenX, proj.screenY);
-        ctx.lineTo(proj.screenX, proj.screenY + len);
-        ctx.stroke();
-      }
-    }
-
     function drawPlayer() {
       const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      const bob = Math.sin(Date.now() / (90 - speed * 25)) * speed * 2.5;
+      const bob = Math.sin(Date.now() / (90 - speed * 25)) * speed * 1.5;
       const px = canvas.width / 2;
-      const py = groundY - baseCellSize * 0.22 + bob;
-      const size = baseCellSize * (0.42 + speed * 0.14);
-      const glow = baseCellSize * (1.2 + speed * 0.8);
+      const py = groundY - baseCellSize * 0.28 + bob;
+      const bodyW = baseCellSize * (0.28 + speed * 0.06);
+      const bodyH = baseCellSize * (0.16 + speed * 0.04);
+      const glow = baseCellSize * (1.4 + speed * 0.6);
 
       ctx.save();
       ctx.translate(px, py);
 
       ctx.shadowColor = COLORS.playerGlow;
       ctx.shadowBlur = glow;
+
       ctx.fillStyle = COLORS.player;
       ctx.beginPath();
-      ctx.moveTo(0, -size);
-      ctx.lineTo(size * 0.7, size * 0.6);
-      ctx.lineTo(0, size * 0.3);
-      ctx.lineTo(-size * 0.7, size * 0.6);
-      ctx.closePath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(-bodyW, -bodyH * 1.2, bodyW * 2, bodyH * 2, bodyH * 0.5);
+      } else {
+        ctx.rect(-bodyW, -bodyH * 1.2, bodyW * 2, bodyH * 2);
+      }
       ctx.fill();
 
-      ctx.shadowBlur = glow * 0.45;
+      const wheelR = bodyH * 0.55;
       ctx.fillStyle = '#fff';
+      ctx.shadowBlur = glow * 0.6;
       ctx.beginPath();
-      ctx.moveTo(0, -size * 0.5);
-      ctx.lineTo(size * 0.25, size * 0.2);
-      ctx.lineTo(-size * 0.25, size * 0.2);
-      ctx.closePath();
+      ctx.arc(-bodyW * 0.55, bodyH * 0.5, wheelR, 0, Math.PI * 2);
+      ctx.arc(bodyW * 0.55, bodyH * 0.5, wheelR, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = COLORS.trailGlow;
+      ctx.shadowBlur = glow * 0.8;
+      ctx.beginPath();
+      ctx.arc(0, -bodyH * 0.9, bodyW * 0.35, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -1028,11 +1146,10 @@
 
       drawSky();
       drawFloorGrid();
-      drawSpeedLines();
 
-      const tiles = collectTiles();
-      for (const t of tiles) {
-        drawTile(t.proj, t.color, t.glow, t.alpha);
+      const walls = collectWalls();
+      for (const w of walls) {
+        drawVerticalWall(w.face, w.fill, w.deep, w.glow, w.alpha, w.pattern);
       }
 
       drawCompressWarning();
@@ -1052,6 +1169,7 @@
       }
 
       if (!playing) updateParticles();
+      if (playing) updateHud();
       render();
       requestAnimationFrame(gameLoop);
     }
