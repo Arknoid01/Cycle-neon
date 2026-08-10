@@ -60,6 +60,7 @@
     const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
     const BASE_TICK = 130, MIN_TICK = 62, ARENA_BORDER = 2, ARENA_SCALE = 3;
     const CELL_SIZE = 1, WALL_H = 1.5, TRAIL_H = 1.1, PERIM_H = 1.8;
+    const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
 
     const canvas = document.getElementById('game');
     const scoreEl = document.getElementById('score');
@@ -80,8 +81,11 @@
     let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime;
     let trailPoints, audioCtx, engineOsc, engineGain;
     let scene, camera, renderer, playerMesh, mobileMeshes, cellMeshes, liveTrailMesh;
-    let camPos = new THREE.Vector3(), camTarget = new THREE.Vector3();
+    let smoothCamX = 0, smoothCamZ = 0, smoothCamAngle = -Math.PI / 2;
+    let smoothPlayerAngle = -Math.PI / 2;
+    let camReady = false;
     let matWall, matTrail, matMobile, matPerimeter, boxGeo;
+    const _worldPos = new THREE.Vector3();
 
     const ARENAS = [
       { id: 'battement', name: 'Le Battement',
@@ -186,12 +190,14 @@
       gridH = 28 * ARENA_SCALE;
     }
 
-    function gridToWorld(gx, gy) {
-      return new THREE.Vector3(
+    function gridToWorld(gx, gy, out) {
+      const v = out || _worldPos;
+      v.set(
         (gx - gridW/2 + 0.5) * CELL_SIZE,
         0,
         (gy - gridH/2 + 0.5) * CELL_SIZE
       );
+      return v;
     }
 
     function makeMat(color, emissive, opacity, tall) {
@@ -356,6 +362,8 @@
       createPlayer();
       score = 0; tickMs = BASE_TICK; lastTick = 0; turnQueue = null;
       playing = true; gameStartTime = performance.now();
+      camReady = false;
+      smoothPlayerAngle = CAM_DIR_ANGLES[player.dir];
       overlay.classList.add('hidden'); controls.classList.remove('hidden');
       updateHud(); unlockAudio(); updateEngineSound();
       updatePlayerMesh();
@@ -433,23 +441,50 @@
 
     function updatePlayerMesh() {
       if (!playerMesh || !player) return;
-      const p = gridToWorld(player.renderX, player.renderY);
+      const p = gridToWorld(player.renderX, player.renderY, _worldPos);
       playerMesh.position.set(p.x, 0, p.z);
-      playerMesh.rotation.y = [-Math.PI/2, 0, Math.PI/2, Math.PI][player.dir];
+
+      const targetAngle = CAM_DIR_ANGLES[player.dir];
+      let angleDiff = targetAngle - smoothPlayerAngle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      smoothPlayerAngle += angleDiff * 0.28;
+      playerMesh.rotation.y = smoothPlayerAngle;
+
       updateLiveTrail();
     }
 
     function updateCamera() {
       if (!player) return;
-      const p = gridToWorld(player.renderX, player.renderY);
-      const d = player.dir;
-      const dist = 14, height = 12, look = 5;
-      const tx = p.x + DX[d]*look, tz = p.z + DY[d]*look;
-      const cx = p.x - DX[d]*dist, cz = p.z - DY[d]*dist;
-      camTarget.set(tx, TRAIL_H, tz);
-      camPos.set(cx, height, cz);
-      camera.position.lerp(camPos, 0.12);
-      camera.lookAt(camTarget);
+
+      const p = gridToWorld(player.renderX, player.renderY, _worldPos);
+      const targetAngle = CAM_DIR_ANGLES[player.dir];
+      const dist = 14;
+      const height = 12;
+      const lookAhead = 4;
+
+      if (!camReady) {
+        smoothCamX = p.x;
+        smoothCamZ = p.z;
+        smoothCamAngle = targetAngle;
+        camReady = true;
+      }
+
+      smoothCamX += (p.x - smoothCamX) * 0.18;
+      smoothCamZ += (p.z - smoothCamZ) * 0.18;
+
+      let angleDiff = targetAngle - smoothCamAngle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      smoothCamAngle += angleDiff * 0.1;
+
+      const offX = -Math.cos(smoothCamAngle) * dist;
+      const offZ = -Math.sin(smoothCamAngle) * dist;
+      const lookX = smoothCamX + Math.cos(smoothCamAngle) * lookAhead;
+      const lookZ = smoothCamZ + Math.sin(smoothCamAngle) * lookAhead;
+
+      camera.position.set(smoothCamX + offX, height, smoothCamZ + offZ);
+      camera.lookAt(lookX, TRAIL_H, lookZ);
     }
 
     function resize() {
