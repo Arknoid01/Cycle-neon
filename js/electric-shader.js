@@ -43,21 +43,22 @@ const FRAG = /* glsl */`
   }
 
   void main() {
-    float along = dot(vWorldPos.xz, vec2(1.0, 0.85)) * uScale + uTime * uSpeed;
+    float t = uTime * uSpeed;
+    float along = dot(vWorldPos.xz, vec2(1.0, 0.85)) * uScale + t * 0.35;
     float across = vLocalPos.z;
 
     float band = exp(-across * across * 38.0);
 
-    float n = noise(vec2(along * 1.8, uTime * 0.25)) * 0.1;
-    float zig = sin(along * 11.0 + uTime * uSpeed * 3.2) * 0.32;
-    float zig2 = sin(along * 17.5 - uTime * uSpeed * 5.8) * 0.16;
+    float n = noise(vec2(along * 1.8, uTime * 0.12)) * 0.1;
+    float zig = sin(along * 11.0 + t * 1.0) * 0.32;
+    float zig2 = sin(along * 17.5 - t * 1.6) * 0.16;
     float center = zig + zig2 + n;
 
     float dist = abs(across - center);
     float bolt = smoothstep(0.11, 0.0, dist);
     float boltCore = smoothstep(0.038, 0.0, dist);
 
-    float runner = smoothstep(0.86, 1.0, sin(along * 9.0 - uTime * uSpeed * 4.5));
+    float runner = smoothstep(0.86, 1.0, sin(along * 9.0 - t * 1.2));
     float spark = boltCore * runner;
 
     vec3 body = uColor * band * uBody * 0.35;
@@ -81,7 +82,7 @@ export function createElectricMaterial(opts) {
       uColor: { value: new THREE.Color(opts.color) },
       uSparkColor: { value: new THREE.Color(opts.sparkColor ?? 0xcccccc) },
       uTime: { value: 0 },
-      uSpeed: { value: opts.speed ?? 1.4 },
+      uSpeed: { value: opts.speed ?? 0.75 },
       uIntensity: { value: opts.intensity ?? 0.95 },
       uScale: { value: opts.scale ?? 1.1 },
       uBody: { value: opts.body ?? 0.55 },
@@ -92,7 +93,7 @@ export function createElectricMaterial(opts) {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
-  mat.userData.baseSpeed = opts.speed ?? 1.4;
+  mat.userData.baseSpeed = opts.speed ?? 0.75;
   mat.userData.baseIntensity = opts.intensity ?? 0.95;
   return mat;
 }
