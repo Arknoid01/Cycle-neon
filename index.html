@@ -390,7 +390,7 @@
             s.lastShrink = now;
             s.margin++;
             const m = s.margin;
-            const limit = Math.floor(Math.min(gridW, gridH) / 2) - 3;
+            const limit = Math.floor(Math.min(gridW, gridH) / 2) - ARENA_BORDER - 4;
             if (m > limit) return;
 
             for (let x = m; x < gridW - m; x++) {
