@@ -1,0 +1,473 @@
+(function () {
+  'use strict';
+
+  const CELL_EMPTY = 0;
+  const CELL_TRAIL = 1;
+  const CELL_WALL = 2;
+
+  const DIR_UP = 0;
+  const DIR_RIGHT = 1;
+  const DIR_DOWN = 2;
+  const DIR_LEFT = 3;
+
+  const DX = [0, 1, 0, -1];
+  const DY = [-1, 0, 1, 0];
+
+  const COLORS = {
+    trail: '#0ff',
+    trailGlow: '#08f',
+    player: '#f0f',
+    playerGlow: '#80f',
+    wall: '#f44',
+    wallGlow: '#f00',
+    mobileWall: '#ff8800',
+    mobileWallGlow: '#ff4400',
+    grid: 'rgba(0, 40, 60, 0.35)',
+  };
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const overlay = document.getElementById('overlay');
+  const overlayScore = document.getElementById('overlay-score');
+  const overlayRecord = document.getElementById('overlay-record');
+  const overlayHint = document.getElementById('overlay-hint');
+  const controlsHint = document.getElementById('controls-hint');
+
+  let gridW, gridH, cellSize, offsetX, offsetY;
+  let grid;
+  let player;
+  let mobileWalls;
+  let score;
+  let highScore;
+  let tickMs;
+  let lastTick;
+  let playing;
+  let turnQueue;
+  let particles;
+  let shakeTimer;
+
+  function loadHighScore() {
+    try {
+      return parseInt(localStorage.getItem('lc_highscore') || '0', 10);
+    } catch {
+      return 0;
+    }
+  }
+
+  function saveHighScore(val) {
+    try {
+      localStorage.setItem('lc_highscore', String(val));
+    } catch { /* offline storage unavailable */ }
+  }
+
+  function initGridDimensions() {
+    const margin = 16;
+    const availW = canvas.width - margin * 2;
+    const availH = canvas.height - margin * 2 - 60;
+
+    const targetCols = 18;
+    const targetRows = 28;
+
+    cellSize = Math.floor(Math.min(availW / targetCols, availH / targetRows));
+    cellSize = Math.max(cellSize, 12);
+
+    gridW = Math.floor(availW / cellSize);
+    gridH = Math.floor(availH / cellSize);
+
+    offsetX = Math.floor((canvas.width - gridW * cellSize) / 2);
+    offsetY = Math.floor((canvas.height - gridH * cellSize) / 2) + 20;
+  }
+
+  function createGrid() {
+    grid = new Uint8Array(gridW * gridH);
+
+    for (let x = 0; x < gridW; x++) {
+      setCell(x, 0, CELL_WALL);
+      setCell(x, gridH - 1, CELL_WALL);
+    }
+    for (let y = 0; y < gridH; y++) {
+      setCell(0, y, CELL_WALL);
+      setCell(gridW - 1, y, CELL_WALL);
+    }
+  }
+
+  function getCell(x, y) {
+    if (x < 0 || x >= gridW || y < 0 || y >= gridH) return CELL_WALL;
+    return grid[y * gridW + x];
+  }
+
+  function setCell(x, y, val) {
+    if (x < 0 || x >= gridW || y < 0 || y >= gridH) return;
+    grid[y * gridW + x] = val;
+  }
+
+  function createMobileWalls() {
+    mobileWalls = [
+      {
+        x: Math.floor(gridW / 2),
+        y: Math.floor(gridH / 2),
+        dir: DIR_RIGHT,
+        min: 3,
+        max: gridW - 4,
+        interval: 4000,
+        lastMove: 0,
+        warning: false,
+      },
+      {
+        x: Math.floor(gridW / 2),
+        y: Math.floor(gridH / 3),
+        dir: DIR_LEFT,
+        min: 3,
+        max: gridW - 4,
+        interval: 3000,
+        lastMove: 0,
+        warning: false,
+      },
+    ];
+  }
+
+  function createPlayer() {
+    const startX = Math.floor(gridW / 2);
+    const startY = gridH - 4;
+    player = {
+      x: startX,
+      y: startY,
+      dir: DIR_UP,
+      prevX: startX,
+      prevY: startY,
+    };
+  }
+
+  function resetGame() {
+    initGridDimensions();
+    createGrid();
+    createMobileWalls();
+    createPlayer();
+    score = 0;
+    tickMs = 130;
+    lastTick = 0;
+    turnQueue = null;
+    particles = [];
+    shakeTimer = 0;
+    playing = true;
+    overlay.classList.add('hidden');
+    controlsHint.classList.remove('hidden');
+    updateScoreDisplay();
+  }
+
+  function updateScoreDisplay() {
+    scoreEl.textContent = score.toLocaleString('fr-FR');
+  }
+
+  function turnLeft() {
+    if (!playing) return;
+    const newDir = (player.dir + 3) % 4;
+    if (newDir !== (player.dir + 2) % 4) turnQueue = newDir;
+  }
+
+  function turnRight() {
+    if (!playing) return;
+    const newDir = (player.dir + 1) % 4;
+    if (newDir !== (player.dir + 2) % 4) turnQueue = newDir;
+  }
+
+  function isMobileWallAt(x, y) {
+    for (const w of mobileWalls) {
+      if (w.x === x && w.y === y) return true;
+    }
+    return false;
+  }
+
+  function updateMobileWalls(now) {
+    for (const w of mobileWalls) {
+      const elapsed = now - w.lastMove;
+      w.warning = elapsed > w.interval - 800;
+
+      if (elapsed >= w.interval) {
+        w.lastMove = now;
+        const step = w.dir === DIR_RIGHT ? 1 : -1;
+        let next = w.x + step;
+
+        if (next > w.max || next < w.min) {
+          w.dir = w.dir === DIR_RIGHT ? DIR_LEFT : DIR_RIGHT;
+          next = w.x + (w.dir === DIR_RIGHT ? 1 : -1);
+        }
+
+        w.x = next;
+      }
+    }
+  }
+
+  function spawnParticles(x, y, color) {
+    for (let i = 0; i < 24; i++) {
+      const angle = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
+      const speed = 1 + Math.random() * 3;
+      particles.push({
+        x: x * cellSize + offsetX + cellSize / 2,
+        y: y * cellSize + offsetY + cellSize / 2,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        color,
+      });
+    }
+  }
+
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 0.03;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function gameTick(now) {
+    if (!playing) return;
+
+    if (turnQueue !== null) {
+      player.dir = turnQueue;
+      turnQueue = null;
+    }
+
+    player.prevX = player.x;
+    player.prevY = player.y;
+
+    const nx = player.x + DX[player.dir];
+    const ny = player.y + DY[player.dir];
+
+    const cell = getCell(nx, ny);
+    const hitMobile = isMobileWallAt(nx, ny);
+
+    if (cell === CELL_WALL || cell === CELL_TRAIL || hitMobile) {
+      die();
+      return;
+    }
+
+    setCell(player.x, player.y, CELL_TRAIL);
+    player.x = nx;
+    player.y = ny;
+    score++;
+
+    if (score % 15 === 0 && tickMs > 65) {
+      tickMs -= 3;
+    }
+
+    updateScoreDisplay();
+  }
+
+  function die() {
+    playing = false;
+    shakeTimer = 300;
+    spawnParticles(player.x, player.y, COLORS.player);
+    spawnParticles(player.x, player.y, COLORS.trail);
+
+    const isRecord = score > highScore;
+    if (isRecord) {
+      highScore = score;
+      saveHighScore(highScore);
+    }
+
+    overlayScore.textContent = score.toLocaleString('fr-FR');
+    overlayRecord.classList.toggle('hidden', !isRecord);
+    overlayHint.textContent = 'Toucher pour rejouer';
+    overlay.classList.remove('hidden');
+    controlsHint.classList.add('hidden');
+  }
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    if (grid) {
+      const savedScore = score;
+      resetGame();
+      score = savedScore;
+      updateScoreDisplay();
+    }
+  }
+
+  function drawCell(x, y, color, glowColor, alpha) {
+    const px = offsetX + x * cellSize;
+    const py = offsetY + y * cellSize;
+    const pad = 1;
+
+    ctx.globalAlpha = alpha ?? 1;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = cellSize * 0.6;
+    ctx.fillStyle = color;
+    ctx.fillRect(px + pad, py + pad, cellSize - pad * 2, cellSize - pad * 2);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= gridW; x++) {
+      const px = offsetX + x * cellSize;
+      ctx.moveTo(px, offsetY);
+      ctx.lineTo(px, offsetY + gridH * cellSize);
+    }
+    for (let y = 0; y <= gridH; y++) {
+      const py = offsetY + y * cellSize;
+      ctx.moveTo(offsetX, py);
+      ctx.lineTo(offsetX + gridW * cellSize, py);
+    }
+    ctx.stroke();
+  }
+
+  function drawTrail() {
+    for (let y = 0; y < gridH; y++) {
+      for (let x = 0; x < gridW; x++) {
+        if (grid[y * gridW + x] === CELL_TRAIL) {
+          drawCell(x, y, COLORS.trail, COLORS.trailGlow, 0.85);
+        }
+      }
+    }
+  }
+
+  function drawWalls() {
+    for (let y = 0; y < gridH; y++) {
+      for (let x = 0; x < gridW; x++) {
+        if (grid[y * gridW + x] === CELL_WALL) {
+          drawCell(x, y, COLORS.wall, COLORS.wallGlow, 0.7);
+        }
+      }
+    }
+  }
+
+  function drawMobileWalls() {
+    for (const w of mobileWalls) {
+      const alpha = w.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.9;
+      drawCell(w.x, w.y, COLORS.mobileWall, COLORS.mobileWallGlow, alpha);
+    }
+  }
+
+  function drawPlayer() {
+    const px = offsetX + player.x * cellSize + cellSize / 2;
+    const py = offsetY + player.y * cellSize + cellSize / 2;
+    const size = cellSize * 0.35;
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate((player.dir * Math.PI) / 2);
+
+    ctx.shadowColor = COLORS.playerGlow;
+    ctx.shadowBlur = cellSize;
+    ctx.fillStyle = COLORS.player;
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.7, size * 0.6);
+    ctx.lineTo(0, size * 0.3);
+    ctx.lineTo(-size * 0.7, size * 0.6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowBlur = cellSize * 0.4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.5);
+    ctx.lineTo(size * 0.25, size * 0.2);
+    ctx.lineTo(-size * 0.25, size * 0.2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.globalAlpha = p.life;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  }
+
+  function render() {
+    let shakeX = 0;
+    let shakeY = 0;
+    if (shakeTimer > 0) {
+      shakeTimer -= 16;
+      shakeX = (Math.random() - 0.5) * 6;
+      shakeY = (Math.random() - 0.5) * 6;
+    }
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    drawGrid();
+    drawWalls();
+    drawTrail();
+    drawMobileWalls();
+    if (playing) drawPlayer();
+    drawParticles();
+
+    ctx.restore();
+  }
+
+  function gameLoop(timestamp) {
+    if (playing && timestamp - lastTick >= tickMs) {
+      updateMobileWalls(timestamp);
+      gameTick(timestamp);
+      lastTick = timestamp;
+    }
+
+    if (!playing) updateParticles();
+    render();
+    requestAnimationFrame(gameLoop);
+  }
+
+  function handleInput(clientX, clientY) {
+    if (!playing) {
+      resetGame();
+      return;
+    }
+
+    const half = canvas.width / 2;
+    if (clientX < half) {
+      turnLeft();
+    } else {
+      turnRight();
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    handleInput(e.clientX, e.clientY);
+  });
+
+  overlay.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    resetGame();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      if (!playing) resetGame();
+      else turnLeft();
+    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      if (!playing) resetGame();
+      else turnRight();
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      if (!playing) resetGame();
+    }
+  });
+
+  window.addEventListener('resize', resize);
+
+  highScore = loadHighScore();
+  resize();
+  resetGame();
+  requestAnimationFrame(gameLoop);
+})();

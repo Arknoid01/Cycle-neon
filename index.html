@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Light Cycle Neon</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="ui">
+    <div id="score">0</div>
+    <div id="overlay" class="hidden">
+      <div id="overlay-score"></div>
+      <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
+      <div id="overlay-hint">Toucher pour rejouer</div>
+    </div>
+    <div id="controls-hint" class="hidden">
+      <span class="left-zone">◀</span>
+      <span class="right-zone">▶</span>
+    </div>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
