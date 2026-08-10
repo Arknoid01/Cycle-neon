@@ -8,8 +8,8 @@ export const COLOR_PRESETS = [
 ];
 
 export const BOT_DEFS = [
-  { name: 'Spectre', isPlayer: false, body: 0xff66cc, glow: 0xff0088, wheel: 0xff88cc, trail: 0xffb8e8, trailGlow: 0xff44aa },
-  { name: 'Phantom', isPlayer: false, body: 0x66ff88, glow: 0x00ff66, wheel: 0x88ffaa, trail: 0xb8ffd8, trailGlow: 0x44ff88 },
+  { name: 'Spectre', isPlayer: false, personality: 'chasseur', difficulty: 2, body: 0xff66cc, glow: 0xff0088, wheel: 0xff88cc, trail: 0xffb8e8, trailGlow: 0xff44aa },
+  { name: 'Phantom', isPlayer: false, personality: 'prudent', difficulty: 2, body: 0x66ff88, glow: 0x00ff66, wheel: 0x88ffaa, trail: 0xb8ffd8, trailGlow: 0x44ff88 },
 ];
 
 export function loadCosmetic() {
@@ -27,8 +27,8 @@ export function getCosmeticPreset() {
 export function getRiderDefs() {
   const c = getCosmeticPreset();
   return [
-    { name: 'Toi', isPlayer: true, body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow },
-    ...BOT_DEFS,
+    { key: 'player', name: 'Toi', isPlayer: true, body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow },
+    ...BOT_DEFS.map((b, i) => ({ key: 'bot' + i, ...b })),
   ];
 }
 

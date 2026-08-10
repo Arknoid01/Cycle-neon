@@ -1,9 +1,11 @@
 import { Grid, gridDimensions } from './grid.js';
-import { MovingWallSystem, createWallConfigs } from './moving-wall.js';
+import { MovingWallSystem, createWallConfigs, getStaticWalls } from './moving-wall.js';
 import { getRiderDefs } from './cosmetics.js';
+import { chooseBotTurn } from './bots.js';
 import {
   DX, DY, CAM_DIR_ANGLES, trailVal, getTickInterval,
-  ARENA_BORDER, KILL_BONUS, WIN_BONUS,
+  ARENA_BORDER, CELL_WALL, KILL_BONUS, WIN_BONUS, NEAR_MISS_BONUS, MULTIPLIER_MAX,
+  CHAMPIONSHIP_RIDERS,
 } from './constants.js';
 
 export class Simulation {
@@ -13,6 +15,7 @@ export class Simulation {
     this.riders = [];
     this.score = 0;
     this.kills = 0;
+    this.multiplier = 1;
     this.simTick = 0;
     this.lastSimTime = 0;
     this.tickIntervalMs = 130;
@@ -20,26 +23,38 @@ export class Simulation {
     this.turnQueue = null;
     this.gameStartTime = 0;
     this.arenaId = 'classique';
+    this.mode = 'arcade';
     this.deadRiders = [];
+    this.deathOrder = [];
     this.playerDied = false;
     this.playerWon = false;
+    this.roundComplete = false;
+    this.nearMissCooldown = 0;
+    this.survivalBumpAt = 15;
   }
 
   get gridW() { return this.grid?.w ?? 0; }
   get gridH() { return this.grid?.h ?? 0; }
 
   getPlayer() { return this.riders.find(r => r.isPlayer); }
+  aliveRiders() { return this.riders.filter(r => r.alive); }
   aliveBots() { return this.riders.filter(r => !r.isPlayer && r.alive); }
 
-  reset(arenaId) {
+  reset(arenaId, options = {}) {
     const { w, h } = gridDimensions();
     this.grid = new Grid(w, h);
     this.grid.buildPerimeter();
+    for (const { x, y } of getStaticWalls(arenaId, w, h, ARENA_BORDER)) {
+      if (!this.grid.isPerimeter(x, y)) this.grid.set(x, y, CELL_WALL);
+    }
     this.arenaId = arenaId;
+    this.mode = options.mode || 'arcade';
     this.walls.reset(createWallConfigs(arenaId, w, h, ARENA_BORDER), this.grid, w, h, ARENA_BORDER);
-    this.riders = this._spawnRiders(w, h);
+    const defs = options.riderDefs || getRiderDefs();
+    this.riders = this._spawnRiders(w, h, defs);
     this.score = 0;
     this.kills = 0;
+    this.multiplier = 1;
     this.simTick = 0;
     this.lastSimTime = 0;
     this.tickIntervalMs = getTickInterval(0);
@@ -47,26 +62,46 @@ export class Simulation {
     this.turnQueue = null;
     this.gameStartTime = performance.now();
     this.deadRiders = [];
+    this.deathOrder = [];
     this.playerDied = false;
     this.playerWon = false;
+    this.roundComplete = false;
+    this.nearMissCooldown = 0;
+    this.survivalBumpAt = 15;
   }
 
-  _spawnRiders(gridW, gridH) {
-    const defs = getRiderDefs();
-    const spawns = [
-      { x: Math.floor(gridW / 2), y: gridH - ARENA_BORDER - 6, dir: 0 },
-      { x: Math.floor(gridW / 4), y: ARENA_BORDER + 6, dir: 2 },
-      { x: Math.floor(3 * gridW / 4), y: ARENA_BORDER + 6, dir: 2 },
-    ];
+  _spawnRiders(gridW, gridH, defs) {
+    const n = defs.length;
+    const spawns = this._spawnPoints(gridW, gridH, n);
     return defs.map((def, i) => {
       const s = spawns[i];
       return {
-        id: i, name: def.name, isPlayer: def.isPlayer, def, alive: true,
-        x: s.x, y: s.y, dir: s.dir,
+        id: i, key: def.key ?? ('r' + i), name: def.name, isPlayer: def.isPlayer, def,
+        personality: def.personality, difficulty: def.difficulty,
+        alive: true, x: s.x, y: s.y, dir: s.dir,
         prevX: s.x, prevY: s.y, renderX: s.x, renderY: s.y,
         smoothAngle: CAM_DIR_ANGLES[s.dir],
       };
     });
+  }
+
+  _spawnPoints(gridW, gridH, n) {
+    const b = ARENA_BORDER;
+    if (n >= CHAMPIONSHIP_RIDERS) {
+      return [
+        { x: Math.floor(gridW / 2), y: gridH - b - 6, dir: 0 },
+        { x: Math.floor(gridW / 4), y: b + 6, dir: 2 },
+        { x: Math.floor(3 * gridW / 4), y: b + 6, dir: 2 },
+        { x: b + 6, y: Math.floor(gridH / 2), dir: 1 },
+        { x: gridW - b - 7, y: Math.floor(gridH / 2), dir: 3 },
+        { x: Math.floor(gridW / 2), y: b + 6, dir: 2 },
+      ];
+    }
+    return [
+      { x: Math.floor(gridW / 2), y: gridH - b - 6, dir: 0 },
+      { x: Math.floor(gridW / 4), y: b + 6, dir: 2 },
+      { x: Math.floor(3 * gridW / 4), y: b + 6, dir: 2 },
+    ];
   }
 
   setTurn(dir) {
@@ -85,11 +120,20 @@ export class Simulation {
     if (wallFx.pulseSound) events.push({ type: 'wallWarn' });
 
     this._tickRiders(events);
+    this._checkRiskRewards(events, now);
     this.simTick++;
     this.tickIntervalMs = getTickInterval(this.score);
 
-    if (this.playerDied) events.push({ type: 'death' });
-    else if (this.playerWon) events.push({ type: 'victory' });
+    if (this.mode === 'championship') {
+      if (this.aliveRiders().length <= 1 && !this.roundComplete) {
+        this.roundComplete = true;
+        this.playing = false;
+        events.push({ type: 'roundEnd', rankings: this.getRoundRankings() });
+      }
+    } else {
+      if (this.playerDied) events.push({ type: 'death' });
+      else if (this.playerWon) events.push({ type: 'victory' });
+    }
 
     return { events };
   }
@@ -104,7 +148,7 @@ export class Simulation {
         this.turnQueue = null;
         events.push({ type: 'turn' });
       } else if (!r.isPlayer) {
-        newDir = this._chooseAiTurn(r, moves);
+        newDir = chooseBotTurn(this, r, moves);
       }
       moves.push({ rider: r, newDir, nx: r.x + DX[newDir], ny: r.y + DY[newDir] });
     }
@@ -126,12 +170,15 @@ export class Simulation {
       if (dead.has(m.rider)) {
         m.rider.alive = false;
         this.deadRiders.push(m.rider);
+        this.deathOrder.push({ key: m.rider.key, name: m.rider.name, isPlayer: m.rider.isPlayer });
         if (m.rider.isPlayer) {
           this.playerDied = true;
-          this.playing = false;
+          this.multiplier = 1;
+          if (this.mode !== 'championship') this.playing = false;
         } else if (this.getPlayer()?.alive) {
           this.kills++;
-          this.score += KILL_BONUS;
+          this.score += KILL_BONUS * this.multiplier;
+          this._bumpMultiplier(events, 'kill');
           events.push({ type: 'kill' });
         }
         continue;
@@ -146,17 +193,59 @@ export class Simulation {
       this.grid.set(m.rider.prevX, m.rider.prevY, trailVal(m.rider.id));
       m.rider.x = m.nx;
       m.rider.y = m.ny;
-      if (m.rider.isPlayer) events.push({ type: 'scoreTick' });
+      if (m.rider.isPlayer) {
+        this.score += this.multiplier;
+        events.push({ type: 'scoreTick' });
+      }
     }
 
-    if (!this.playerDied && this.getPlayer()?.alive && this.aliveBots().length === 0) {
+    if (this.mode !== 'championship' && !this.playerDied && this.getPlayer()?.alive && this.aliveBots().length === 0) {
       this.playerWon = true;
       this.playing = false;
-      this.score += WIN_BONUS;
+      this.score += WIN_BONUS * this.multiplier;
     }
   }
 
-  /** True if (x,y) is fatal this tick: wall/trail, occupant, or trail left by a departing rider. */
+  _bumpMultiplier(events, reason) {
+    const prev = this.multiplier;
+    this.multiplier = Math.min(MULTIPLIER_MAX, this.multiplier + 1);
+    if (this.multiplier > prev) events.push({ type: 'multiplierUp', value: this.multiplier, reason });
+  }
+
+  _checkRiskRewards(events, now) {
+    const p = this.getPlayer();
+    if (!p?.alive) return;
+
+    const elapsed = this.getElapsedSeconds(now);
+    if (elapsed >= this.survivalBumpAt) {
+      this.survivalBumpAt += 15;
+      this._bumpMultiplier(events, 'survival');
+    }
+
+    if (this.nearMissCooldown > 0) {
+      this.nearMissCooldown--;
+      return;
+    }
+
+    if (this._adjacentBlocked(p)) {
+      this.nearMissCooldown = 10;
+      this.score += NEAR_MISS_BONUS * this.multiplier;
+      this._bumpMultiplier(events, 'nearMiss');
+      events.push({ type: 'nearMiss' });
+    } else if (this.walls.isPlayerNearMobile(p, this.gridW, this.gridH)) {
+      this.nearMissCooldown = 14;
+      this.score += Math.floor(NEAR_MISS_BONUS * 0.5) * this.multiplier;
+      events.push({ type: 'wallNear' });
+    }
+  }
+
+  _adjacentBlocked(rider) {
+    for (let d = 0; d < 4; d++) {
+      if (this.grid.isBlocked(rider.x + DX[d], rider.y + DY[d])) return true;
+    }
+    return false;
+  }
+
   _willBeBlocked(x, y, rider) {
     if (this.grid.isBlocked(x, y)) return true;
     for (const r of this.riders) {
@@ -166,57 +255,23 @@ export class Simulation {
     return false;
   }
 
-  _chooseAiTurn(rider, moves) {
-    const fwd = rider.dir;
-    const left = (rider.dir + 3) % 4;
-    const right = (rider.dir + 1) % 4;
-
-    const canGo = (dir) => {
-      const nx = rider.x + DX[dir], ny = rider.y + DY[dir];
-      return !this._willBeBlocked(nx, ny, rider);
-    };
-
-    const spaceInDir = (dir, maxLook = 8) => {
-      let x = rider.x, y = rider.y, n = 0;
-      for (let i = 0; i < maxLook; i++) {
-        x += DX[dir]; y += DY[dir];
-        if (this.grid.isBlocked(x, y)) return n;
-        n++;
-      }
-      return n;
-    };
-
-    if (!canGo(fwd)) {
-      const lOk = canGo(left), rOk = canGo(right);
-      if (lOk && rOk) return spaceInDir(left) >= spaceInDir(right) ? left : right;
-      if (lOk) return left;
-      if (rOk) return right;
-      return fwd;
+  getRoundRankings() {
+    const rankings = [];
+    for (const r of this.aliveRiders()) {
+      rankings.push({ key: r.key, name: r.name, isPlayer: r.isPlayer });
     }
-    for (let look = 1; look <= 3; look++) {
-      const tx = rider.x + DX[fwd] * look, ty = rider.y + DY[fwd] * look;
-      if (this.grid.isBlocked(tx, ty)) {
-        const lOk = canGo(left), rOk = canGo(right);
-        if (lOk && rOk) {
-          if (Math.random() < 0.12) return Math.random() < 0.5 ? left : right;
-          return spaceInDir(left) >= spaceInDir(right) ? left : right;
-        }
-        if (lOk) return left;
-        if (rOk) return right;
-        break;
-      }
+    for (let i = this.deathOrder.length - 1; i >= 0; i--) {
+      const d = this.deathOrder[i];
+      if (!rankings.some(x => x.key === d.key)) rankings.push(d);
     }
-    if (Math.random() < 0.018 && canGo(left)) return left;
-    if (Math.random() < 0.018 && canGo(right)) return right;
-    return fwd;
+    return rankings;
+  }
+
+  getIntensity() {
+    return Math.min(1, (this.multiplier - 1) / (MULTIPLIER_MAX - 1));
   }
 
   checkNearMiss() {
-    const p = this.getPlayer();
-    if (!p?.alive) return false;
-    for (let d = 0; d < 4; d++) {
-      if (this.grid.isBlocked(p.x + DX[d], p.y + DY[d])) return true;
-    }
     return false;
   }
 

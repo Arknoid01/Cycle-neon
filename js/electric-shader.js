@@ -46,28 +46,29 @@ const FRAG = /* glsl */`
     float along = dot(vWorldPos.xz, vec2(1.0, 0.85)) * uScale + uTime * uSpeed;
     float across = vLocalPos.z;
 
-    float band = exp(-across * across * 55.0);
+    float band = exp(-across * across * 38.0);
 
-    float n = noise(vec2(along * 2.4, uTime * 0.35)) * 0.18;
-    float zig = sin(along * 18.0 + uTime * uSpeed * 4.0) * 0.11;
-    float zig2 = sin(along * 31.0 - uTime * uSpeed * 6.5) * 0.06;
+    float n = noise(vec2(along * 1.8, uTime * 0.25)) * 0.1;
+    float zig = sin(along * 11.0 + uTime * uSpeed * 3.2) * 0.32;
+    float zig2 = sin(along * 17.5 - uTime * uSpeed * 5.8) * 0.16;
     float center = zig + zig2 + n;
 
-    float bolt = exp(-pow(across - center, 2.0) * 420.0);
-    float bolt2 = exp(-pow(across + center * 0.75, 2.0) * 280.0) * 0.55;
+    float dist = abs(across - center);
+    float bolt = smoothstep(0.11, 0.0, dist);
+    float boltCore = smoothstep(0.038, 0.0, dist);
 
-    float runner = sin(along * 14.0 - uTime * uSpeed * 5.0);
-    float spark = smoothstep(0.82, 1.0, runner) * (bolt + bolt2);
+    float runner = smoothstep(0.86, 1.0, sin(along * 9.0 - uTime * uSpeed * 4.5));
+    float spark = boltCore * runner;
 
-    float vert = sin(vWorldPos.y * 6.0 + along * 3.0 + uTime * uSpeed * 2.0) * 0.04;
-    bolt += exp(-pow(across - center - vert, 2.0) * 200.0) * 0.35;
+    vec3 body = uColor * band * uBody * 0.35;
+    body *= (1.0 - boltCore * 0.65);
 
-    vec3 body = uColor * band * uBody;
-    vec3 elec = mix(uColor, uSparkColor, 0.92) * (bolt + bolt2) * uIntensity;
-    vec3 flash = uSparkColor * spark * 2.8;
+    vec3 elecHalo = mix(uColor, uSparkColor, 0.45) * bolt * uIntensity * 0.55;
+    vec3 elecCore = uSparkColor * boltCore * uIntensity * 2.6;
+    vec3 flash = uSparkColor * spark * 4.0;
 
-    vec3 col = body + elec + flash;
-    float alpha = clamp(band * uBody * 0.65 + (bolt + bolt2) * 0.9 + spark * 0.85, 0.0, 1.0);
+    vec3 col = body + elecHalo + elecCore + flash;
+    float alpha = clamp(band * uBody * 0.35 + bolt * 0.55 + boltCore * 0.95, 0.0, 1.0);
 
     gl_FragColor = vec4(col, alpha);
   }

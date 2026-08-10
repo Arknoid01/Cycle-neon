@@ -19,7 +19,8 @@
     <div id="score">0</div>
     <div id="high-score"></div>
     <div id="rivals"></div>
-    <div id="challenge-hud"></div>
+    <div id="multiplier-hud" class="hidden">×1</div>
+    <div id="champ-hud" class="hidden"></div>
     <div id="overlay" class="hidden">
       <div id="overlay-title"></div>
       <div id="overlay-score"></div>
@@ -27,25 +28,92 @@
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
       <div id="overlay-challenge" class="hidden"></div>
       <div id="overlay-next"></div>
-      <div id="overlay-hint">Toucher pour choisir une arène</div>
+      <div id="overlay-hint">Toucher pour revenir au menu</div>
     </div>
-    <div id="arena-menu">
-      <div id="arena-menu-title">LIGHT CYCLE</div>
-      <div id="arena-menu-sub">CHOISIR UNE ARÈNE</div>
-      <div id="cosmetic-section">
-        <div id="cosmetic-label">TON CYCLE</div>
+
+    <div id="home-menu">
+      <div id="home-screen" class="menu-screen">
+        <header class="home-header">
+          <div class="home-title">LIGHT CYCLE</div>
+          <div class="home-sub">NEON GRID</div>
+          <div id="home-best" class="home-best"></div>
+        </header>
+        <div class="tile-grid">
+          <button type="button" class="menu-tile tile-play" data-screen="play">
+            <span class="tile-icon">▶</span>
+            <span class="tile-label">Nouvelle partie</span>
+            <span class="tile-desc">Choisir un scénario</span>
+          </button>
+          <button type="button" class="menu-tile tile-custom" data-screen="custom">
+            <span class="tile-icon">◈</span>
+            <span class="tile-label">Personnalisation</span>
+            <span class="tile-desc">Couleur du cycle</span>
+          </button>
+          <button type="button" class="menu-tile tile-trophies" data-screen="trophies">
+            <span class="tile-icon">★</span>
+            <span class="tile-label">Trophées</span>
+            <span class="tile-desc" id="trophy-summary">Défis et records</span>
+          </button>
+          <button type="button" class="menu-tile tile-options" data-screen="options">
+            <span class="tile-icon">⚙</span>
+            <span class="tile-label">Options</span>
+            <span class="tile-desc">Son et confort</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="play-screen" class="menu-screen hidden">
+        <button type="button" class="menu-back" data-back>← Accueil</button>
+        <h2 class="screen-title">Nouvelle partie</h2>
+        <button type="button" id="start-championship" class="arena-btn arena-championship">
+          <div class="arena-btn-name">🏆 Championnat</div>
+          <div class="arena-btn-desc">5 manches · 6 concurrents · points cumulés</div>
+        </button>
+        <p class="screen-sub section-label">Arène rapide</p>
+        <div id="arena-list"></div>
+        <button type="button" id="arena-random" class="arena-btn arena-random">
+          <div class="arena-btn-name">Aléatoire</div>
+          <div class="arena-btn-desc">Une arène surprise à chaque partie</div>
+        </button>
+      </div>
+
+      <div id="custom-screen" class="menu-screen hidden">
+        <button type="button" class="menu-back" data-back>← Accueil</button>
+        <h2 class="screen-title">Personnalisation</h2>
+        <p class="screen-sub">Couleur de ton light cycle</p>
+        <div id="cosmetic-preview" class="cosmetic-preview"></div>
         <div id="cosmetic-picker"></div>
       </div>
-      <div id="challenges-section">
-        <div id="challenges-label">DÉFIS</div>
+
+      <div id="trophies-screen" class="menu-screen hidden">
+        <button type="button" class="menu-back" data-back>← Accueil</button>
+        <h2 class="screen-title">Trophées</h2>
+        <p class="screen-sub" id="trophies-progress"></p>
         <div id="challenges-list"></div>
       </div>
-      <div id="arena-list"></div>
-      <button type="button" id="arena-random" class="arena-btn arena-random">
-        <div class="arena-btn-name">Aléatoire</div>
-        <div class="arena-btn-desc">Une arène surprise à chaque partie</div>
-      </button>
+
+      <div id="options-screen" class="menu-screen hidden">
+        <button type="button" class="menu-back" data-back>← Accueil</button>
+        <h2 class="screen-title">Options</h2>
+        <div class="options-list">
+          <label class="option-row">
+            <span class="option-label">Volume</span>
+            <input type="range" id="opt-volume" min="0" max="100" value="100">
+          </label>
+          <label class="option-row option-toggle">
+            <span class="option-label">Vibrations</span>
+            <input type="checkbox" id="opt-haptic" checked>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+          <label class="option-row option-toggle">
+            <span class="option-label">Bloom néon</span>
+            <input type="checkbox" id="opt-bloom" checked>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+      </div>
     </div>
+
     <div id="arena-intro" class="hidden">
       <div id="arena-intro-label">ARÈNE</div>
       <div id="arena-intro-name"></div>

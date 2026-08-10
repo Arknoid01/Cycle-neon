@@ -49,7 +49,7 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.14;
+    this.renderer.toneMappingExposure = 1.05;
 
     this.scene.add(new THREE.AmbientLight(0x223355, 0.25));
 
@@ -57,13 +57,13 @@ export class Renderer {
     this.segGeo = new THREE.BoxGeometry(1, 1, CELL_SIZE * 0.14);
 
     this.matWall = createElectricMaterial({
-      color: 0x7c3aed, sparkColor: 0xddd6fe, speed: 0.9, intensity: 1.0, scale: 1.0, body: 0.5,
+      color: 0x7c3aed, sparkColor: 0xe9d5ff, speed: 0.9, intensity: 1.8, scale: 1.0, body: 0.2,
     });
     this.matMobile = createElectricMaterial({
-      color: 0xff6600, sparkColor: 0xffffcc, speed: 1.4, intensity: 1.25, scale: 1.2, body: 0.55,
+      color: 0xff6600, sparkColor: 0xffffee, speed: 1.4, intensity: 2.0, scale: 1.2, body: 0.22,
     });
     this.matPerimeter = createElectricMaterial({
-      color: 0x9333ea, sparkColor: 0xf5f3ff, speed: 0.7, intensity: 1.15, scale: 0.85, body: 0.6,
+      color: 0x9333ea, sparkColor: 0xfaf5ff, speed: 0.7, intensity: 1.7, scale: 0.85, body: 0.24,
     });
     this._rebuildTrailMats();
 
@@ -77,7 +77,7 @@ export class Renderer {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.68, 0.4, 0.1
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.52, 0.32, 0.58
     );
     this.composer.addPass(this.bloomPass);
   }
@@ -86,11 +86,12 @@ export class Renderer {
     if (!this.electricMats.includes(mat)) this.electricMats.push(mat);
   }
 
-  _rebuildTrailMats() {
-    this.trailMats = getRiderDefs().map(d => {
+  _rebuildTrailMats(defs) {
+    const list = defs ?? getRiderDefs();
+    this.trailMats = list.map(d => {
       const mat = createElectricMaterial({
-        color: d.trailGlow, sparkColor: 0xffffff,
-        speed: 2.0, intensity: 1.45, scale: 1.15, body: 0.52,
+        color: d.trailGlow, sparkColor: 0xccffff,
+        speed: 2.0, intensity: 2.4, scale: 1.15, body: 0.2,
       });
       this._trackElectric(mat);
       return mat;
@@ -98,6 +99,10 @@ export class Renderer {
     this.electricMats = [
       this.matWall, this.matMobile, this.matPerimeter, ...this.trailMats,
     ].filter(Boolean);
+  }
+
+  prepareRiders(riderDefs) {
+    this._rebuildTrailMats(riderDefs);
   }
 
   _cellKey(x, y) { return x + ',' + y; }
@@ -109,7 +114,7 @@ export class Renderer {
     return v;
   }
 
-  clearAll() {
+  clearAll(riderDefs) {
     this.cellMeshes.forEach(m => this.scene.remove(m));
     this.cellMeshes.clear();
     this.riderMeshes.forEach(g => this.scene.remove(g));
@@ -124,7 +129,7 @@ export class Renderer {
     this.explosions = [];
     this.mobileBurstUntil = 0;
     this.electricMats = [];
-    this._rebuildTrailMats();
+    this._rebuildTrailMats(riderDefs);
     this.camReady = false;
   }
 
@@ -441,6 +446,21 @@ export class Renderer {
 
   setBloomEnabled(on) {
     if (this.bloomPass) this.bloomPass.enabled = on;
+  }
+
+  setBloomIntensity(intensity) {
+    if (!this.bloomPass) return;
+    const i = Math.max(0, Math.min(1, intensity));
+    this.bloomPass.strength = 0.45 + i * 0.35;
+  }
+
+  flashNearMiss() {
+    if (!this.bloomPass) return;
+    const prev = this.bloomPass.strength;
+    this.bloomPass.strength = Math.min(1.2, prev + 0.35);
+    setTimeout(() => {
+      if (this.bloomPass) this.bloomPass.strength = prev;
+    }, 120);
   }
 
   render() {
