@@ -268,6 +268,8 @@
 
     const BASE_TICK = 130;
     const MIN_TICK = 62;
+    const ARENA_BORDER = 2;
+    const ARENA_SCALE = 3;
 
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -298,14 +300,18 @@
     let particles;
     let shakeTimer;
     let gameStartTime;
+    let trailPoints;
+    let trailDir;
+    let wallPattern;
+    let trailPattern;
     let audioCtx;
     let engineOsc;
     let engineGain;
     let audioReady;
 
-    const VIEW_FORWARD = 28;
-    const VIEW_BACK = 1;
-    const VIEW_SIDE = 16;
+    const VIEW_FORWARD = 34;
+    const VIEW_BACK = 2;
+    const VIEW_SIDE = 22;
     const CAM_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
 
     let grid;
@@ -326,8 +332,8 @@
               x: Math.floor(gridW / 2),
               y: Math.floor(gridH / 2),
               dir: DIR_RIGHT,
-              min: 3,
-              max: gridW - 4,
+              min: ARENA_BORDER + 3,
+              max: gridW - ARENA_BORDER - 4,
               interval: 4000,
               lastMove: performance.now(),
               warning: false,
@@ -336,8 +342,8 @@
               x: Math.floor(gridW / 2),
               y: Math.floor(gridH / 3),
               dir: DIR_LEFT,
-              min: 3,
-              max: gridW - 4,
+              min: ARENA_BORDER + 3,
+              max: gridW - ARENA_BORDER - 4,
               interval: 3000,
               lastMove: performance.now(),
               warning: false,
@@ -408,8 +414,8 @@
           const cx = Math.floor(gridW / 2);
           arenaState = {
             gates: [
-              { x: cx - 2, yMin: 2, yMax: gridH - 3, open: true, interval: 4500, lastToggle: performance.now(), warning: false },
-              { x: cx + 2, yMin: 2, yMax: gridH - 3, open: true, interval: 3500, lastToggle: performance.now(), warning: false },
+              { x: cx - 4, yMin: ARENA_BORDER + 2, yMax: gridH - ARENA_BORDER - 3, open: true, interval: 4500, lastToggle: performance.now(), warning: false },
+              { x: cx + 4, yMin: ARENA_BORDER + 2, yMax: gridH - ARENA_BORDER - 3, open: true, interval: 3500, lastToggle: performance.now(), warning: false },
             ],
           };
           syncGates();
@@ -544,16 +550,58 @@
       }
     }
 
+    function createTextures() {
+      wallPattern = document.createElement('canvas');
+      wallPattern.width = 48;
+      wallPattern.height = 48;
+      const p = wallPattern.getContext('2d');
+      p.fillStyle = '#1a0a30';
+      p.fillRect(0, 0, 48, 48);
+      p.strokeStyle = 'rgba(216, 180, 254, 0.35)';
+      p.lineWidth = 1.2;
+      for (let y = 0; y < 48; y += 8) {
+        p.beginPath();
+        for (let x = 0; x <= 48; x += 4) {
+          const yy = y + (x % 8 === 0 ? 0 : 4);
+          if (x === 0) p.moveTo(x, yy);
+          else p.lineTo(x, yy);
+        }
+        p.stroke();
+      }
+      p.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      for (let x = 0; x < 48; x += 6) {
+        p.beginPath();
+        p.moveTo(x, 0);
+        p.lineTo(x, 48);
+        p.stroke();
+      }
+
+      trailPattern = document.createElement('canvas');
+      trailPattern.width = 32;
+      trailPattern.height = 32;
+      const t = trailPattern.getContext('2d');
+      t.fillStyle = 'rgba(0, 200, 255, 0.15)';
+      t.fillRect(0, 0, 32, 32);
+      t.strokeStyle = 'rgba(200, 255, 255, 0.25)';
+      t.lineWidth = 1;
+      for (let i = -32; i < 64; i += 6) {
+        t.beginPath();
+        t.moveTo(i, 0);
+        t.lineTo(i + 16, 32);
+        t.stroke();
+      }
+    }
+
     function initGridDimensions() {
-      const margin = 16;
+      const margin = 12;
       const availW = canvas.width - margin * 2;
       const availH = canvas.height - margin * 2 - 80;
 
-      const targetCols = 18;
-      const targetRows = 28;
+      const targetCols = 18 * ARENA_SCALE;
+      const targetRows = 28 * ARENA_SCALE;
 
       baseCellSize = Math.floor(Math.min(availW / targetCols, availH / targetRows));
-      baseCellSize = Math.max(baseCellSize, 12);
+      baseCellSize = Math.max(baseCellSize, 6);
 
       gridW = Math.floor(availW / baseCellSize);
       gridH = Math.floor(availH / baseCellSize);
@@ -561,6 +609,32 @@
       groundY = canvas.height * 0.84;
       horizonY = canvas.height * 0.36;
       focalLength = 7.8;
+    }
+
+    function initTrail(x, y, dir) {
+      trailPoints = [{ x, y }];
+      trailDir = dir;
+    }
+
+    function updateTrailCorner() {
+      const last = trailPoints[trailPoints.length - 1];
+      if (last.x !== player.x || last.y !== player.y) {
+        trailPoints.push({ x: player.x, y: player.y });
+      }
+      trailDir = player.dir;
+    }
+
+    function updateRenderPosition(timestamp) {
+      if (!player) return;
+      if (!playing || lastTick === 0) {
+        player.renderX = player.x;
+        player.renderY = player.y;
+        return;
+      }
+      let progress = Math.min(1, (timestamp - lastTick) / tickMs);
+      progress = progress * progress * (3 - 2 * progress);
+      player.renderX = player.prevX + (player.x - player.prevX) * progress;
+      player.renderY = player.prevY + (player.y - player.prevY) * progress;
     }
 
     function lerpAngle(current, target, t) {
@@ -572,8 +646,8 @@
 
     function updateCamera() {
       if (!player) return;
-      displayX += (player.x - displayX) * 0.26;
-      displayY += (player.y - displayY) * 0.26;
+      displayX += (player.renderX - displayX) * 0.32;
+      displayY += (player.renderY - displayY) * 0.32;
       camAngle = lerpAngle(camAngle, CAM_ANGLES[player.dir], 0.14);
       const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
       focalLength = 7.4 + speed * 0.9;
@@ -610,15 +684,23 @@
 
     function createGrid() {
       grid = new Uint8Array(gridW * gridH);
+      const b = ARENA_BORDER;
 
-      for (let x = 0; x < gridW; x++) {
-        setCell(x, 0, CELL_WALL);
-        setCell(x, gridH - 1, CELL_WALL);
+      for (let layer = 0; layer < b; layer++) {
+        for (let x = 0; x < gridW; x++) {
+          setCell(x, layer, CELL_WALL);
+          setCell(x, gridH - 1 - layer, CELL_WALL);
+        }
+        for (let y = 0; y < gridH; y++) {
+          setCell(layer, y, CELL_WALL);
+          setCell(gridW - 1 - layer, y, CELL_WALL);
+        }
       }
-      for (let y = 0; y < gridH; y++) {
-        setCell(0, y, CELL_WALL);
-        setCell(gridW - 1, y, CELL_WALL);
-      }
+    }
+
+    function isPerimeterCell(x, y) {
+      const b = ARENA_BORDER;
+      return x < b || x >= gridW - b || y < b || y >= gridH - b;
     }
 
     function getCell(x, y) {
@@ -633,14 +715,17 @@
 
     function createPlayer() {
       const startX = Math.floor(gridW / 2);
-      const startY = gridH - 4;
+      const startY = gridH - ARENA_BORDER - 6;
       player = {
         x: startX,
         y: startY,
         dir: DIR_UP,
         prevX: startX,
         prevY: startY,
+        renderX: startX,
+        renderY: startY,
       };
+      initTrail(startX, startY, DIR_UP);
     }
 
     function updateHud() {
@@ -751,6 +836,7 @@
       if (!playing) return;
 
       if (turnQueue !== null) {
+        if (player.dir !== turnQueue) updateTrailCorner();
         player.dir = turnQueue;
         turnQueue = null;
       }
@@ -841,20 +927,11 @@
       };
     }
 
-    function drawWallPattern(face, glowColor) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(face.tl.x, face.tl.y);
-      ctx.lineTo(face.tr.x, face.tr.y);
-      ctx.lineTo(face.br.x, face.br.y);
-      ctx.lineTo(face.bl.x, face.bl.y);
-      ctx.closePath();
-      ctx.clip();
-
+    function drawWallPattern(face) {
       const h = face.yBot - face.yTop;
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.07})`;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
-      const step = Math.max(6, h / 10);
+      const step = Math.max(5, h / 12);
       for (let y = face.yTop; y < face.yBot; y += step) {
         ctx.beginPath();
         let x = face.tl.x;
@@ -868,16 +945,15 @@
         ctx.stroke();
       }
 
-      ctx.strokeStyle = 'rgba(200, 255, 255, 0.12)';
+      ctx.strokeStyle = 'rgba(200, 255, 255, 0.15)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(face.tl.x, face.tl.y);
       ctx.lineTo(face.tr.x, face.tr.y);
       ctx.stroke();
-      ctx.restore();
     }
 
-    function drawVerticalWall(face, fill, deep, glow, alpha, pattern) {
+    function drawVerticalWall(face, fill, deep, glow, alpha, pattern, isTrail, isPerimeter) {
       ctx.save();
 
       ctx.beginPath();
@@ -889,15 +965,28 @@
 
       const grad = ctx.createLinearGradient(face.cx, face.yTop, face.cx, face.yBot);
       grad.addColorStop(0, fill);
+      grad.addColorStop(0.55, isTrail ? 'rgba(180, 250, 255, 0.55)' : fill);
       grad.addColorStop(1, deep);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = grad;
       ctx.shadowColor = glow;
-      ctx.shadowBlur = face.wallH * 0.35;
+      ctx.shadowBlur = face.wallH * (isPerimeter ? 0.55 : 0.38);
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      if (pattern) drawWallPattern(face, glow);
+      if (pattern) {
+        ctx.save();
+        ctx.clip();
+        const patCanvas = isTrail ? trailPattern : wallPattern;
+        if (patCanvas) {
+          const pat = ctx.createPattern(patCanvas, 'repeat');
+          ctx.globalAlpha = isTrail ? 0.35 : 0.5;
+          ctx.fillStyle = pat;
+          ctx.fill();
+        }
+        drawWallPattern(face);
+        ctx.restore();
+      }
 
       ctx.globalAlpha = alpha * 0.85;
       ctx.beginPath();
@@ -909,9 +998,9 @@
       ctx.fillStyle = deep;
       ctx.fill();
 
-      ctx.globalAlpha = Math.min(1, alpha + 0.15);
+      ctx.globalAlpha = Math.min(1, alpha + 0.2);
       ctx.strokeStyle = glow;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = isPerimeter ? 1.8 : 1.2;
       ctx.beginPath();
       ctx.moveTo(face.tl.x, face.tl.y);
       ctx.lineTo(face.tr.x, face.tr.y);
@@ -921,42 +1010,82 @@
       ctx.globalAlpha = 1;
     }
 
+    function sampleSegmentWalls(x1, y1, x2, y2, heightMul, fill, deep, glow, alpha) {
+      const walls = [];
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.max(Math.abs(dx), Math.abs(dy));
+      const steps = Math.max(6, Math.ceil(len * 6));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const gx = x1 + dx * t;
+        const gy = y1 + dy * t;
+        const face = buildWallFace(gx, gy, heightMul);
+        if (!face) continue;
+        walls.push({
+          face,
+          fill,
+          deep,
+          glow,
+          alpha,
+          pattern: true,
+          isTrail: true,
+          isPerimeter: false,
+        });
+      }
+      return walls;
+    }
+
+    function collectTrailWalls() {
+      const walls = [];
+      if (!trailPoints || trailPoints.length === 0 || !player) return walls;
+
+      for (let i = 0; i < trailPoints.length - 1; i++) {
+        const a = trailPoints[i];
+        const b = trailPoints[i + 1];
+        walls.push(...sampleSegmentWalls(
+          a.x, a.y, b.x, b.y,
+          1.18, COLORS.trail, COLORS.trailDeep, COLORS.trailGlow, 0.48
+        ));
+      }
+
+      const tail = trailPoints[trailPoints.length - 1];
+      walls.push(...sampleSegmentWalls(
+        tail.x, tail.y, player.renderX, player.renderY,
+        1.18, COLORS.trail, COLORS.trailDeep, COLORS.trailGlow, 0.52
+      ));
+
+      return walls;
+    }
+
     function collectWalls() {
       const walls = [];
 
       for (let y = 0; y < gridH; y++) {
         for (let x = 0; x < gridW; x++) {
-          const cell = grid[y * gridW + x];
-          if (cell === CELL_EMPTY) continue;
-          const face = buildWallFace(x, y, cell === CELL_TRAIL ? 1.15 : 1.45);
+          if (grid[y * gridW + x] !== CELL_WALL) continue;
+          const perimeter = isPerimeterCell(x, y);
+          const face = buildWallFace(x, y, perimeter ? 1.75 : 1.45);
           if (!face) continue;
-
-          if (cell === CELL_TRAIL) {
-            walls.push({
-              face,
-              fill: COLORS.trail,
-              deep: COLORS.trailDeep,
-              glow: COLORS.trailGlow,
-              alpha: 0.42,
-              pattern: true,
-            });
-          } else if (cell === CELL_WALL) {
-            walls.push({
-              face,
-              fill: COLORS.wall,
-              deep: COLORS.wallDeep,
-              glow: COLORS.wallGlow,
-              alpha: 0.78,
-              pattern: true,
-            });
-          }
+          walls.push({
+            face,
+            fill: COLORS.wall,
+            deep: COLORS.wallDeep,
+            glow: COLORS.wallGlow,
+            alpha: perimeter ? 0.88 : 0.75,
+            pattern: true,
+            isTrail: false,
+            isPerimeter: perimeter,
+          });
         }
       }
 
+      walls.push(...collectTrailWalls());
+
       for (const w of mobileWalls) {
-        const face = buildWallFace(w.x, w.y, 1.28);
+        const face = buildWallFace(w.x, w.y, 1.35);
         if (!face) continue;
-        const alpha = w.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.82;
+        const alpha = w.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.85;
         walls.push({
           face,
           fill: COLORS.mobileWall,
@@ -964,15 +1093,17 @@
           glow: COLORS.mobileWallGlow,
           alpha,
           pattern: true,
+          isTrail: false,
+          isPerimeter: false,
         });
       }
 
       if (currentArena.id === 'piege' && arenaState.gates) {
         for (const g of arenaState.gates) {
           if (g.open) continue;
-          const alpha = g.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.82;
+          const alpha = g.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.85;
           for (let y = g.yMin; y <= g.yMax; y++) {
-            const face = buildWallFace(g.x, y, 1.28);
+            const face = buildWallFace(g.x, y, 1.35);
             if (!face) continue;
             walls.push({
               face,
@@ -981,6 +1112,8 @@
               glow: COLORS.mobileWallGlow,
               alpha,
               pattern: true,
+              isTrail: false,
+              isPerimeter: false,
             });
           }
         }
@@ -1077,40 +1210,61 @@
 
     function drawPlayer() {
       const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      const bob = Math.sin(Date.now() / (90 - speed * 25)) * speed * 1.5;
-      const px = canvas.width / 2;
-      const py = groundY - baseCellSize * 0.28 + bob;
-      const bodyW = baseCellSize * (0.28 + speed * 0.06);
-      const bodyH = baseCellSize * (0.16 + speed * 0.04);
-      const glow = baseCellSize * (1.4 + speed * 0.6);
+      const proj = project(player.renderX, player.renderY);
+      const scale = proj ? proj.size : baseCellSize;
+      const px = proj ? proj.screenX : canvas.width / 2;
+      const py = proj ? proj.screenY - scale * 0.15 : groundY - baseCellSize * 0.28;
+      const bob = Math.sin(Date.now() / (90 - speed * 25)) * speed * 1.2;
+      const glow = scale * (1.6 + speed * 0.7);
 
       ctx.save();
-      ctx.translate(px, py);
+      ctx.translate(px, py + bob);
+
+      const bodyL = scale * (0.55 + speed * 0.08);
+      const bodyW = scale * (0.22 + speed * 0.04);
+      const wheelR = scale * 0.14;
 
       ctx.shadowColor = COLORS.playerGlow;
       ctx.shadowBlur = glow;
 
+      ctx.strokeStyle = COLORS.trailGlow;
+      ctx.lineWidth = scale * 0.12;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, bodyL * 0.5);
+      ctx.lineTo(0, bodyL * 1.1);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
       ctx.fillStyle = COLORS.player;
       ctx.beginPath();
       if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(-bodyW, -bodyH * 1.2, bodyW * 2, bodyH * 2, bodyH * 0.5);
+        ctx.roundRect(-bodyW, -bodyL * 0.55, bodyW * 2, bodyL * 0.95, bodyW * 0.45);
       } else {
-        ctx.rect(-bodyW, -bodyH * 1.2, bodyW * 2, bodyH * 2);
+        ctx.rect(-bodyW, -bodyL * 0.55, bodyW * 2, bodyL * 0.95);
       }
       ctx.fill();
 
-      const wheelR = bodyH * 0.55;
-      ctx.fillStyle = '#fff';
-      ctx.shadowBlur = glow * 0.6;
+      ctx.fillStyle = 'rgba(255, 255, 220, 0.9)';
       ctx.beginPath();
-      ctx.arc(-bodyW * 0.55, bodyH * 0.5, wheelR, 0, Math.PI * 2);
-      ctx.arc(bodyW * 0.55, bodyH * 0.5, wheelR, 0, Math.PI * 2);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(-bodyW * 0.55, -bodyL * 0.35, bodyW * 1.1, bodyL * 0.45, bodyW * 0.2);
+      } else {
+        ctx.rect(-bodyW * 0.55, -bodyL * 0.35, bodyW * 1.1, bodyL * 0.45);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.shadowBlur = glow * 0.7;
+      ctx.beginPath();
+      ctx.arc(-bodyW * 0.75, bodyL * 0.15, wheelR, 0, Math.PI * 2);
+      ctx.arc(bodyW * 0.75, bodyL * 0.15, wheelR, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = COLORS.trailGlow;
-      ctx.shadowBlur = glow * 0.8;
+      ctx.shadowBlur = glow;
       ctx.beginPath();
-      ctx.arc(0, -bodyH * 0.9, bodyW * 0.35, 0, Math.PI * 2);
+      ctx.arc(0, -bodyL * 0.45, bodyW * 0.35, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -1149,7 +1303,7 @@
 
       const walls = collectWalls();
       for (const w of walls) {
-        drawVerticalWall(w.face, w.fill, w.deep, w.glow, w.alpha, w.pattern);
+        drawVerticalWall(w.face, w.fill, w.deep, w.glow, w.alpha, w.pattern, w.isTrail, w.isPerimeter);
       }
 
       drawCompressWarning();
@@ -1160,6 +1314,7 @@
     }
 
     function gameLoop(timestamp) {
+      updateRenderPosition(timestamp);
       updateCamera();
 
       if (playing && timestamp - lastTick >= tickMs) {
@@ -1220,6 +1375,7 @@
     window.addEventListener('resize', resize);
 
     highScore = loadHighScore();
+    createTextures();
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     nextArenaPreview = selectArena();
