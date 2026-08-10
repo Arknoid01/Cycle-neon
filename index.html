@@ -177,10 +177,10 @@
     const btnLeft = document.getElementById('btn-left');
     const btnRight = document.getElementById('btn-right');
 
-    let gridW, gridH, grid, riders = [], mobileWalls, arenaState, currentArena;
+    let gridW, gridH, grid, riders = [], mobileWalls = [], arenaState, currentArena;
     let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime, kills;
     let audioCtx, engineOsc, engineGain;
-    let scene, camera, renderer, composer, bloomPass, mobileMeshes, cellMeshes, trailMats;
+    let scene, camera, renderer, composer, bloomPass, mobileMeshes = [], cellMeshes, trailMats;
     let smoothCamX = 0, smoothCamZ = 0, smoothCamAngle = -Math.PI / 2;
     let camReady = false;
     let introUntil = 0;
@@ -814,6 +814,7 @@
     }
 
     function updateMobileWarnings(now) {
+      if (!mobileMeshes?.length) return;
       mobileMeshes.forEach((mesh, i) => {
         const w = mobileWalls[i];
         if (!w || !mesh.material.emissiveIntensity) return;
