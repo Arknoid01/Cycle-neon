@@ -299,6 +299,7 @@
       cellMeshes.clear();
       mobileMeshes.forEach(m => scene.remove(m));
       mobileMeshes = [];
+      if (liveTrailMesh) { scene.remove(liveTrailMesh); liveTrailMesh = null; }
     }
 
     function createGrid() {
@@ -416,11 +417,26 @@
       player.renderY = player.prevY + (player.y-player.prevY)*t;
     }
 
+    function updateLiveTrail() {
+      if (!playing || !player) {
+        if (liveTrailMesh) { scene.remove(liveTrailMesh); liveTrailMesh = null; }
+        return;
+      }
+      if (!liveTrailMesh) {
+        liveTrailMesh = new THREE.Mesh(boxGeo, makeMat(0xb8f8ff, 0x00eeff, 0.35, false));
+        scene.add(liveTrailMesh);
+      }
+      const p = gridToWorld(player.renderX, player.renderY);
+      liveTrailMesh.position.set(p.x, TRAIL_H/2, p.z);
+      liveTrailMesh.scale.y = TRAIL_H;
+    }
+
     function updatePlayerMesh() {
       if (!playerMesh || !player) return;
       const p = gridToWorld(player.renderX, player.renderY);
       playerMesh.position.set(p.x, 0, p.z);
       playerMesh.rotation.y = [-Math.PI/2, 0, Math.PI/2, Math.PI][player.dir];
+      updateLiveTrail();
     }
 
     function updateCamera() {
