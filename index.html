@@ -21,12 +21,15 @@
     #score { position: absolute; top: env(safe-area-inset-top, 16px); left: 0; right: 0; text-align: center; font-size: 28px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 10px #0ff, 0 0 20px #0ff; padding-top: 28px; }
     #high-score { position: absolute; top: env(safe-area-inset-top, 52px); left: 12px; font-size: 10px; color: rgba(0,255,120,.55); }
     #rivals { position: absolute; top: env(safe-area-inset-top, 52px); right: 12px; font-size: 10px; color: rgba(255,100,180,.7); text-align: right; }
+    #challenge-hud { position: absolute; top: env(safe-area-inset-top, 68px); left: 0; right: 0; text-align: center; font-size: 10px; color: rgba(255,220,80,.65); pointer-events: none; }
     #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.55); pointer-events: auto; }
     #overlay.hidden { display: none; }
     #overlay-title { font-size: 14px; color: rgba(255,136,0,.8); margin-bottom: 8px; }
     #overlay-score { font-size: 48px; font-weight: bold; color: #f0f; text-shadow: 0 0 15px #f0f, 0 0 30px #f0f; }
     #overlay-best { font-size: 13px; color: rgba(255,255,0,.55); margin-top: 8px; }
     #overlay-record { font-size: 18px; color: #ff0; text-shadow: 0 0 10px #ff0; margin-top: 12px; }
+    #overlay-challenge { font-size: 14px; color: #0f8; text-shadow: 0 0 8px #0f8; margin-top: 10px; }
+    #overlay-challenge.hidden { display: none; }
     #overlay-next { font-size: 12px; color: rgba(0,255,255,.45); margin-top: 8px; }
     #overlay-hint { font-size: 14px; color: rgba(255,255,255,.5); margin-top: 24px; }
     #arena-intro {
@@ -68,6 +71,21 @@
     .arena-random { margin-top: 14px; text-align: center; border-color: rgba(255,136,0,.35); background: rgba(255,136,0,.06); }
     .arena-random .arena-btn-name { color: rgba(255,180,80,.95); }
     #cosmetic-section { width: 100%; max-width: 360px; margin-bottom: 18px; }
+    #challenges-section { width: 100%; max-width: 360px; margin-bottom: 16px; }
+    #challenges-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
+    #challenges-list { display: flex; flex-direction: column; gap: 6px; }
+    .challenge-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.5);
+    }
+    .challenge-item.done { border-color: rgba(0,255,120,.25); color: rgba(0,255,120,.75); }
+    .challenge-item.active { border-color: rgba(255,220,80,.45); background: rgba(255,220,80,.06); cursor: pointer; }
+    .challenge-item:not(.done) { cursor: pointer; }
+    .challenge-check { width: 14px; flex-shrink: 0; text-align: center; opacity: .35; }
+    .challenge-item.done .challenge-check { opacity: 1; color: #0f8; }
+    .challenge-name { font-weight: bold; color: rgba(255,220,80,.85); margin-bottom: 1px; }
+    .challenge-item.done .challenge-name { color: rgba(0,255,120,.85); }
     #cosmetic-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 10px; text-align: center; }
     #cosmetic-picker { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
     .color-swatch {
@@ -86,11 +104,13 @@
     <div id="score">0</div>
     <div id="high-score"></div>
     <div id="rivals"></div>
+    <div id="challenge-hud"></div>
     <div id="overlay" class="hidden">
       <div id="overlay-title"></div>
       <div id="overlay-score"></div>
       <div id="overlay-best"></div>
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
+      <div id="overlay-challenge" class="hidden"></div>
       <div id="overlay-next"></div>
       <div id="overlay-hint">Toucher pour choisir une arène</div>
     </div>
@@ -100,6 +120,10 @@
       <div id="cosmetic-section">
         <div id="cosmetic-label">TON CYCLE</div>
         <div id="cosmetic-picker"></div>
+      </div>
+      <div id="challenges-section">
+        <div id="challenges-label">DÉFIS</div>
+        <div id="challenges-list"></div>
       </div>
       <div id="arena-list"></div>
       <button type="button" id="arena-random" class="arena-btn arena-random">
@@ -137,7 +161,20 @@
     const BASE_TICK = 130, MIN_TICK = 62, ARENA_BORDER = 2, ARENA_SCALE = 3;
     const CELL_SIZE = 1, WALL_H = 1.5, TRAIL_H = 1.1, PERIM_H = 1.8;
     const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
-    const KILL_BONUS = 300;
+    const KILL_BONUS = 300, WIN_BONUS = 500;
+
+    const CHALLENGES = [
+      { id: 'eliminate_all', name: 'Chasseur', desc: 'Élimine les 2 adversaires',
+        check: s => s.won && s.kills >= 2 },
+      { id: 'survive_30', name: 'Endurant', desc: 'Survis 30 secondes',
+        check: s => s.time >= 30 },
+      { id: 'compresseur_30', name: 'Compressé', desc: '30 s dans Le Compresseur',
+        check: s => s.arenaId === 'compresseur' && s.time >= 30 },
+      { id: 'win_classique', name: 'Duel', desc: 'Gagne dans Le Classique',
+        check: s => s.won && s.arenaId === 'classique' },
+      { id: 'score_100', name: 'Centurion', desc: 'Atteins 100 points',
+        check: s => s.score >= 100 },
+    ];
 
     const BOT_DEFS = [
       { name: 'Spectre', isPlayer: false, body: 0xff66cc, glow: 0xff0088, wheel: 0xff88cc, trail: 0xffb8e8, trailGlow: 0xff44aa },
@@ -159,17 +196,20 @@
     const timerEl = document.getElementById('timer');
     const highScoreEl = document.getElementById('high-score');
     const rivalsEl = document.getElementById('rivals');
+    const challengeHudEl = document.getElementById('challenge-hud');
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
     const overlayScore = document.getElementById('overlay-score');
     const overlayBest = document.getElementById('overlay-best');
     const overlayRecord = document.getElementById('overlay-record');
+    const overlayChallenge = document.getElementById('overlay-challenge');
     const overlayNext = document.getElementById('overlay-next');
     const overlayHint = document.getElementById('overlay-hint');
     const arenaMenu = document.getElementById('arena-menu');
     const arenaList = document.getElementById('arena-list');
     const arenaRandomBtn = document.getElementById('arena-random');
     const cosmeticPicker = document.getElementById('cosmetic-picker');
+    const challengesList = document.getElementById('challenges-list');
     const arenaIntro = document.getElementById('arena-intro');
     const arenaIntroName = document.getElementById('arena-intro-name');
     const arenaIntroDesc = document.getElementById('arena-intro-desc');
@@ -178,7 +218,7 @@
     const btnRight = document.getElementById('btn-right');
 
     let gridW, gridH, grid, riders = [], mobileWalls = [], arenaState, currentArena;
-    let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime, kills;
+    let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime, kills, activeChallengeId;
     let audioCtx, engineOsc, engineGain;
     let scene, camera, renderer, composer, bloomPass, mobileMeshes = [], cellMeshes, trailMats;
     let smoothCamX = 0, smoothCamZ = 0, smoothCamAngle = -Math.PI / 2;
@@ -264,6 +304,54 @@
     function loadArenaBest(id) { try { return parseInt(localStorage.getItem('lc_best_'+id)||'0',10); } catch { return 0; } }
     function saveArenaBest(id, v) { try { localStorage.setItem('lc_best_'+id, String(v)); } catch {} }
 
+    function loadChallenges() { try { return JSON.parse(localStorage.getItem('lc_challenges')||'{}'); } catch { return {}; } }
+    function saveChallengeDone(id) {
+      const c = loadChallenges(); c[id] = true;
+      try { localStorage.setItem('lc_challenges', JSON.stringify(c)); } catch {}
+    }
+
+    function buildChallengesList() {
+      const done = loadChallenges();
+      challengesList.innerHTML = '';
+      CHALLENGES.forEach(ch => {
+        const el = document.createElement('div');
+        const isDone = !!done[ch.id];
+        el.className = 'challenge-item'+(isDone ? ' done' : '')+(!isDone && activeChallengeId === ch.id ? ' active' : '');
+        el.innerHTML =
+          '<span class="challenge-check">'+(isDone ? '✓' : '○')+'</span>'+
+          '<div><div class="challenge-name">'+ch.name+'</div>'+ch.desc+'</div>';
+        if (!isDone) {
+          el.addEventListener('click', () => {
+            activeChallengeId = activeChallengeId === ch.id ? null : ch.id;
+            buildChallengesList();
+          });
+        }
+        challengesList.appendChild(el);
+      });
+    }
+
+    function checkChallenges(stats) {
+      const done = loadChallenges();
+      const unlocked = [];
+      for (const ch of CHALLENGES) {
+        if (!done[ch.id] && ch.check(stats)) {
+          saveChallengeDone(ch.id);
+          unlocked.push(ch);
+        }
+      }
+      return unlocked;
+    }
+
+    function getActiveChallenge() {
+      if (!activeChallengeId) return null;
+      return CHALLENGES.find(c => c.id === activeChallengeId) || null;
+    }
+
+    function playVictory() {
+      haptic([20, 30, 20, 30, 40]);
+      [440, 554, 659, 880].forEach((f, i) => setTimeout(() => playTone(f, .12, 'sine', .07), i * 80));
+    }
+
     function getArenaById(id) { return ARENAS.find(a => a.id === id); }
     function loadArenaPref() { try { return localStorage.getItem('lc_arena_pref') || 'random'; } catch { return 'random'; } }
     function saveArenaPref(id) { try { localStorage.setItem('lc_arena_pref', id); } catch {} }
@@ -303,6 +391,7 @@
 
     function buildArenaMenu() {
       buildCosmeticPicker();
+      buildChallengesList();
       arenaList.innerHTML = '';
       ARENAS.forEach(a => {
         const btn = document.createElement('button');
@@ -321,6 +410,7 @@
       buildArenaMenu();
       playing = false;
       stopEngine();
+      challengeHudEl.textContent = '';
       arenaMenu.classList.remove('hidden');
       overlay.classList.add('hidden');
       controls.classList.add('hidden');
@@ -648,6 +738,7 @@
       createRiders();
       score = 0; kills = 0; tickMs = BASE_TICK; lastTick = 0; turnQueue = null;
       playing = true; gameStartTime = performance.now();
+      challengeHudEl.textContent = getActiveChallenge() ? 'Défi : '+getActiveChallenge().name : '';
       camReady = false;
       const player = getPlayer();
       if (player) player.smoothAngle = CAM_DIR_ANGLES[player.dir];
@@ -732,7 +823,8 @@
         }
       }
 
-      if (playerDied) endGame();
+      if (playerDied) endGame(false);
+      else if (getPlayer()?.alive && aliveBots().length === 0) endGame(true);
       else { checkNearMiss(); updateHud(); }
     }
 
@@ -793,24 +885,35 @@
       spawnExplosion(rider);
     }
 
-    function endGame() {
+    function endGame(won) {
       playing = false; stopEngine();
-      const player = getPlayer();
-      const rank = 1 + aliveBots().length;
+      const time = (performance.now() - gameStartTime) / 1000;
+      if (won) { score += WIN_BONUS; playVictory(); }
+      const rank = won ? 1 : 1 + aliveBots().length;
       const rec = score > highScore;
       if (rec) { highScore = score; saveHighScore(highScore); }
       const arenaRec = score > loadArenaBest(currentArena.id);
       if (arenaRec) saveArenaBest(currentArena.id, score);
-      overlayTitle.textContent = rank === 1 ? 'VICTOIRE !' : currentArena.name;
+      const unlocked = checkChallenges({ won, kills, score, time, arenaId: currentArena.id });
+      buildChallengesList();
+      overlayTitle.textContent = won ? 'VICTOIRE !' : currentArena.name;
       overlayScore.textContent = score.toLocaleString('fr-FR');
-      const rankTxt = rank === 1 ? '1er — tous éliminés !' : rank+'e place';
+      const rankTxt = won ? '1er — dernier en vie !' : rank+'e place';
       const killTxt = kills > 0 ? ' · '+kills+' kill'+(kills>1?'s':'') : '';
+      const winTxt = won ? ' · +'+WIN_BONUS+' bonus' : '';
       overlayBest.textContent = arenaRec
-        ? 'Record arène : '+score.toLocaleString('fr-FR')+' · '+rankTxt+killTxt
-        : 'Record : '+highScore.toLocaleString('fr-FR')+' · '+rankTxt+killTxt;
+        ? 'Record arène : '+score.toLocaleString('fr-FR')+' · '+rankTxt+killTxt+winTxt
+        : 'Record : '+highScore.toLocaleString('fr-FR')+' · '+rankTxt+killTxt+winTxt;
       overlayRecord.classList.toggle('hidden', !rec);
+      if (unlocked.length) {
+        overlayChallenge.textContent = 'Défi débloqué : '+unlocked.map(c => c.name).join(', ');
+        overlayChallenge.classList.remove('hidden');
+      } else {
+        overlayChallenge.classList.add('hidden');
+      }
       overlayNext.textContent = 'Arène : '+currentArena.name;
       overlay.classList.remove('hidden'); controls.classList.add('hidden');
+      challengeHudEl.textContent = '';
     }
 
     function updateMobileWarnings(now) {
