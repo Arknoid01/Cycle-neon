@@ -1,20 +1,23 @@
 # Light Cycle Neon
 
-Prototype arcade Light Cycle (Tron / Armagetron) — HTML5 Canvas, sans serveur.
+Prototype arcade Light Cycle (Tron / Armagetron) — un seul fichier HTML, zéro serveur.
 
-## Lancer le prototype
+## Lancer
+
+Double-cliquer sur `index.html`, ou :
 
 ```bash
-# Depuis la racine du repo
-python3 -m http.server 8080
+open index.html        # macOS
+xdg-open index.html    # Linux
+start index.html       # Windows
 ```
 
-Ouvrir http://localhost:8080
+Aucun serveur, aucune installation, aucune dépendance.
 
 ## Contrôles
 
 - **Mobile** : toucher gauche = tourner à gauche, toucher droite = tourner à droite
-- **Desktop** : `A` / `←` = gauche, `D` / `→` = droite, `Espace` = rejouer après game over
+- **Desktop** : `A` / `←` = gauche, `D` / `→` = droite, `Espace` = rejouer
 
 ## V1 prototype
 
@@ -22,3 +25,7 @@ Ouvrir http://localhost:8080
 - Arène carrée avec murs mobiles (2 barres horizontales)
 - Score, record local, accélération progressive
 - Rendu néon, particules à la mort, restart instantané
+
+## Capacitor (plus tard)
+
+Pour publier sur les stores, Capacitor enveloppe ce fichier HTML — toujours sans backend.
