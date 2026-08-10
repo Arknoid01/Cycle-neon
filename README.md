@@ -1,31 +1,26 @@
 # Light Cycle Neon
 
-Prototype arcade Light Cycle (Tron / Armagetron) — un seul fichier HTML, zéro serveur.
+Prototype arcade Light Cycle — un seul fichier HTML, zéro serveur.
 
 ## Lancer
 
-Double-cliquer sur `index.html`, ou :
-
-```bash
-open index.html        # macOS
-xdg-open index.html    # Linux
-start index.html       # Windows
-```
-
-Aucun serveur, aucune installation, aucune dépendance.
+Double-cliquer sur `index.html`.
 
 ## Contrôles
 
-- **Mobile** : boutons flèches transparents (style émulateur) en bas à gauche / droite
-- **Desktop** : `A` / `←` = gauche, `D` / `→` = droite, `Espace` = rejouer
+- **Mobile** : boutons flèches transparents (style émulateur)
+- **Desktop** : `A` / `←` et `D` / `→`, `Espace` pour rejouer
 
-## V1 prototype
+## V2 (actuel)
 
-- Grille, moto, trace persistante, collisions
-- Arène carrée avec murs mobiles (2 barres horizontales)
-- Score, record local, accélération progressive
-- Rendu néon, particules à la mort, restart instantané
+- **4 arènes** : Le Battement, Le Compresseur, Le Piège, Le Classique
+- Rotation aléatoire à chaque mort
+- Sons procéduraux (moteur, virage, crash, quasi-collision)
+- Feedback quasi-collision (flash + glow)
+- HUD : nom d'arène, record, score
+- Accélération progressive
 
-## Capacitor (plus tard)
+## V1
 
-Pour publier sur les stores, Capacitor enveloppe ce fichier HTML — toujours sans backend.
+- Grille, moto, trace, collisions, murs mobiles
+- Rendu néon, particules, restart instantané
