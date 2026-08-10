@@ -6,216 +6,34 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Light Cycle Neon</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: 'Courier New', Courier, monospace;
-      user-select: none;
-    }
-
-    #game {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-
-    #ui {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    #hud-top {
-      position: absolute;
-      top: env(safe-area-inset-top, 12px);
-      left: 12px;
-      right: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding-top: 8px;
-      gap: 8px;
-    }
-
-    #arena-name {
-      font-size: 11px;
-      color: rgba(255, 136, 0, 0.85);
-      text-shadow: 0 0 8px rgba(255, 100, 0, 0.6);
-      letter-spacing: 1px;
-      max-width: 42%;
-      line-height: 1.3;
-    }
-
-    #timer {
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.92);
-      letter-spacing: 1px;
-      text-align: right;
-      font-weight: normal;
-    }
-
-    #score {
-      position: absolute;
-      top: env(safe-area-inset-top, 16px);
-      left: 0;
-      right: 0;
-      text-align: center;
-      font-size: 28px;
-      font-weight: bold;
-      color: #7df9ff;
-      text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #08f;
-      padding-top: 28px;
-      letter-spacing: 2px;
-    }
-
-    #high-score {
-      position: absolute;
-      top: env(safe-area-inset-top, 52px);
-      left: 12px;
-      font-size: 10px;
-      color: rgba(0, 255, 120, 0.55);
-      text-shadow: 0 0 6px rgba(0, 255, 100, 0.35);
-      letter-spacing: 1px;
-    }
-
-    #overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.55);
-      pointer-events: auto;
-    }
-
-    #overlay.hidden {
-      display: none;
-    }
-
-    #overlay-title {
-      font-size: 14px;
-      color: rgba(255, 136, 0, 0.8);
-      text-shadow: 0 0 10px rgba(255, 100, 0, 0.5);
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-    }
-
-    #overlay-score {
-      font-size: 48px;
-      font-weight: bold;
-      color: #f0f;
-      text-shadow: 0 0 15px #f0f, 0 0 30px #f0f, 0 0 60px #80f;
-      letter-spacing: 3px;
-    }
-
-    #overlay-best {
-      font-size: 13px;
-      color: rgba(255, 255, 0, 0.55);
-      margin-top: 8px;
-      letter-spacing: 1px;
-    }
-
-    #overlay-record {
-      font-size: 18px;
-      color: #ff0;
-      text-shadow: 0 0 10px #ff0, 0 0 20px #ff0;
-      margin-top: 12px;
-      letter-spacing: 2px;
-    }
-
-    #overlay-next {
-      font-size: 12px;
-      color: rgba(0, 255, 255, 0.45);
-      margin-top: 8px;
-      letter-spacing: 1px;
-    }
-
-    #overlay-hint {
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.5);
-      margin-top: 24px;
-      letter-spacing: 1px;
-    }
-
-    #controls {
-      position: absolute;
-      bottom: env(safe-area-inset-bottom, 20px);
-      left: 0;
-      right: 0;
-      display: flex;
-      justify-content: space-between;
-      padding: 0 20px;
-      pointer-events: auto;
-    }
-
-    #controls.hidden {
-      display: none;
-    }
-
-    .control-btn {
-      width: 88px;
-      height: 88px;
-      border: 2px solid rgba(0, 255, 255, 0.22);
-      border-radius: 18px;
-      background: rgba(0, 255, 255, 0.06);
-      backdrop-filter: blur(2px);
-      -webkit-backdrop-filter: blur(2px);
-      color: rgba(0, 255, 255, 0.45);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.08s, border-color 0.08s, color 0.08s, transform 0.08s;
-      touch-action: manipulation;
-    }
-
-    .control-btn svg {
-      width: 36px;
-      height: 36px;
-      fill: currentColor;
-      filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.5));
-    }
-
-    .control-btn:active,
-    .control-btn.pressed {
-      background: rgba(0, 255, 255, 0.18);
-      border-color: rgba(0, 255, 255, 0.55);
-      color: rgba(0, 255, 255, 0.95);
-      transform: scale(0.94);
-    }
-
-    @media (min-height: 700px) {
-      .control-btn {
-        width: 100px;
-        height: 100px;
-      }
-
-      .control-btn svg {
-        width: 42px;
-        height: 42px;
-      }
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; user-select: none; }
+    #game { display: block; width: 100%; height: 100%; }
+    #ui { position: fixed; inset: 0; pointer-events: none; }
+    #hud-top { position: absolute; top: env(safe-area-inset-top, 12px); left: 12px; right: 12px; display: flex; justify-content: space-between; padding-top: 8px; }
+    #arena-name { font-size: 11px; color: rgba(255,136,0,.85); text-shadow: 0 0 8px rgba(255,100,0,.6); max-width: 42%; }
+    #timer { font-size: 13px; color: rgba(255,255,255,.92); text-align: right; }
+    #score { position: absolute; top: env(safe-area-inset-top, 16px); left: 0; right: 0; text-align: center; font-size: 28px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 10px #0ff, 0 0 20px #0ff; padding-top: 28px; }
+    #high-score { position: absolute; top: env(safe-area-inset-top, 52px); left: 12px; font-size: 10px; color: rgba(0,255,120,.55); }
+    #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.55); pointer-events: auto; }
+    #overlay.hidden { display: none; }
+    #overlay-title { font-size: 14px; color: rgba(255,136,0,.8); margin-bottom: 8px; }
+    #overlay-score { font-size: 48px; font-weight: bold; color: #f0f; text-shadow: 0 0 15px #f0f, 0 0 30px #f0f; }
+    #overlay-best { font-size: 13px; color: rgba(255,255,0,.55); margin-top: 8px; }
+    #overlay-record { font-size: 18px; color: #ff0; text-shadow: 0 0 10px #ff0; margin-top: 12px; }
+    #overlay-next { font-size: 12px; color: rgba(0,255,255,.45); margin-top: 8px; }
+    #overlay-hint { font-size: 14px; color: rgba(255,255,255,.5); margin-top: 24px; }
+    #controls { position: absolute; bottom: env(safe-area-inset-bottom, 20px); left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 20px; pointer-events: auto; }
+    #controls.hidden { display: none; }
+    .control-btn { width: 88px; height: 88px; border: 2px solid rgba(0,255,255,.22); border-radius: 18px; background: rgba(0,255,255,.06); color: rgba(0,255,255,.45); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
+    .control-btn svg { width: 36px; height: 36px; fill: currentColor; filter: drop-shadow(0 0 6px rgba(0,255,255,.5)); }
+    .control-btn:active, .control-btn.pressed { background: rgba(0,255,255,.18); border-color: rgba(0,255,255,.55); color: rgba(0,255,255,.95); transform: scale(.94); }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
-
   <div id="ui">
-    <div id="hud-top">
-      <div id="arena-name"></div>
-      <div id="timer">T : 0.00</div>
-    </div>
+    <div id="hud-top"><div id="arena-name"></div><div id="timer">T : 0.00</div></div>
     <div id="score">0</div>
     <div id="high-score"></div>
     <div id="overlay" class="hidden">
@@ -227,52 +45,23 @@
       <div id="overlay-hint">Toucher pour rejouer</div>
     </div>
     <div id="controls" class="hidden">
-      <button type="button" id="btn-left" class="control-btn" aria-label="Tourner à gauche">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-      </button>
-      <button type="button" id="btn-right" class="control-btn" aria-label="Tourner à droite">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-      </button>
+      <button type="button" id="btn-left" class="control-btn" aria-label="Gauche"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+      <button type="button" id="btn-right" class="control-btn" aria-label="Droite"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
     </div>
   </div>
-
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script>
   (function () {
     'use strict';
+    const THREE = window.THREE;
 
-    const CELL_EMPTY = 0;
-    const CELL_TRAIL = 1;
-    const CELL_WALL = 2;
-
-    const DIR_UP = 0;
-    const DIR_RIGHT = 1;
-    const DIR_DOWN = 2;
-    const DIR_LEFT = 3;
-
-    const DX = [0, 1, 0, -1];
-    const DY = [-1, 0, 1, 0];
-
-    const COLORS = {
-      trail: '#b8f8ff',
-      trailGlow: '#00eeff',
-      trailDeep: '#0891b2',
-      player: '#ffe566',
-      playerGlow: '#ffcc00',
-      wall: '#b794f6',
-      wallGlow: '#d8b4fe',
-      wallDeep: '#7c3aed',
-      mobileWall: '#ffaa44',
-      mobileWallGlow: '#ff8800',
-      grid: 'rgba(0, 255, 90, 0.5)',
-    };
-
-    const BASE_TICK = 130;
-    const MIN_TICK = 62;
-    const ARENA_BORDER = 2;
-    const ARENA_SCALE = 3;
+    const CELL_EMPTY = 0, CELL_TRAIL = 1, CELL_WALL = 2;
+    const DIR_UP = 0, DIR_RIGHT = 1, DIR_DOWN = 2, DIR_LEFT = 3;
+    const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+    const BASE_TICK = 130, MIN_TICK = 62, ARENA_BORDER = 2, ARENA_SCALE = 3;
+    const CELL_SIZE = 1, WALL_H = 1.5, TRAIL_H = 1.1, PERIM_H = 1.8;
 
     const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
     const arenaNameEl = document.getElementById('arena-name');
     const timerEl = document.getElementById('timer');
@@ -283,1101 +72,411 @@
     const overlayBest = document.getElementById('overlay-best');
     const overlayRecord = document.getElementById('overlay-record');
     const overlayNext = document.getElementById('overlay-next');
-    const overlayHint = document.getElementById('overlay-hint');
     const controls = document.getElementById('controls');
     const btnLeft = document.getElementById('btn-left');
     const btnRight = document.getElementById('btn-right');
 
-    let gridW, gridH, baseCellSize;
-    let groundY, horizonY, focalLength;
-    let camAngle, displayX, displayY;
-    let score;
-    let highScore;
-    let tickMs;
-    let lastTick;
-    let playing;
-    let turnQueue;
-    let particles;
-    let shakeTimer;
-    let gameStartTime;
-    let trailPoints;
-    let trailDir;
-    let wallPattern;
-    let trailPattern;
-    let audioCtx;
-    let engineOsc;
-    let engineGain;
-    let audioReady;
-
-    const VIEW_FORWARD = 34;
-    const VIEW_BACK = 2;
-    const VIEW_SIDE = 22;
-    const CAM_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
-
-    let grid;
-    let player;
-    let mobileWalls;
-    let arenaState;
-    let currentArena;
-    let nextArenaPreview;
+    let gridW, gridH, grid, player, mobileWalls, arenaState, currentArena, nextArenaPreview;
+    let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime;
+    let trailPoints, audioCtx, engineOsc, engineGain;
+    let scene, camera, renderer, playerMesh, mobileMeshes, cellMeshes, liveTrailMesh;
+    let camPos = new THREE.Vector3(), camTarget = new THREE.Vector3();
+    let matWall, matTrail, matMobile, matPerimeter, boxGeo;
 
     const ARENAS = [
-      {
-        id: 'battement',
-        name: 'Le Battement',
-        next: 'Le Compresseur',
+      { id: 'battement', name: 'Le Battement',
         init() {
           mobileWalls = [
-            {
-              x: Math.floor(gridW / 2),
-              y: Math.floor(gridH / 2),
-              dir: DIR_RIGHT,
-              min: ARENA_BORDER + 3,
-              max: gridW - ARENA_BORDER - 4,
-              interval: 4000,
-              lastMove: performance.now(),
-              warning: false,
-            },
-            {
-              x: Math.floor(gridW / 2),
-              y: Math.floor(gridH / 3),
-              dir: DIR_LEFT,
-              min: ARENA_BORDER + 3,
-              max: gridW - ARENA_BORDER - 4,
-              interval: 3000,
-              lastMove: performance.now(),
-              warning: false,
-            },
+            { x: Math.floor(gridW/2), y: Math.floor(gridH/2), dir: DIR_RIGHT, min: ARENA_BORDER+3, max: gridW-ARENA_BORDER-4, interval: 4000, lastMove: performance.now(), warning: false },
+            { x: Math.floor(gridW/2), y: Math.floor(gridH/3), dir: DIR_LEFT, min: ARENA_BORDER+3, max: gridW-ARENA_BORDER-4, interval: 3000, lastMove: performance.now(), warning: false },
           ];
           arenaState = {};
         },
         update(now) {
           for (const w of mobileWalls) {
-            const elapsed = now - w.lastMove;
-            w.warning = elapsed > w.interval - 800;
-            if (elapsed >= w.interval) {
-              w.lastMove = now;
-              const step = w.dir === DIR_RIGHT ? 1 : -1;
-              let next = w.x + step;
-              if (next > w.max || next < w.min) {
-                w.dir = w.dir === DIR_RIGHT ? DIR_LEFT : DIR_RIGHT;
-                next = w.x + (w.dir === DIR_RIGHT ? 1 : -1);
-              }
-              w.x = next;
-              playWallShift();
+            const e = now - w.lastMove;
+            w.warning = e > w.interval - 800;
+            if (e >= w.interval) {
+              w.lastMove = now; const step = w.dir === DIR_RIGHT ? 1 : -1;
+              let nx = w.x + step;
+              if (nx > w.max || nx < w.min) { w.dir = w.dir === DIR_RIGHT ? DIR_LEFT : DIR_RIGHT; nx = w.x + (w.dir === DIR_RIGHT ? 1 : -1); }
+              w.x = nx; syncMobileMeshes(); playWallShift();
             }
           }
         },
       },
-      {
-        id: 'compresseur',
-        name: 'Le Compresseur',
-        next: 'Le Piège',
-        init() {
-          mobileWalls = [];
-          arenaState = {
-            margin: 0,
-            lastShrink: performance.now(),
-            interval: 5000,
-            warning: false,
-          };
-        },
+      { id: 'compresseur', name: 'Le Compresseur',
+        init() { mobileWalls = []; arenaState = { margin: 0, lastShrink: performance.now(), interval: 5000, warning: false }; },
         update(now) {
-          const s = arenaState;
-          const elapsed = now - s.lastShrink;
-          s.warning = elapsed > s.interval - 1000;
-          if (elapsed >= s.interval) {
-            s.lastShrink = now;
-            s.margin++;
-            const m = s.margin;
-            const limit = Math.floor(Math.min(gridW, gridH) / 2) - ARENA_BORDER - 4;
-            if (m > limit) return;
-
-            for (let x = m; x < gridW - m; x++) {
-              setCell(x, m, CELL_WALL);
-              setCell(x, gridH - 1 - m, CELL_WALL);
-            }
-            for (let y = m; y < gridH - m; y++) {
-              setCell(m, y, CELL_WALL);
-              setCell(gridW - 1 - m, y, CELL_WALL);
-            }
+          const s = arenaState, e = now - s.lastShrink;
+          s.warning = e > s.interval - 1000;
+          if (e >= s.interval) {
+            s.lastShrink = now; s.margin++;
+            const m = s.margin, lim = Math.floor(Math.min(gridW, gridH)/2) - ARENA_BORDER - 4;
+            if (m > lim) return;
+            for (let x = m; x < gridW-m; x++) { setCell(x, m, CELL_WALL); setCell(x, gridH-1-m, CELL_WALL); }
+            for (let y = m; y < gridH-m; y++) { setCell(m, y, CELL_WALL); setCell(gridW-1-m, y, CELL_WALL); }
             playWallShift();
           }
         },
       },
-      {
-        id: 'piege',
-        name: 'Le Piège',
-        next: 'Le Classique',
+      { id: 'piege', name: 'Le Piège',
         init() {
-          mobileWalls = [];
-          const cx = Math.floor(gridW / 2);
-          arenaState = {
-            gates: [
-              { x: cx - 4, yMin: ARENA_BORDER + 2, yMax: gridH - ARENA_BORDER - 3, open: true, interval: 4500, lastToggle: performance.now(), warning: false },
-              { x: cx + 4, yMin: ARENA_BORDER + 2, yMax: gridH - ARENA_BORDER - 3, open: true, interval: 3500, lastToggle: performance.now(), warning: false },
-            ],
-          };
+          mobileWalls = []; const cx = Math.floor(gridW/2);
+          arenaState = { gates: [
+            { x: cx-4, yMin: ARENA_BORDER+2, yMax: gridH-ARENA_BORDER-3, open: true, interval: 4500, lastToggle: performance.now(), warning: false },
+            { x: cx+4, yMin: ARENA_BORDER+2, yMax: gridH-ARENA_BORDER-3, open: true, interval: 3500, lastToggle: performance.now(), warning: false },
+          ]};
           syncGates();
         },
         update(now) {
           for (const g of arenaState.gates) {
-            const elapsed = now - g.lastToggle;
-            g.warning = elapsed > g.interval - 900;
-            if (elapsed >= g.interval) {
-              g.lastToggle = now;
-              g.open = !g.open;
-              syncGate(g);
-              playWallShift();
-            }
+            const e = now - g.lastToggle;
+            g.warning = e > g.interval - 900;
+            if (e >= g.interval) { g.lastToggle = now; g.open = !g.open; syncGate(g); playWallShift(); }
           }
         },
       },
-      {
-        id: 'classique',
-        name: 'Le Classique',
-        next: 'Le Battement',
-        init() {
-          mobileWalls = [];
-          arenaState = {};
-        },
-        update() {},
-      },
+      { id: 'classique', name: 'Le Classique', init() { mobileWalls = []; arenaState = {}; }, update() {} },
     ];
 
     function syncGate(g) {
       for (let y = g.yMin; y <= g.yMax; y++) {
-        if (g.open) {
-          if (getCell(g.x, y) === CELL_WALL) setCell(g.x, y, CELL_EMPTY);
-        } else {
-          setCell(g.x, y, CELL_WALL);
-        }
+        if (g.open) { if (getCell(g.x,y) === CELL_WALL) setCell(g.x, y, CELL_EMPTY); }
+        else setCell(g.x, y, CELL_WALL);
       }
     }
-
-    function syncGates() {
-      for (const g of arenaState.gates) syncGate(g);
-    }
-
-    function selectArena() {
-      return ARENAS[Math.floor(Math.random() * ARENAS.length)];
-    }
-
-    function pickArenas(rotate) {
-      if (rotate) {
-        currentArena = nextArenaPreview;
-      }
-      nextArenaPreview = selectArena();
-    }
-
-    function loadHighScore() {
-      try {
-        return parseInt(localStorage.getItem('lc_highscore') || '0', 10);
-      } catch {
-        return 0;
-      }
-    }
-
-    function saveHighScore(val) {
-      try {
-        localStorage.setItem('lc_highscore', String(val));
-      } catch { /* file:// ou mode privé */ }
-    }
+    function syncGates() { for (const g of arenaState.gates) syncGate(g); }
+    function selectArena() { return ARENAS[Math.floor(Math.random()*ARENAS.length)]; }
+    function pickArenas(r) { if (r) currentArena = nextArenaPreview; nextArenaPreview = selectArena(); }
+    function loadHighScore() { try { return parseInt(localStorage.getItem('lc_highscore')||'0',10); } catch { return 0; } }
+    function saveHighScore(v) { try { localStorage.setItem('lc_highscore', String(v)); } catch {} }
 
     function initAudio() {
       if (audioCtx) return;
       try {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        engineOsc = audioCtx.createOscillator();
-        engineGain = audioCtx.createGain();
-        engineOsc.type = 'sawtooth';
-        engineOsc.frequency.value = 90;
-        engineGain.gain.value = 0;
-        engineOsc.connect(engineGain);
-        engineGain.connect(audioCtx.destination);
-        engineOsc.start();
-        audioReady = true;
-      } catch { /* audio unavailable */ }
+        audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        engineOsc = audioCtx.createOscillator(); engineGain = audioCtx.createGain();
+        engineOsc.type = 'sawtooth'; engineOsc.frequency.value = 90; engineGain.gain.value = 0;
+        engineOsc.connect(engineGain); engineGain.connect(audioCtx.destination); engineOsc.start();
+      } catch {}
     }
-
-    function unlockAudio() {
-      if (!audioCtx) initAudio();
-      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-      if (engineGain && playing) engineGain.gain.value = 0.028;
-    }
-
+    function unlockAudio() { if (!audioCtx) initAudio(); if (audioCtx?.state==='suspended') audioCtx.resume(); if (engineGain&&playing) engineGain.gain.value=0.028; }
     function updateEngineSound() {
-      if (!engineOsc || !engineGain || !playing) return;
-      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      engineOsc.frequency.setTargetAtTime(70 + speed * 140, audioCtx.currentTime, 0.05);
-      engineGain.gain.setTargetAtTime(0.02 + speed * 0.03, audioCtx.currentTime, 0.05);
+      if (!engineOsc||!playing) return;
+      const sp = (BASE_TICK-tickMs)/(BASE_TICK-MIN_TICK);
+      engineOsc.frequency.setTargetAtTime(70+sp*140, audioCtx.currentTime, 0.05);
+      engineGain.gain.setTargetAtTime(0.02+sp*0.03, audioCtx.currentTime, 0.05);
     }
-
-    function stopEngine() {
-      if (engineGain) engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-    }
-
-    function playTone(freq, dur, type, vol) {
+    function stopEngine() { if (engineGain) engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); }
+    function playTone(f,d,t,v) {
       if (!audioCtx) return;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = type || 'square';
-      osc.frequency.value = freq;
-      gain.gain.value = vol || 0.08;
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + dur);
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type=t||'square'; o.frequency.value=f; g.gain.value=v||0.08;
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+d);
+      o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d);
     }
-
-    function playTurn() {
-      playTone(320, 0.06, 'square', 0.05);
-    }
-
-    function playWallShift() {
-      playTone(180, 0.12, 'sawtooth', 0.06);
-    }
-
-    function playNearMiss() {
-      playTone(520, 0.08, 'sine', 0.07);
-    }
-
-    function playCrash() {
-      if (!audioCtx) return;
-      for (let i = 0; i < 5; i++) {
-        setTimeout(() => playTone(80 + Math.random() * 200, 0.15, 'sawtooth', 0.12), i * 40);
-      }
-    }
-
-    function createTextures() {
-      wallPattern = document.createElement('canvas');
-      wallPattern.width = 48;
-      wallPattern.height = 48;
-      const p = wallPattern.getContext('2d');
-      p.fillStyle = '#1a0a30';
-      p.fillRect(0, 0, 48, 48);
-      p.strokeStyle = 'rgba(216, 180, 254, 0.35)';
-      p.lineWidth = 1.2;
-      for (let y = 0; y < 48; y += 8) {
-        p.beginPath();
-        for (let x = 0; x <= 48; x += 4) {
-          const yy = y + (x % 8 === 0 ? 0 : 4);
-          if (x === 0) p.moveTo(x, yy);
-          else p.lineTo(x, yy);
-        }
-        p.stroke();
-      }
-      p.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      for (let x = 0; x < 48; x += 6) {
-        p.beginPath();
-        p.moveTo(x, 0);
-        p.lineTo(x, 48);
-        p.stroke();
-      }
-
-      trailPattern = document.createElement('canvas');
-      trailPattern.width = 32;
-      trailPattern.height = 32;
-      const t = trailPattern.getContext('2d');
-      t.fillStyle = 'rgba(0, 200, 255, 0.15)';
-      t.fillRect(0, 0, 32, 32);
-      t.strokeStyle = 'rgba(200, 255, 255, 0.25)';
-      t.lineWidth = 1;
-      for (let i = -32; i < 64; i += 6) {
-        t.beginPath();
-        t.moveTo(i, 0);
-        t.lineTo(i + 16, 32);
-        t.stroke();
-      }
-    }
+    const playTurn = () => playTone(320,.06,'square',.05);
+    const playWallShift = () => playTone(180,.12,'sawtooth',.06);
+    const playNearMiss = () => playTone(520,.08,'sine',.07);
+    function playCrash() { for (let i=0;i<5;i++) setTimeout(()=>playTone(80+Math.random()*200,.15,'sawtooth',.12), i*40); }
 
     function initGridDimensions() {
-      const margin = 12;
-      const availW = canvas.width - margin * 2;
-      const availH = canvas.height - margin * 2 - 80;
-
-      const targetCols = 18 * ARENA_SCALE;
-      const targetRows = 28 * ARENA_SCALE;
-
-      baseCellSize = Math.floor(Math.min(availW / targetCols, availH / targetRows));
-      baseCellSize = Math.max(baseCellSize, 6);
-
-      gridW = Math.floor(availW / baseCellSize);
-      gridH = Math.floor(availH / baseCellSize);
-
-      groundY = canvas.height * 0.84;
-      horizonY = canvas.height * 0.36;
-      focalLength = 7.8;
+      gridW = 18 * ARENA_SCALE;
+      gridH = 28 * ARENA_SCALE;
     }
 
-    function initTrail(x, y, dir) {
-      trailPoints = [{ x, y }];
-      trailDir = dir;
+    function gridToWorld(gx, gy) {
+      return new THREE.Vector3(
+        (gx - gridW/2 + 0.5) * CELL_SIZE,
+        0,
+        (gy - gridH/2 + 0.5) * CELL_SIZE
+      );
     }
 
-    function updateTrailCorner() {
-      const last = trailPoints[trailPoints.length - 1];
-      if (last.x !== player.x || last.y !== player.y) {
-        trailPoints.push({ x: player.x, y: player.y });
+    function makeMat(color, emissive, opacity, tall) {
+      return new THREE.MeshStandardMaterial({
+        color, emissive, emissiveIntensity: tall ? 1.2 : 0.9,
+        transparent: true, opacity, metalness: 0.15, roughness: 0.35,
+      });
+    }
+
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x020208);
+      scene.fog = new THREE.Fog(0x020208, 40, 90);
+
+      camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      scene.add(new THREE.AmbientLight(0x334466, 0.5));
+      const dl = new THREE.DirectionalLight(0xffffff, 0.35);
+      dl.position.set(10, 20, 5); scene.add(dl);
+
+      matWall = makeMat(0xb794f6, 0x7c3aed, 0.82, false);
+      matTrail = makeMat(0xb8f8ff, 0x00eeff, 0.55, false);
+      matMobile = makeMat(0xffaa44, 0xff6600, 0.85, false);
+      matPerimeter = makeMat(0xc4b5fd, 0x9333ea, 0.92, true);
+      boxGeo = new THREE.BoxGeometry(CELL_SIZE*0.92, 1, CELL_SIZE*0.92);
+
+      const floor = new THREE.GridHelper(Math.max(gridW, gridH), Math.max(gridW, gridH), 0x00ff66, 0x003318);
+      floor.position.y = 0.01; scene.add(floor);
+
+      playerMesh = buildBike();
+      scene.add(playerMesh);
+
+      cellMeshes = new Map();
+      mobileMeshes = [];
+    }
+
+    function buildBike() {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.22, 0.85),
+        makeMat(0xffe566, 0xffcc00, 1, true)
+      );
+      body.position.y = 0.25; g.add(body);
+      const cockpit = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.12, 0.35),
+        makeMat(0xffffee, 0xffffaa, 1, true)
+      );
+      cockpit.position.set(0, 0.38, -0.15); g.add(cockpit);
+      const wheelGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12);
+      const wMat = makeMat(0xffffff, 0x00eeff, 1, true);
+      [-0.28, 0.28].forEach(s => {
+        const w = new THREE.Mesh(wheelGeo, wMat);
+        w.rotation.z = Math.PI/2; w.position.set(s, 0.12, 0.28); g.add(w);
+      });
+      const emitter = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 8, 8),
+        makeMat(0x00eeff, 0x00eeff, 1, true)
+      );
+      emitter.position.set(0, 0.3, 0.45); g.add(emitter);
+      return g;
+    }
+
+    function cellKey(x,y) { return x+','+y; }
+
+    function addCellMesh(x, y, type) {
+      const key = cellKey(x,y);
+      removeCellMesh(x, y);
+      const perimeter = type === CELL_WALL && isPerimeterCell(x,y);
+      let mat, h;
+      if (type === CELL_TRAIL) { mat = matTrail; h = TRAIL_H; }
+      else if (perimeter) { mat = matPerimeter; h = PERIM_H; }
+      else { mat = type === CELL_WALL ? matWall : matMobile; h = WALL_H; }
+      const mesh = new THREE.Mesh(boxGeo, mat);
+      const p = gridToWorld(x, y);
+      mesh.position.set(p.x, h/2, p.z);
+      mesh.scale.y = h;
+      scene.add(mesh);
+      cellMeshes.set(key, mesh);
+    }
+
+    function removeCellMesh(x, y) {
+      const key = cellKey(x,y);
+      const m = cellMeshes.get(key);
+      if (m) { scene.remove(m); cellMeshes.delete(key); }
+    }
+
+    function syncMobileMeshes() {
+      mobileMeshes.forEach(m => scene.remove(m));
+      mobileMeshes = [];
+      for (const w of mobileWalls) {
+        const mesh = new THREE.Mesh(boxGeo, matMobile);
+        const p = gridToWorld(w.x, w.y);
+        mesh.position.set(p.x, WALL_H/2, p.z);
+        mesh.scale.y = WALL_H;
+        scene.add(mesh);
+        mobileMeshes.push(mesh);
       }
-      trailDir = player.dir;
     }
 
-    function updateRenderPosition(timestamp) {
-      if (!player) return;
-      if (!playing || lastTick === 0) {
-        player.renderX = player.x;
-        player.renderY = player.y;
-        return;
-      }
-      let progress = Math.min(1, (timestamp - lastTick) / tickMs);
-      progress = progress * progress * (3 - 2 * progress);
-      player.renderX = player.prevX + (player.x - player.prevX) * progress;
-      player.renderY = player.prevY + (player.y - player.prevY) * progress;
-    }
-
-    function lerpAngle(current, target, t) {
-      let diff = target - current;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      return current + diff * t;
-    }
-
-    function updateCamera() {
-      if (!player) return;
-      displayX += (player.renderX - displayX) * 0.32;
-      displayY += (player.renderY - displayY) * 0.32;
-      camAngle = lerpAngle(camAngle, CAM_ANGLES[player.dir], 0.14);
-      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      focalLength = 7.4 + speed * 0.9;
-    }
-
-    function worldToCamera(gx, gy) {
-      const relX = gx - displayX;
-      const relY = gy - displayY;
-      const fwdX = Math.cos(camAngle);
-      const fwdY = Math.sin(camAngle);
-      const rightX = Math.sin(camAngle);
-      const rightY = -Math.cos(camAngle);
-      return {
-        forward: relX * fwdX + relY * fwdY,
-        side: relX * rightX + relY * rightY,
-      };
-    }
-
-    function project(gx, gy) {
-      const { forward, side } = worldToCamera(gx, gy);
-      if (forward < -VIEW_BACK || forward > VIEW_FORWARD) return null;
-      if (Math.abs(side) > VIEW_SIDE + 1) return null;
-
-      const depth = forward + 4;
-      const persp = focalLength / depth;
-      const size = baseCellSize * persp * 1.05;
-      const screenX = canvas.width / 2 + side * baseCellSize * persp;
-      const screenY = groundY - forward * baseCellSize * persp * 0.62;
-
-      if (screenY < horizonY - 30 || screenY > canvas.height + size) return null;
-
-      return { screenX, screenY, size, forward, persp };
+    function clearCellMeshes() {
+      cellMeshes.forEach(m => scene.remove(m));
+      cellMeshes.clear();
+      mobileMeshes.forEach(m => scene.remove(m));
+      mobileMeshes = [];
     }
 
     function createGrid() {
       grid = new Uint8Array(gridW * gridH);
+      clearCellMeshes();
       const b = ARENA_BORDER;
-
       for (let layer = 0; layer < b; layer++) {
-        for (let x = 0; x < gridW; x++) {
-          setCell(x, layer, CELL_WALL);
-          setCell(x, gridH - 1 - layer, CELL_WALL);
-        }
-        for (let y = 0; y < gridH; y++) {
-          setCell(layer, y, CELL_WALL);
-          setCell(gridW - 1 - layer, y, CELL_WALL);
-        }
+        for (let x = 0; x < gridW; x++) { setCell(x, layer, CELL_WALL); setCell(x, gridH-1-layer, CELL_WALL); }
+        for (let y = 0; y < gridH; y++) { setCell(layer, y, CELL_WALL); setCell(gridW-1-layer, y, CELL_WALL); }
       }
     }
 
-    function isPerimeterCell(x, y) {
+    function isPerimeterCell(x,y) {
       const b = ARENA_BORDER;
-      return x < b || x >= gridW - b || y < b || y >= gridH - b;
+      return x<b||x>=gridW-b||y<b||y>=gridH-b;
     }
-
-    function getCell(x, y) {
-      if (x < 0 || x >= gridW || y < 0 || y >= gridH) return CELL_WALL;
-      return grid[y * gridW + x];
-    }
+    function getCell(x,y) { if (x<0||x>=gridW||y<0||y>=gridH) return CELL_WALL; return grid[y*gridW+x]; }
 
     function setCell(x, y, val) {
-      if (x < 0 || x >= gridW || y < 0 || y >= gridH) return;
-      grid[y * gridW + x] = val;
+      if (x<0||x>=gridW||y<0||y>=gridH) return;
+      const old = grid[y*gridW+x];
+      if (old === val) return;
+      grid[y*gridW+x] = val;
+      if (val === CELL_EMPTY) removeCellMesh(x,y);
+      else addCellMesh(x,y,val);
+    }
+
+    function initTrail(x,y) { trailPoints = [{x,y}]; }
+    function updateTrailCorner() {
+      const last = trailPoints[trailPoints.length-1];
+      if (last.x !== player.x || last.y !== player.y) trailPoints.push({x:player.x, y:player.y});
     }
 
     function createPlayer() {
-      const startX = Math.floor(gridW / 2);
-      const startY = gridH - ARENA_BORDER - 6;
-      player = {
-        x: startX,
-        y: startY,
-        dir: DIR_UP,
-        prevX: startX,
-        prevY: startY,
-        renderX: startX,
-        renderY: startY,
-      };
-      initTrail(startX, startY, DIR_UP);
+      const sx = Math.floor(gridW/2), sy = gridH - ARENA_BORDER - 6;
+      player = { x:sx, y:sy, dir:DIR_UP, prevX:sx, prevY:sy, renderX:sx, renderY:sy };
+      initTrail(sx, sy);
     }
 
     function updateHud() {
       arenaNameEl.textContent = currentArena.name;
-      highScoreEl.textContent = 'BEST ' + highScore.toLocaleString('fr-FR');
+      highScoreEl.textContent = 'BEST '+highScore.toLocaleString('fr-FR');
       scoreEl.textContent = score.toLocaleString('fr-FR');
-      if (playing) {
-        const t = (performance.now() - gameStartTime) / 1000;
-        timerEl.textContent = 'T : ' + t.toFixed(2);
-      }
+      if (playing) timerEl.textContent = 'T : '+((performance.now()-gameStartTime)/1000).toFixed(2);
     }
 
     function resetGame(rotateArena) {
       initGridDimensions();
+      if (!scene) initThree();
       createGrid();
       if (rotateArena) pickArenas(true);
       currentArena.init();
+      syncMobileMeshes();
       createPlayer();
-      score = 0;
-      tickMs = BASE_TICK;
-      lastTick = 0;
-      turnQueue = null;
-      particles = [];
-      shakeTimer = 0;
-      playing = true;
-      gameStartTime = performance.now();
-      camAngle = CAM_ANGLES[player.dir];
-      displayX = player.x;
-      displayY = player.y;
-      overlay.classList.add('hidden');
-      controls.classList.remove('hidden');
-      updateHud();
-      unlockAudio();
-      updateEngineSound();
+      score = 0; tickMs = BASE_TICK; lastTick = 0; turnQueue = null;
+      playing = true; gameStartTime = performance.now();
+      overlay.classList.add('hidden'); controls.classList.remove('hidden');
+      updateHud(); unlockAudio(); updateEngineSound();
+      updatePlayerMesh();
     }
 
     function turnLeft() {
-      if (!playing) return;
-      unlockAudio();
-      const newDir = (player.dir + 3) % 4;
-      if (newDir !== (player.dir + 2) % 4) {
-        turnQueue = newDir;
-        playTurn();
-      }
+      if (!playing) return; unlockAudio();
+      const nd = (player.dir+3)%4;
+      if (nd !== (player.dir+2)%4) { turnQueue = nd; playTurn(); }
     }
-
     function turnRight() {
-      if (!playing) return;
-      unlockAudio();
-      const newDir = (player.dir + 1) % 4;
-      if (newDir !== (player.dir + 2) % 4) {
-        turnQueue = newDir;
-        playTurn();
-      }
+      if (!playing) return; unlockAudio();
+      const nd = (player.dir+1)%4;
+      if (nd !== (player.dir+2)%4) { turnQueue = nd; playTurn(); }
     }
 
-    function isMobileWallAt(x, y) {
-      for (const w of mobileWalls) {
-        if (w.x === x && w.y === y) return true;
-      }
-      return false;
-    }
+    function isMobileWallAt(x,y) { return mobileWalls.some(w => w.x===x && w.y===y); }
 
     function checkNearMiss() {
-      for (let d = 0; d < 4; d++) {
-        const nx = player.x + DX[d];
-        const ny = player.y + DY[d];
-        const cell = getCell(nx, ny);
-        if (cell === CELL_WALL || cell === CELL_TRAIL || isMobileWallAt(nx, ny)) {
-          playNearMiss();
-          return;
-        }
+      for (let d=0; d<4; d++) {
+        const c = getCell(player.x+DX[d], player.y+DY[d]);
+        if (c===CELL_WALL||c===CELL_TRAIL||isMobileWallAt(player.x+DX[d], player.y+DY[d])) { playNearMiss(); return; }
       }
     }
 
-    function spawnParticles(gx, gy, color, count) {
-      const proj = project(gx, gy);
-      const cx = proj ? proj.screenX : canvas.width / 2;
-      const cy = proj ? proj.screenY : groundY - baseCellSize * 0.2;
-      const n = count || 24;
-      for (let i = 0; i < n; i++) {
-        const angle = (Math.PI * 2 * i) / n + Math.random() * 0.3;
-        const speed = 1 + Math.random() * 4;
-        particles.push({
-          x: cx,
-          y: cy,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          life: 1,
-          color,
-        });
-      }
-    }
-
-    function updateParticles() {
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vx *= 0.98;
-        p.vy *= 0.98;
-        p.life -= 0.025;
-        if (p.life <= 0) particles.splice(i, 1);
-      }
-    }
-
-    function gameTick(now) {
+    function gameTick() {
       if (!playing) return;
-
       if (turnQueue !== null) {
         if (player.dir !== turnQueue) updateTrailCorner();
-        player.dir = turnQueue;
-        turnQueue = null;
+        player.dir = turnQueue; turnQueue = null;
       }
-
-      player.prevX = player.x;
-      player.prevY = player.y;
-
-      const nx = player.x + DX[player.dir];
-      const ny = player.y + DY[player.dir];
-
-      const cell = getCell(nx, ny);
-      const hitMobile = isMobileWallAt(nx, ny);
-
-      if (cell === CELL_WALL || cell === CELL_TRAIL || hitMobile) {
-        die();
-        return;
-      }
-
+      player.prevX = player.x; player.prevY = player.y;
+      const nx = player.x+DX[player.dir], ny = player.y+DY[player.dir];
+      if (getCell(nx,ny)===CELL_WALL || getCell(nx,ny)===CELL_TRAIL || isMobileWallAt(nx,ny)) { die(); return; }
       setCell(player.x, player.y, CELL_TRAIL);
-      player.x = nx;
-      player.y = ny;
-      score++;
-
-      if (score % 12 === 0 && tickMs > MIN_TICK) {
-        tickMs -= 2;
-        updateEngineSound();
-      }
-
-      checkNearMiss();
-      updateHud();
+      player.x = nx; player.y = ny; score++;
+      if (score%12===0 && tickMs>MIN_TICK) { tickMs -= 2; updateEngineSound(); }
+      checkNearMiss(); updateHud();
     }
 
     function die() {
-      playing = false;
-      shakeTimer = 400;
-      stopEngine();
-      playCrash();
-      spawnParticles(player.x, player.y, COLORS.player, 32);
-      spawnParticles(player.x, player.y, COLORS.trail, 24);
-
-      const isRecord = score > highScore;
-      if (isRecord) {
-        highScore = score;
-        saveHighScore(highScore);
-      }
-
+      playing = false; stopEngine(); playCrash();
+      const rec = score > highScore;
+      if (rec) { highScore = score; saveHighScore(highScore); }
       overlayTitle.textContent = currentArena.name;
       overlayScore.textContent = score.toLocaleString('fr-FR');
-      overlayBest.textContent = 'Record : ' + highScore.toLocaleString('fr-FR');
-      overlayRecord.classList.toggle('hidden', !isRecord);
-      overlayNext.textContent = 'Prochaine arène : ' + nextArenaPreview.name;
-      overlayHint.textContent = 'Toucher pour rejouer';
-      overlay.classList.remove('hidden');
-      controls.classList.add('hidden');
+      overlayBest.textContent = 'Record : '+highScore.toLocaleString('fr-FR');
+      overlayRecord.classList.toggle('hidden', !rec);
+      overlayNext.textContent = 'Prochaine arène : '+nextArenaPreview.name;
+      overlay.classList.remove('hidden'); controls.classList.add('hidden');
+    }
+
+    function updateRenderPosition(ts) {
+      if (!player) return;
+      if (!playing || !lastTick) { player.renderX = player.x; player.renderY = player.y; return; }
+      let t = Math.min(1, (ts-lastTick)/tickMs);
+      t = t*t*(3-2*t);
+      player.renderX = player.prevX + (player.x-player.prevX)*t;
+      player.renderY = player.prevY + (player.y-player.prevY)*t;
+    }
+
+    function updatePlayerMesh() {
+      if (!playerMesh || !player) return;
+      const p = gridToWorld(player.renderX, player.renderY);
+      playerMesh.position.set(p.x, 0, p.z);
+      playerMesh.rotation.y = [-Math.PI/2, 0, Math.PI/2, Math.PI][player.dir];
+    }
+
+    function updateCamera() {
+      if (!player) return;
+      const p = gridToWorld(player.renderX, player.renderY);
+      const d = player.dir;
+      const dist = 14, height = 12, look = 5;
+      const tx = p.x + DX[d]*look, tz = p.z + DY[d]*look;
+      const cx = p.x - DX[d]*dist, cz = p.z - DY[d]*dist;
+      camTarget.set(tx, TRAIL_H, tz);
+      camPos.set(cx, height, cz);
+      camera.position.lerp(camPos, 0.12);
+      camera.lookAt(camTarget);
     }
 
     function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      if (grid) {
-        if (playing) resetGame(false);
-        else initGridDimensions();
-      }
+      if (!renderer) return;
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    function buildWallFace(gx, gy, heightMul) {
-      const floor = project(gx, gy);
-      if (!floor) return null;
-
-      const wallH = floor.size * heightMul;
-      const hw = floor.size * 0.5;
-      const hwTop = hw * 0.9;
-      const depth = hw * 0.14;
-
-      const bl = { x: floor.screenX - hw, y: floor.screenY };
-      const br = { x: floor.screenX + hw, y: floor.screenY };
-      const tr = { x: floor.screenX + hwTop, y: floor.screenY - wallH };
-      const tl = { x: floor.screenX - hwTop, y: floor.screenY - wallH };
-
-      return {
-        forward: floor.forward,
-        bl, br, tr, tl,
-        depth,
-        wallH,
-        cx: floor.screenX,
-        yTop: tl.y,
-        yBot: bl.y,
-      };
-    }
-
-    function drawWallPattern(face) {
-      const h = face.yBot - face.yTop;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-      const step = Math.max(5, h / 12);
-      for (let y = face.yTop; y < face.yBot; y += step) {
-        ctx.beginPath();
-        let x = face.tl.x;
-        for (let i = 0; i < 6; i++) {
-          const nx = x + (face.tr.x - face.tl.x) / 3;
-          const ny = y + (i % 2 === 0 ? step * 0.35 : -step * 0.15);
-          if (i === 0) ctx.moveTo(x, ny);
-          else ctx.lineTo(nx, ny);
-          x = nx;
-        }
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = 'rgba(200, 255, 255, 0.15)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(face.tl.x, face.tl.y);
-      ctx.lineTo(face.tr.x, face.tr.y);
-      ctx.stroke();
-    }
-
-    function drawVerticalWall(face, fill, deep, glow, alpha, pattern, isTrail, isPerimeter) {
-      ctx.save();
-
-      ctx.beginPath();
-      ctx.moveTo(face.tl.x, face.tl.y);
-      ctx.lineTo(face.tr.x, face.tr.y);
-      ctx.lineTo(face.br.x, face.br.y);
-      ctx.lineTo(face.bl.x, face.bl.y);
-      ctx.closePath();
-
-      const grad = ctx.createLinearGradient(face.cx, face.yTop, face.cx, face.yBot);
-      grad.addColorStop(0, fill);
-      grad.addColorStop(0.55, isTrail ? 'rgba(180, 250, 255, 0.55)' : fill);
-      grad.addColorStop(1, deep);
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = grad;
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = face.wallH * (isPerimeter ? 0.55 : 0.38);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      if (pattern) {
-        ctx.save();
-        ctx.clip();
-        const patCanvas = isTrail ? trailPattern : wallPattern;
-        if (patCanvas) {
-          const pat = ctx.createPattern(patCanvas, 'repeat');
-          ctx.globalAlpha = isTrail ? 0.35 : 0.5;
-          ctx.fillStyle = pat;
-          ctx.fill();
-        }
-        drawWallPattern(face);
-        ctx.restore();
-      }
-
-      ctx.globalAlpha = alpha * 0.85;
-      ctx.beginPath();
-      ctx.moveTo(face.br.x, face.br.y);
-      ctx.lineTo(face.br.x + face.depth, face.br.y - face.wallH * 0.06);
-      ctx.lineTo(face.tr.x + face.depth, face.tr.y - face.wallH * 0.06);
-      ctx.lineTo(face.tr.x, face.tr.y);
-      ctx.closePath();
-      ctx.fillStyle = deep;
-      ctx.fill();
-
-      ctx.globalAlpha = Math.min(1, alpha + 0.2);
-      ctx.strokeStyle = glow;
-      ctx.lineWidth = isPerimeter ? 1.8 : 1.2;
-      ctx.beginPath();
-      ctx.moveTo(face.tl.x, face.tl.y);
-      ctx.lineTo(face.tr.x, face.tr.y);
-      ctx.stroke();
-
-      ctx.restore();
-      ctx.globalAlpha = 1;
-    }
-
-    function sampleSegmentWalls(x1, y1, x2, y2, heightMul, fill, deep, glow, alpha) {
-      const walls = [];
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const len = Math.max(Math.abs(dx), Math.abs(dy));
-      const steps = Math.max(6, Math.ceil(len * 6));
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const gx = x1 + dx * t;
-        const gy = y1 + dy * t;
-        const face = buildWallFace(gx, gy, heightMul);
-        if (!face) continue;
-        walls.push({
-          face,
-          fill,
-          deep,
-          glow,
-          alpha,
-          pattern: true,
-          isTrail: true,
-          isPerimeter: false,
-        });
-      }
-      return walls;
-    }
-
-    function collectTrailWalls() {
-      const walls = [];
-      if (!trailPoints || trailPoints.length === 0 || !player) return walls;
-
-      for (let i = 0; i < trailPoints.length - 1; i++) {
-        const a = trailPoints[i];
-        const b = trailPoints[i + 1];
-        walls.push(...sampleSegmentWalls(
-          a.x, a.y, b.x, b.y,
-          1.18, COLORS.trail, COLORS.trailDeep, COLORS.trailGlow, 0.48
-        ));
-      }
-
-      const tail = trailPoints[trailPoints.length - 1];
-      walls.push(...sampleSegmentWalls(
-        tail.x, tail.y, player.renderX, player.renderY,
-        1.18, COLORS.trail, COLORS.trailDeep, COLORS.trailGlow, 0.52
-      ));
-
-      return walls;
-    }
-
-    function collectWalls() {
-      const walls = [];
-
-      for (let y = 0; y < gridH; y++) {
-        for (let x = 0; x < gridW; x++) {
-          if (grid[y * gridW + x] !== CELL_WALL) continue;
-          const perimeter = isPerimeterCell(x, y);
-          const face = buildWallFace(x, y, perimeter ? 1.75 : 1.45);
-          if (!face) continue;
-          walls.push({
-            face,
-            fill: COLORS.wall,
-            deep: COLORS.wallDeep,
-            glow: COLORS.wallGlow,
-            alpha: perimeter ? 0.88 : 0.75,
-            pattern: true,
-            isTrail: false,
-            isPerimeter: perimeter,
-          });
-        }
-      }
-
-      walls.push(...collectTrailWalls());
-
-      for (const w of mobileWalls) {
-        const face = buildWallFace(w.x, w.y, 1.35);
-        if (!face) continue;
-        const alpha = w.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.85;
-        walls.push({
-          face,
-          fill: COLORS.mobileWall,
-          deep: '#cc6600',
-          glow: COLORS.mobileWallGlow,
-          alpha,
-          pattern: true,
-          isTrail: false,
-          isPerimeter: false,
-        });
-      }
-
-      if (currentArena.id === 'piege' && arenaState.gates) {
-        for (const g of arenaState.gates) {
-          if (g.open) continue;
-          const alpha = g.warning ? 0.45 + Math.sin(Date.now() / 100) * 0.2 : 0.85;
-          for (let y = g.yMin; y <= g.yMax; y++) {
-            const face = buildWallFace(g.x, y, 1.35);
-            if (!face) continue;
-            walls.push({
-              face,
-              fill: COLORS.mobileWall,
-              deep: '#cc6600',
-              glow: COLORS.mobileWallGlow,
-              alpha,
-              pattern: true,
-              isTrail: false,
-              isPerimeter: false,
-            });
-          }
-        }
-      }
-
-      walls.sort((a, b) => b.face.forward - a.face.forward);
-      return walls;
-    }
-
-    function drawSky() {
-      const grad = ctx.createLinearGradient(0, 0, 0, groundY);
-      grad.addColorStop(0, '#050510');
-      grad.addColorStop(0.55, '#080818');
-      grad.addColorStop(1, '#000000');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, canvas.width, groundY + 6);
-    }
-
-    function drawFloorGrid() {
-      ctx.lineWidth = 1;
-
-      for (let f = -VIEW_BACK; f <= VIEW_FORWARD; f += 1) {
-        const persp = focalLength / (f + 4);
-        const alpha = Math.max(0.06, (0.35 - f * 0.01) * persp * 0.55);
-        ctx.strokeStyle = `rgba(0, 255, 90, ${alpha})`;
-        ctx.beginPath();
-        let started = false;
-
-        for (let s = -VIEW_SIDE; s <= VIEW_SIDE; s += 0.5) {
-          const gx = displayX + Math.cos(camAngle) * f + Math.sin(camAngle) * s;
-          const gy = displayY + Math.sin(camAngle) * f - Math.cos(camAngle) * s;
-          const proj = project(gx, gy);
-          if (!proj) continue;
-          if (!started) {
-            ctx.moveTo(proj.screenX, proj.screenY);
-            started = true;
-          } else {
-            ctx.lineTo(proj.screenX, proj.screenY);
-          }
-        }
-        if (started) ctx.stroke();
-      }
-
-      for (let s = -VIEW_SIDE; s <= VIEW_SIDE; s += 1) {
-        ctx.beginPath();
-        let started = false;
-        for (let f = -VIEW_BACK; f <= VIEW_FORWARD; f += 0.5) {
-          const gx = displayX + Math.cos(camAngle) * f + Math.sin(camAngle) * s;
-          const gy = displayY + Math.sin(camAngle) * f - Math.cos(camAngle) * s;
-          const proj = project(gx, gy);
-          if (!proj) continue;
-          if (!started) {
-            ctx.moveTo(proj.screenX, proj.screenY);
-            started = true;
-          } else {
-            ctx.lineTo(proj.screenX, proj.screenY);
-          }
-        }
-        if (started) {
-          ctx.strokeStyle = 'rgba(0, 220, 80, 0.12)';
-          ctx.stroke();
-        }
-      }
-    }
-
-    function drawCompressWarning() {
-      if (currentArena.id !== 'compresseur' || !arenaState.warning) return;
-      const m = arenaState.margin + 1;
-      const alpha = 0.12 + Math.sin(Date.now() / 120) * 0.08;
-      ctx.strokeStyle = `rgba(255, 80, 0, ${alpha})`;
-      ctx.lineWidth = 2;
-      ctx.shadowColor = '#ff4400';
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      let started = false;
-
-      for (let i = 0; i <= 4; i++) {
-        const t = i / 4;
-        const gx = m + t * (gridW - 1 - 2 * m);
-        const proj = project(gx, m);
-        if (!proj) continue;
-        if (!started) { ctx.moveTo(proj.screenX, proj.screenY); started = true; }
-        else ctx.lineTo(proj.screenX, proj.screenY);
-      }
-      for (let i = 0; i <= 4; i++) {
-        const t = i / 4;
-        const gx = m + t * (gridW - 1 - 2 * m);
-        const proj = project(gx, gridH - 1 - m);
-        if (proj) ctx.lineTo(proj.screenX, proj.screenY);
-      }
-      if (started) ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-
-    function drawPlayer() {
-      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      const proj = project(player.renderX, player.renderY);
-      const scale = proj ? proj.size : baseCellSize;
-      const px = proj ? proj.screenX : canvas.width / 2;
-      const py = proj ? proj.screenY - scale * 0.15 : groundY - baseCellSize * 0.28;
-      const bob = Math.sin(Date.now() / (90 - speed * 25)) * speed * 1.2;
-      const glow = scale * (1.6 + speed * 0.7);
-
-      ctx.save();
-      ctx.translate(px, py + bob);
-
-      const bodyL = scale * (0.55 + speed * 0.08);
-      const bodyW = scale * (0.22 + speed * 0.04);
-      const wheelR = scale * 0.14;
-
-      ctx.shadowColor = COLORS.playerGlow;
-      ctx.shadowBlur = glow;
-
-      ctx.strokeStyle = COLORS.trailGlow;
-      ctx.lineWidth = scale * 0.12;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(0, bodyL * 0.5);
-      ctx.lineTo(0, bodyL * 1.1);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      ctx.fillStyle = COLORS.player;
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(-bodyW, -bodyL * 0.55, bodyW * 2, bodyL * 0.95, bodyW * 0.45);
-      } else {
-        ctx.rect(-bodyW, -bodyL * 0.55, bodyW * 2, bodyL * 0.95);
-      }
-      ctx.fill();
-
-      ctx.fillStyle = 'rgba(255, 255, 220, 0.9)';
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(-bodyW * 0.55, -bodyL * 0.35, bodyW * 1.1, bodyL * 0.45, bodyW * 0.2);
-      } else {
-        ctx.rect(-bodyW * 0.55, -bodyL * 0.35, bodyW * 1.1, bodyL * 0.45);
-      }
-      ctx.fill();
-
-      ctx.fillStyle = '#fff';
-      ctx.shadowBlur = glow * 0.7;
-      ctx.beginPath();
-      ctx.arc(-bodyW * 0.75, bodyL * 0.15, wheelR, 0, Math.PI * 2);
-      ctx.arc(bodyW * 0.75, bodyL * 0.15, wheelR, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = COLORS.trailGlow;
-      ctx.shadowBlur = glow;
-      ctx.beginPath();
-      ctx.arc(0, -bodyL * 0.45, bodyW * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-      ctx.shadowBlur = 0;
-    }
-
-    function drawParticles() {
-      for (const p of particles) {
-        ctx.globalAlpha = p.life;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
-      }
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-    }
-
-    function render() {
-      let shakeX = 0;
-      let shakeY = 0;
-      if (shakeTimer > 0) {
-        shakeTimer -= 16;
-        shakeX = (Math.random() - 0.5) * 8;
-        shakeY = (Math.random() - 0.5) * 8;
-      }
-
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.save();
-      ctx.translate(shakeX, shakeY);
-
-      drawSky();
-      drawFloorGrid();
-
-      const walls = collectWalls();
-      for (const w of walls) {
-        drawVerticalWall(w.face, w.fill, w.deep, w.glow, w.alpha, w.pattern, w.isTrail, w.isPerimeter);
-      }
-
-      drawCompressWarning();
-      if (playing) drawPlayer();
-      drawParticles();
-
-      ctx.restore();
-    }
-
-    function gameLoop(timestamp) {
-      updateRenderPosition(timestamp);
+    function gameLoop(ts) {
+      updateRenderPosition(ts);
+      updatePlayerMesh();
       updateCamera();
-
-      if (playing && timestamp - lastTick >= tickMs) {
-        currentArena.update(timestamp);
-        gameTick(timestamp);
-        lastTick = timestamp;
+      if (playing && ts - lastTick >= tickMs) {
+        currentArena.update(ts);
+        gameTick();
+        lastTick = ts;
       }
-
-      if (!playing) updateParticles();
-      if (playing) updateHud();
-      render();
+      if (renderer) renderer.render(scene, camera);
       requestAnimationFrame(gameLoop);
     }
 
     function bindControlButton(btn, action) {
-      const press = (e) => {
-        e.preventDefault();
-        if (!playing) return;
-        btn.classList.add('pressed');
-        action();
-      };
+      const press = e => { e.preventDefault(); if (!playing) return; btn.classList.add('pressed'); action(); };
       const release = () => btn.classList.remove('pressed');
-
       btn.addEventListener('pointerdown', press);
       btn.addEventListener('pointerup', release);
       btn.addEventListener('pointerleave', release);
       btn.addEventListener('pointercancel', release);
     }
-
     bindControlButton(btnLeft, turnLeft);
     bindControlButton(btnRight, turnRight);
 
-    overlay.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      unlockAudio();
-      resetGame(true);
+    overlay.addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); resetGame(true); });
+    window.addEventListener('keydown', e => {
+      if (e.key==='ArrowLeft'||e.key==='a'||e.key==='A') { if (!playing){unlockAudio();resetGame(true);} else turnLeft(); }
+      else if (e.key==='ArrowRight'||e.key==='d'||e.key==='D') { if (!playing){unlockAudio();resetGame(true);} else turnRight(); }
+      else if ((e.key===' '||e.key==='Enter') && !playing) { unlockAudio(); resetGame(true); }
     });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        if (!playing) {
-          unlockAudio();
-          resetGame(true);
-        } else turnLeft();
-      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        if (!playing) {
-          unlockAudio();
-          resetGame(true);
-        } else turnRight();
-      } else if (e.key === ' ' || e.key === 'Enter') {
-        if (!playing) {
-          unlockAudio();
-          resetGame(true);
-        }
-      }
-    });
-
     window.addEventListener('resize', resize);
 
     highScore = loadHighScore();
-    createTextures();
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    initGridDimensions();
     nextArenaPreview = selectArena();
     currentArena = selectArena();
     resetGame(false);
