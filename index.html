@@ -67,6 +67,16 @@
     .arena-btn-best { font-size: 10px; color: rgba(0,255,120,.55); margin-top: 6px; }
     .arena-random { margin-top: 14px; text-align: center; border-color: rgba(255,136,0,.35); background: rgba(255,136,0,.06); }
     .arena-random .arena-btn-name { color: rgba(255,180,80,.95); }
+    #cosmetic-section { width: 100%; max-width: 360px; margin-bottom: 18px; }
+    #cosmetic-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 10px; text-align: center; }
+    #cosmetic-picker { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .color-swatch {
+      width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15);
+      cursor: pointer; touch-action: manipulation; position: relative;
+      box-shadow: 0 0 10px var(--swatch-glow, #0ff);
+    }
+    .color-swatch.selected { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 16px var(--swatch-glow, #0ff); }
+    .color-swatch:active { transform: scale(.95); }
   </style>
 </head>
 <body>
@@ -87,6 +97,10 @@
     <div id="arena-menu">
       <div id="arena-menu-title">LIGHT CYCLE</div>
       <div id="arena-menu-sub">CHOISIR UNE ARÈNE</div>
+      <div id="cosmetic-section">
+        <div id="cosmetic-label">TON CYCLE</div>
+        <div id="cosmetic-picker"></div>
+      </div>
       <div id="arena-list"></div>
       <button type="button" id="arena-random" class="arena-btn arena-random">
         <div class="arena-btn-name">Aléatoire</div>
@@ -117,10 +131,18 @@
     const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
     const KILL_BONUS = 300;
 
-    const RIDER_DEFS = [
-      { name: 'Toi', isPlayer: true, body: 0xffe566, glow: 0xffcc00, wheel: 0x00eeff, trail: 0xb8f8ff, trailGlow: 0x00eeff },
+    const BOT_DEFS = [
       { name: 'Spectre', isPlayer: false, body: 0xff66cc, glow: 0xff0088, wheel: 0xff88cc, trail: 0xffb8e8, trailGlow: 0xff44aa },
       { name: 'Phantom', isPlayer: false, body: 0x66ff88, glow: 0x00ff66, wheel: 0x88ffaa, trail: 0xb8ffd8, trailGlow: 0x44ff88 },
+    ];
+
+    const COLOR_PRESETS = [
+      { id: 'cyan', body: 0xffe566, glow: 0xffcc00, wheel: 0x00eeff, trail: 0xb8f8ff, trailGlow: 0x00eeff },
+      { id: 'magenta', body: 0xffaacc, glow: 0xff66bb, wheel: 0xff44aa, trail: 0xffb8e8, trailGlow: 0xff0088 },
+      { id: 'orange', body: 0xffee88, glow: 0xffaa00, wheel: 0xff8800, trail: 0xffd8a8, trailGlow: 0xff6600 },
+      { id: 'lime', body: 0xeeff88, glow: 0xaaff00, wheel: 0x66ff44, trail: 0xd8ffb8, trailGlow: 0x44ff00 },
+      { id: 'violet', body: 0xddaaff, glow: 0xaa66ff, wheel: 0x8844ff, trail: 0xe8ccff, trailGlow: 0x6600ff },
+      { id: 'crimson', body: 0xffaaaa, glow: 0xff4444, wheel: 0xff0022, trail: 0xffc8c8, trailGlow: 0xff0044 },
     ];
 
     const canvas = document.getElementById('game');
@@ -139,6 +161,7 @@
     const arenaMenu = document.getElementById('arena-menu');
     const arenaList = document.getElementById('arena-list');
     const arenaRandomBtn = document.getElementById('arena-random');
+    const cosmeticPicker = document.getElementById('cosmetic-picker');
     const arenaIntro = document.getElementById('arena-intro');
     const arenaIntroName = document.getElementById('arena-intro-name');
     const arenaIntroDesc = document.getElementById('arena-intro-desc');
@@ -237,7 +260,41 @@
     function loadArenaPref() { try { return localStorage.getItem('lc_arena_pref') || 'random'; } catch { return 'random'; } }
     function saveArenaPref(id) { try { localStorage.setItem('lc_arena_pref', id); } catch {} }
 
+    function loadCosmetic() { try { return localStorage.getItem('lc_cosmetic') || 'cyan'; } catch { return 'cyan'; } }
+    function saveCosmetic(id) { try { localStorage.setItem('lc_cosmetic', id); } catch {} }
+    function getCosmeticPreset() { return COLOR_PRESETS.find(p => p.id === loadCosmetic()) || COLOR_PRESETS[0]; }
+    function getRiderDefs() {
+      const c = getCosmeticPreset();
+      return [{ name: 'Toi', isPlayer: true, body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow }, ...BOT_DEFS];
+    }
+    function hexCss(h) { return '#'+h.toString(16).padStart(6,'0'); }
+    function applyScoreColor() {
+      const c = getCosmeticPreset();
+      scoreEl.style.color = hexCss(c.trailGlow);
+      scoreEl.style.textShadow = '0 0 10px '+hexCss(c.trailGlow)+', 0 0 20px '+hexCss(c.trailGlow);
+    }
+
+    function buildCosmeticPicker() {
+      const current = loadCosmetic();
+      cosmeticPicker.innerHTML = '';
+      COLOR_PRESETS.forEach(p => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'color-swatch'+(p.id === current ? ' selected' : '');
+        btn.style.background = 'linear-gradient(135deg, '+hexCss(p.body)+', '+hexCss(p.trailGlow)+')';
+        btn.style.setProperty('--swatch-glow', hexCss(p.trailGlow));
+        btn.setAttribute('aria-label', p.id);
+        btn.addEventListener('click', () => {
+          saveCosmetic(p.id);
+          buildCosmeticPicker();
+          applyScoreColor();
+        });
+        cosmeticPicker.appendChild(btn);
+      });
+    }
+
     function buildArenaMenu() {
+      buildCosmeticPicker();
       arenaList.innerHTML = '';
       ARENAS.forEach(a => {
         const btn = document.createElement('button');
@@ -466,7 +523,7 @@
     function createRiders() {
       (riders || []).forEach(r => { if (r.mesh) scene.remove(r.mesh); });
       riders = [];
-      trailMats = RIDER_DEFS.map(d => makeMat(d.trail, d.trailGlow, 0.55, false));
+      trailMats = getRiderDefs().map(d => makeMat(d.trail, d.trailGlow, 0.55, false));
 
       const spawns = [
         { x: Math.floor(gridW/2), y: gridH - ARENA_BORDER - 6, dir: DIR_UP },
@@ -474,7 +531,7 @@
         { x: Math.floor(3*gridW/4), y: ARENA_BORDER + 6, dir: DIR_DOWN },
       ];
 
-      RIDER_DEFS.forEach((def, i) => {
+      getRiderDefs().forEach((def, i) => {
         const s = spawns[i];
         const rider = {
           id: i, name: def.name, isPlayer: def.isPlayer, def, alive: true,
@@ -866,6 +923,7 @@
 
     highScore = loadHighScore();
     initGridDimensions();
+    applyScoreColor();
     buildArenaMenu();
     showArenaMenu();
     requestAnimationFrame(gameLoop);
