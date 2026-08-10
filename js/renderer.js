@@ -3,7 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {
-  CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, PERIM_H,
+  CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_PANEL, PERIM_H,
   CAM_DIR_ANGLES,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
@@ -20,58 +20,116 @@ export class Renderer {
     this.riderMeshes = new Map();
     this.liveTrails = new Map();
     this.trailMats = [];
+    this.trailCoreMats = [];
     this.explosions = [];
     this.matWall = null;
+    this.matWallCore = null;
     this.matMobile = null;
+    this.matMobileCore = null;
     this.matPerimeter = null;
-    this.boxGeo = null;
+    this.matPerimeterCap = null;
+    this.wallGeo = null;
+    this.trailArmGeo = null;
+    this.trailCoreGeo = null;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
     this.smoothCamAngle = -Math.PI / 2;
     this.camReady = false;
     this._worldPos = new THREE.Vector3();
+    this._worldPos2 = new THREE.Vector3();
   }
 
   init() {
     const { w, h } = gridDimensions();
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x020208);
-    this.scene.fog = new THREE.Fog(0x020208, 40, 90);
+    this.scene.background = new THREE.Color(0x010108);
+    this.scene.fog = new THREE.FogExp2(0x010108, 0.028);
 
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 200);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.15;
 
-    this.scene.add(new THREE.AmbientLight(0x334466, 0.45));
-    const dl = new THREE.DirectionalLight(0xffffff, 0.35);
-    dl.position.set(10, 20, 5);
+    this.scene.add(new THREE.AmbientLight(0x223355, 0.35));
+    const dl = new THREE.DirectionalLight(0xaaccff, 0.28);
+    dl.position.set(8, 22, 6);
     this.scene.add(dl);
+    const rim = new THREE.DirectionalLight(0x6644aa, 0.18);
+    rim.position.set(-6, 10, -8);
+    this.scene.add(rim);
 
-    this.matWall = this._makeMat(0xb794f6, 0x7c3aed, 0.82, false);
-    this.matMobile = this._makeMat(0xffaa44, 0xff6600, 0.85, false);
-    this.matPerimeter = this._makeMat(0xc4b5fd, 0x9333ea, 0.92, true);
-    this.boxGeo = new THREE.BoxGeometry(CELL_SIZE * 0.92, 1, CELL_SIZE * 0.92);
-    this.trailMats = getRiderDefs().map(d => this._makeMat(d.trail, d.trailGlow, 0.55, false));
+    this.wallGeo = new THREE.BoxGeometry(CELL_SIZE * 0.94, 1, CELL_SIZE * 0.94);
+    this.trailArmGeo = new THREE.BoxGeometry(CELL_SIZE * 0.92, 1, TRAIL_PANEL);
+    this.trailCoreGeo = new THREE.BoxGeometry(TRAIL_PANEL * 0.55, 1, TRAIL_PANEL * 0.55);
 
-    const floor = new THREE.GridHelper(Math.max(w, h), Math.max(w, h), 0x00ff66, 0x003318);
-    floor.position.y = 0.01;
+    this.matWall = this._makeGlassMat(0x9b7bff, 0x6d28d9, { opacity: 0.38, intensity: 1.35 });
+    this.matWallCore = this._makeNeonMat(0xc4b5fd, 0xa855f7, { intensity: 2.2, opacity: 0.85 });
+    this.matMobile = this._makeGlassMat(0xffbb66, 0xff6600, { opacity: 0.42, intensity: 1.5 });
+    this.matMobileCore = this._makeNeonMat(0xffeeaa, 0xff8800, { intensity: 2.4, opacity: 0.9 });
+    this.matPerimeter = this._makeGlassMat(0xd8ccff, 0x9333ea, { opacity: 0.52, intensity: 1.65 });
+    this.matPerimeterCap = this._makeNeonMat(0xf5f0ff, 0xbb66ff, { intensity: 2.8, opacity: 0.95 });
+
+    this._rebuildTrailMats();
+
+    const floorSize = Math.max(w, h);
+    const floor = new THREE.GridHelper(floorSize, floorSize, 0x00ff88, 0x002211);
+    floor.position.y = 0.005;
+    floor.material.transparent = true;
+    floor.material.opacity = 0.55;
     this.scene.add(floor);
+
+    const floorGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(floorSize, floorSize),
+      new THREE.MeshBasicMaterial({ color: 0x001a0a, transparent: true, opacity: 0.35 })
+    );
+    floorGlow.rotation.x = -Math.PI / 2;
+    floorGlow.position.y = 0.002;
+    this.scene.add(floorGlow);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.composer.addPass(new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.38, 0.1
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.72, 0.42, 0.08
     ));
   }
 
-  _makeMat(color, emissive, opacity, tall) {
+  _rebuildTrailMats() {
+    this.trailMats = getRiderDefs().map(d =>
+      this._makeGlassMat(d.trail, d.trailGlow, { opacity: 0.48, intensity: 1.55 })
+    );
+    this.trailCoreMats = getRiderDefs().map(d =>
+      this._makeNeonMat(d.trailGlow, d.trailGlow, { intensity: 2.6, opacity: 0.92 })
+    );
+  }
+
+  _makeNeonMat(color, emissive, { intensity = 1.4, opacity = 1 } = {}) {
     return new THREE.MeshStandardMaterial({
-      color, emissive, emissiveIntensity: tall ? 1.5 : 1.05,
-      transparent: true, opacity, metalness: 0.1, roughness: 0.4,
+      color, emissive, emissiveIntensity: intensity,
+      transparent: opacity < 1, opacity,
+      metalness: 0.35, roughness: 0.25,
     });
+  }
+
+  _makeGlassMat(color, emissive, { opacity = 0.4, intensity = 1.2 } = {}) {
+    return new THREE.MeshPhysicalMaterial({
+      color, emissive, emissiveIntensity: intensity,
+      transparent: true, opacity,
+      metalness: 0.15, roughness: 0.12,
+      transmission: 0.35, thickness: 0.4,
+      clearcoat: 0.6, clearcoatRoughness: 0.15,
+    });
+  }
+
+  _addEdges(parent, geo, color, opacity = 0.55, scaleY = 1) {
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending })
+    );
+    edges.scale.y = scaleY;
+    parent.add(edges);
+    return edges;
   }
 
   _cellKey(x, y) { return x + ',' + y; }
@@ -88,11 +146,11 @@ export class Renderer {
     this.cellMeshes.clear();
     this.riderMeshes.forEach(g => this.scene.remove(g));
     this.riderMeshes.clear();
-    this.liveTrails.forEach(m => this.scene.remove(m));
+    this.liveTrails.forEach(g => this.scene.remove(g));
     this.liveTrails.clear();
     this.explosions.forEach(e => this.scene.remove(e.points));
     this.explosions = [];
-    this.trailMats = getRiderDefs().map(d => this._makeMat(d.trail, d.trailGlow, 0.55, false));
+    this._rebuildTrailMats();
     this.camReady = false;
   }
 
@@ -119,7 +177,7 @@ export class Renderer {
   }
 
   _isMobileCell(x, y, wallSystem) {
-    if (!wallSystem) return false;
+    if (!wallSystem) return null;
     for (const w of wallSystem.walls) {
       for (const c of w.renderPositions()) {
         if (c.x === x && c.y === y) return w;
@@ -128,57 +186,245 @@ export class Renderer {
     return null;
   }
 
+  _buildTrailGroup(trailIdx) {
+    const g = new THREE.Group();
+    const shellMat = this.trailMats[trailIdx].clone();
+    const coreMat = this.trailCoreMats[trailIdx].clone();
+
+    const armX = new THREE.Mesh(this.trailArmGeo, shellMat);
+    armX.scale.y = TRAIL_H;
+    g.add(armX);
+
+    const armZ = new THREE.Mesh(this.trailArmGeo, shellMat.clone());
+    armZ.rotation.y = Math.PI / 2;
+    armZ.scale.y = TRAIL_H;
+    g.add(armZ);
+
+    const core = new THREE.Mesh(this.trailCoreGeo, coreMat);
+    core.scale.y = TRAIL_H * 1.02;
+    g.add(core);
+
+    this._addEdges(g, this.trailArmGeo, 0xffffff, 0.35, TRAIL_H);
+    const edgeZ = this._addEdges(g, this.trailArmGeo, 0xffffff, 0.35, TRAIL_H);
+    edgeZ.rotation.y = Math.PI / 2;
+
+    g.userData.shellMats = [armX.material, armZ.material];
+    g.userData.coreMat = coreMat;
+    return g;
+  }
+
+  _buildWallGroup(glassMat, coreMat, h, edgeColor) {
+    const g = new THREE.Group();
+    const shell = new THREE.Mesh(this.wallGeo, glassMat.clone());
+    shell.scale.y = h;
+    g.add(shell);
+
+    const core = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL_SIZE * 0.22, 1, CELL_SIZE * 0.22),
+      coreMat.clone()
+    );
+    core.scale.y = h * 0.96;
+    g.add(core);
+
+    this._addEdges(g, this.wallGeo, edgeColor, 0.5, h);
+    g.userData.shellMat = shell.material;
+    g.userData.coreMat = core.material;
+    return g;
+  }
+
+  _buildPerimeterGroup(h) {
+    const g = new THREE.Group();
+    const shell = new THREE.Mesh(this.wallGeo, this.matPerimeter.clone());
+    shell.scale.y = h;
+    g.add(shell);
+
+    const cap = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL_SIZE * 0.96, 0.06, CELL_SIZE * 0.96),
+      this.matPerimeterCap.clone()
+    );
+    cap.position.y = h / 2 - 0.02;
+    g.add(cap);
+
+    const core = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL_SIZE * 0.18, 1, CELL_SIZE * 0.18),
+      this._makeNeonMat(0xffffff, 0xcc99ff, { intensity: 2.5, opacity: 0.9 })
+    );
+    core.scale.y = h * 0.92;
+    g.add(core);
+
+    this._addEdges(g, this.wallGeo, 0xeeddff, 0.65, h);
+    g.userData.shellMat = shell.material;
+    return g;
+  }
+
   _setCellMesh(x, y, type, grid, wallSystem) {
     const key = this._cellKey(x, y);
     const existing = this.cellMeshes.get(key);
     if (existing) { this.scene.remove(existing); this.cellMeshes.delete(key); }
 
-    const perimeter = type === CELL_WALL && grid.isPerimeter(x, y);
-    let mat, h;
-    if (isTrail(type)) { mat = this.trailMats[type - TRAIL_BASE]; h = TRAIL_H; }
-    else if (perimeter) { mat = this.matPerimeter; h = PERIM_H; }
-    else if (type === CELL_WALL && this._isMobileCell(x, y, wallSystem)) {
-      mat = this.matMobile.clone(); h = WALL_H;
-    }
-    else { mat = this.matWall; h = WALL_H; }
-
-    const mesh = new THREE.Mesh(this.boxGeo, mat);
+    let group, h;
     const p = this.gridToWorld(x, y);
-    mesh.position.set(p.x, h / 2, p.z);
-    mesh.scale.y = h;
-    this.scene.add(mesh);
-    this.cellMeshes.set(key, mesh);
+
+    if (isTrail(type)) {
+      group = this._buildTrailGroup(type - TRAIL_BASE);
+      h = TRAIL_H;
+    } else if (type === CELL_WALL && grid.isPerimeter(x, y)) {
+      group = this._buildPerimeterGroup(PERIM_H);
+      h = PERIM_H;
+    } else if (type === CELL_WALL && this._isMobileCell(x, y, wallSystem)) {
+      group = this._buildWallGroup(this.matMobile, this.matMobileCore, WALL_H, 0xffcc66);
+      h = WALL_H;
+    } else {
+      group = this._buildWallGroup(this.matWall, this.matWallCore, WALL_H, 0xbb99ff);
+      h = WALL_H;
+    }
+
+    group.position.set(p.x, h / 2, p.z);
+    this.scene.add(group);
+    this.cellMeshes.set(key, group);
   }
 
   syncMobileWarnings(wallSystem, now) {
     for (const w of wallSystem.walls) {
       for (const { x, y } of w.renderPositions()) {
-        const mesh = this.cellMeshes.get(this._cellKey(x, y));
-        if (!mesh?.material) continue;
+        const group = this.cellMeshes.get(this._cellKey(x, y));
+        if (!group?.userData?.shellMat) continue;
         const lvl = w.warningLevel;
-        if (lvl === 0) mesh.material.emissiveIntensity = 1.05;
-        else if (lvl === 1) mesh.material.emissiveIntensity = 0.85;
-        else if (lvl === 2) mesh.material.emissiveIntensity = 0.8 + Math.sin(now / 70) * 0.6;
-        else mesh.material.emissiveIntensity = 1.4 + Math.sin(now / 40) * 0.4;
+        let pulse = 1.05;
+        if (lvl === 1) pulse = 0.75;
+        else if (lvl === 2) pulse = 0.85 + Math.sin(now / 65) * 0.55;
+        else if (lvl === 3) pulse = 1.5 + Math.sin(now / 35) * 0.45;
+        group.userData.shellMat.emissiveIntensity = pulse;
+        if (group.userData.coreMat) group.userData.coreMat.emissiveIntensity = pulse * 1.4;
       }
     }
   }
 
   _buildBike(def) {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.22, 0.85), this._makeMat(def.body, def.glow, 1, true));
-    body.position.y = 0.25; g.add(body);
-    const cockpit = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.35), this._makeMat(0xffffee, 0xffffaa, 1, true));
-    cockpit.position.set(0, 0.38, -0.15); g.add(cockpit);
-    const wheelGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12);
-    const wMat = this._makeMat(0xffffff, def.wheel, 1, true);
-    [-0.28, 0.28].forEach(s => {
-      const w = new THREE.Mesh(wheelGeo, wMat);
-      w.rotation.z = Math.PI / 2; w.position.set(s, 0.12, 0.28); g.add(w);
+    const stripMat = this._makeNeonMat(def.glow, def.wheel, { intensity: 2.8, opacity: 0.95 });
+    const bodyMat = this._makeNeonMat(def.body, def.glow, { intensity: 1.6, opacity: 0.92 });
+    const darkMat = this._makeNeonMat(0x0a0a18, def.glow, { intensity: 0.35, opacity: 0.95 });
+
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.16, 0.78), darkMat);
+    chassis.position.y = 0.2;
+    g.add(chassis);
+
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.32), bodyMat);
+    nose.position.set(0, 0.26, -0.28);
+    g.add(nose);
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.08, 0.22), stripMat);
+    canopy.position.set(0, 0.34, -0.18);
+    g.add(canopy);
+
+    const addStrip = (sx, sy, sz, w, ht, d) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(w, ht, d), stripMat.clone());
+      s.position.set(sx, sy, sz);
+      g.add(s);
+    };
+    addStrip(-0.2, 0.22, 0.02, 0.035, 0.12, 0.62);
+    addStrip(0.2, 0.22, 0.02, 0.035, 0.12, 0.62);
+    addStrip(0, 0.3, 0.1, 0.5, 0.025, 0.035);
+
+    const ringGeo = new THREE.TorusGeometry(0.13, 0.028, 10, 28);
+    const wheelMat = this._makeNeonMat(def.wheel, def.wheel, { intensity: 3, opacity: 1 });
+    [-0.24, 0.24].forEach(s => {
+      const ring = new THREE.Mesh(ringGeo, wheelMat.clone());
+      ring.rotation.y = Math.PI / 2;
+      ring.position.set(s, 0.13, 0.22);
+      g.add(ring);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12), darkMat);
+      hub.rotation.z = Math.PI / 2;
+      hub.position.set(s, 0.13, 0.22);
+      g.add(hub);
     });
-    const emitter = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), this._makeMat(def.wheel, def.wheel, 1, true));
-    emitter.position.set(0, 0.3, 0.45); g.add(emitter);
+
+    const emitter = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 14, 14),
+      this._makeNeonMat(def.trailGlow, def.trailGlow, { intensity: 3.5, opacity: 1 })
+    );
+    emitter.position.set(0, 0.26, 0.36);
+    g.add(emitter);
+
+    const disc = new THREE.Mesh(
+      new THREE.RingGeometry(0.12, 0.38, 32),
+      new THREE.MeshBasicMaterial({
+        color: def.glow, transparent: true, opacity: 0.32,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      })
+    );
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = 0.015;
+    g.add(disc);
+
+    const light = new THREE.PointLight(def.glow, 0.85, 5.5);
+    light.position.set(0, 0.45, 0.1);
+    g.add(light);
+
+    g.userData.emitter = emitter;
+    g.userData.disc = disc;
+    g.userData.light = light;
     return g;
+  }
+
+  _buildLiveTrail(def) {
+    const g = new THREE.Group();
+    const shellMat = this._makeGlassMat(def.trail, def.trailGlow, { opacity: 0.55, intensity: 1.8 });
+    const coreMat = this._makeNeonMat(def.trailGlow, def.trailGlow, { intensity: 3.2, opacity: 1 });
+
+    const head = new THREE.Mesh(this.trailArmGeo, shellMat);
+    head.scale.y = TRAIL_H;
+    g.add(head);
+    const headCore = new THREE.Mesh(this.trailCoreGeo, coreMat);
+    headCore.scale.y = TRAIL_H;
+    g.add(headCore);
+
+    const segGeo = new THREE.BoxGeometry(1, 1, TRAIL_PANEL);
+    const segment = new THREE.Mesh(segGeo, shellMat.clone());
+    segment.scale.y = TRAIL_H;
+    g.add(segment);
+    const segCore = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, TRAIL_PANEL * 0.5),
+      coreMat.clone()
+    );
+    segCore.scale.y = TRAIL_H;
+    g.add(segCore);
+
+    g.userData.head = head;
+    g.userData.headCore = headCore;
+    g.userData.segment = segment;
+    g.userData.segCore = segCore;
+    return g;
+  }
+
+  _updateLiveTrail(lt, rider) {
+    const p = this.gridToWorld(rider.renderX, rider.renderY, this._worldPos);
+    const prev = this.gridToWorld(rider.prevX, rider.prevY, this._worldPos2);
+
+    lt.userData.head.position.set(p.x, TRAIL_H / 2, p.z);
+    lt.userData.headCore.position.set(p.x, TRAIL_H / 2, p.z);
+
+    const dx = p.x - prev.x;
+    const dz = p.z - prev.z;
+    const dist = Math.hypot(dx, dz);
+
+    if (dist > 0.02) {
+      const midX = (p.x + prev.x) / 2;
+      const midZ = (p.z + prev.z) / 2;
+      const angle = Math.atan2(dz, dx);
+      lt.userData.segment.visible = true;
+      lt.userData.segCore.visible = true;
+      lt.userData.segment.position.set(midX, TRAIL_H / 2, midZ);
+      lt.userData.segCore.position.set(midX, TRAIL_H / 2, midZ);
+      lt.userData.segment.rotation.y = -angle;
+      lt.userData.segCore.rotation.y = -angle;
+      lt.userData.segment.scale.set(dist, TRAIL_H, 1);
+      lt.userData.segCore.scale.set(dist, TRAIL_H, 1);
+    } else {
+      lt.userData.segment.visible = false;
+      lt.userData.segCore.visible = false;
+    }
   }
 
   ensureRiderMesh(rider) {
@@ -190,7 +436,7 @@ export class Renderer {
     return this.riderMeshes.get(rider.id);
   }
 
-  syncRiders(riders, playing) {
+  syncRiders(riders, playing, now = performance.now()) {
     for (const r of riders) {
       if (!r.alive) {
         const mesh = this.riderMeshes.get(r.id);
@@ -210,23 +456,26 @@ export class Renderer {
       r.smoothAngle += diff * 0.28;
       mesh.rotation.y = r.smoothAngle;
 
+      const pulse = 0.85 + Math.sin(now / 120 + r.id) * 0.15;
+      if (mesh.userData.emitter) mesh.userData.emitter.scale.setScalar(pulse);
+      if (mesh.userData.disc) mesh.userData.disc.material.opacity = 0.22 + Math.sin(now / 180) * 0.1;
+      if (mesh.userData.light) mesh.userData.light.intensity = 0.7 + Math.sin(now / 140 + r.id) * 0.2;
+
       if (playing) {
         let lt = this.liveTrails.get(r.id);
         if (!lt) {
-          lt = new THREE.Mesh(this.boxGeo, this._makeMat(r.def.trail, r.def.trailGlow, 0.35, false));
+          lt = this._buildLiveTrail(r.def);
           this.scene.add(lt);
           this.liveTrails.set(r.id, lt);
         }
-        const lp = this.gridToWorld(r.renderX, r.renderY);
-        lt.position.set(lp.x, TRAIL_H / 2, lp.z);
-        lt.scale.y = TRAIL_H;
+        this._updateLiveTrail(lt, r);
       }
     }
   }
 
   spawnExplosion(rider) {
     const p = this.gridToWorld(rider.x, rider.y, this._worldPos);
-    const count = 40;
+    const count = 48;
     const positions = new Float32Array(count * 3);
     const vel = [];
     for (let i = 0; i < count; i++) {
@@ -234,15 +483,15 @@ export class Renderer {
       positions[i * 3 + 1] = TRAIL_H + 0.2;
       positions[i * 3 + 2] = p.z;
       vel.push({
-        x: (Math.random() - 0.5) * 0.35,
-        y: 0.05 + Math.random() * 0.2,
-        z: (Math.random() - 0.5) * 0.35,
+        x: (Math.random() - 0.5) * 0.4,
+        y: 0.06 + Math.random() * 0.25,
+        z: (Math.random() - 0.5) * 0.4,
       });
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const points = new THREE.Points(geo, new THREE.PointsMaterial({
-      color: rider.def.body, size: 0.3, transparent: true, opacity: 1,
+      color: rider.def.trailGlow, size: 0.35, transparent: true, opacity: 1,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     this.scene.add(points);
@@ -251,13 +500,13 @@ export class Renderer {
 
   updateExplosions() {
     this.explosions = this.explosions.filter(e => {
-      e.life -= 0.028;
+      e.life -= 0.026;
       const pos = e.points.geometry.attributes.position;
       for (let i = 0; i < e.vel.length; i++) {
         pos.array[i * 3] += e.vel[i].x;
         pos.array[i * 3 + 1] += e.vel[i].y;
         pos.array[i * 3 + 2] += e.vel[i].z;
-        e.vel[i].y -= 0.01;
+        e.vel[i].y -= 0.012;
       }
       pos.needsUpdate = true;
       e.points.material.opacity = Math.max(0, e.life);
@@ -270,7 +519,7 @@ export class Renderer {
     if (!player?.alive) return;
     const p = this.gridToWorld(player.renderX, player.renderY, this._worldPos);
     const targetAngle = CAM_DIR_ANGLES[player.dir];
-    const dist = 14, height = 12, lookAhead = 4;
+    const dist = 14, height = 12.5, lookAhead = 4.5;
 
     if (!this.camReady) {
       this.smoothCamX = p.x; this.smoothCamZ = p.z;
@@ -290,7 +539,7 @@ export class Renderer {
     );
     this.camera.lookAt(
       this.smoothCamX + Math.cos(this.smoothCamAngle) * lookAhead,
-      TRAIL_H,
+      TRAIL_H * 0.55,
       this.smoothCamZ + Math.sin(this.smoothCamAngle) * lookAhead
     );
   }
