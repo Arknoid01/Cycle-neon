@@ -204,7 +204,7 @@ export class UI {
 
   showMenu() {
     this.buildHomeMenu();
-    this.challengeHudEl.textContent = '';
+    if (this.challengeHudEl) this.challengeHudEl.textContent = '';
     this.multiplierEl?.classList.add('hidden');
     this.champHudEl?.classList.add('hidden');
     this.homeMenu.classList.remove('hidden');
@@ -239,7 +239,7 @@ export class UI {
     if (playing) this.timerEl.textContent = 'T : ' + sim.getElapsedSeconds(now).toFixed(2);
     const ch = this.activeChallengeId
       ? CHALLENGES.find(c => c.id === this.activeChallengeId) : null;
-    this.challengeHudEl.textContent = ch ? 'Défi : ' + ch.name : '';
+    if (this.challengeHudEl) this.challengeHudEl.textContent = ch ? 'Défi : ' + ch.name : '';
 
     if (sim.multiplier > 1 && this.multiplierEl) {
       this.multiplierEl.classList.remove('hidden');
@@ -325,7 +325,7 @@ export class UI {
     this.overlayHint.textContent = 'Toucher pour revenir au menu';
     this.overlay.classList.remove('hidden');
     this.controls.classList.add('hidden');
-    this.challengeHudEl.textContent = '';
+    if (this.challengeHudEl) this.challengeHudEl.textContent = '';
     this.multiplierEl?.classList.add('hidden');
   }
 
