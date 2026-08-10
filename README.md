@@ -1,26 +1,29 @@
 # Light Cycle Neon
 
-Prototype arcade Light Cycle — un seul fichier HTML, zéro serveur.
+Jeu arcade Light Cycle — **Three.js / WebGL**, un seul fichier HTML.
 
 ## Lancer
 
-Double-cliquer sur `index.html`.
+Servir via HTTP (Three.js CDN) :
+
+```bash
+python3 -m http.server 8080
+# → http://localhost:8080
+```
+
+Ou double-clic sur `index.html` si le navigateur autorise le CDN.
+
+## Stack
+
+- **Three.js** (WebGL) — rendu GPU, murs 3D, caméra chase
+- Logique grille en JS pur (collisions, arènes, score)
+- Web Audio procédural
+- Capacitor-ready (wrapper mobile plus tard)
 
 ## Contrôles
 
-- **Mobile** : boutons flèches transparents (style émulateur)
-- **Desktop** : `A` / `←` et `D` / `→`, `Espace` pour rejouer
+- Flèches transparentes (mobile) ou `A`/`D` (desktop)
 
-## V2 (actuel)
+## Arènes
 
-- **4 arènes** : Le Battement, Le Compresseur, Le Piège, Le Classique
-- Rotation aléatoire à chaque mort
-- Sons procéduraux (moteur, virage, crash, quasi-collision)
-- Feedback quasi-collision (flash + glow)
-- HUD : nom d'arène, record, score
-- Accélération progressive
-
-## V1
-
-- Grille, moto, trace, collisions, murs mobiles
-- Rendu néon, particules, restart instantané
+Le Battement, Le Compresseur, Le Piège, Le Classique
