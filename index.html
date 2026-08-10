@@ -35,17 +35,46 @@
       pointer-events: none;
     }
 
+    #hud-top {
+      position: absolute;
+      top: env(safe-area-inset-top, 12px);
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-top: 8px;
+      gap: 8px;
+    }
+
+    #arena-name {
+      font-size: 11px;
+      color: rgba(255, 136, 0, 0.85);
+      text-shadow: 0 0 8px rgba(255, 100, 0, 0.6);
+      letter-spacing: 1px;
+      max-width: 42%;
+      line-height: 1.3;
+    }
+
+    #high-score {
+      font-size: 11px;
+      color: rgba(255, 255, 0, 0.6);
+      text-shadow: 0 0 6px rgba(255, 255, 0, 0.4);
+      letter-spacing: 1px;
+      text-align: right;
+    }
+
     #score {
       position: absolute;
       top: env(safe-area-inset-top, 16px);
       left: 0;
       right: 0;
       text-align: center;
-      font-size: 28px;
+      font-size: 32px;
       font-weight: bold;
       color: #0ff;
       text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #08f;
-      padding-top: 16px;
+      padding-top: 28px;
       letter-spacing: 2px;
     }
 
@@ -64,12 +93,27 @@
       display: none;
     }
 
+    #overlay-title {
+      font-size: 14px;
+      color: rgba(255, 136, 0, 0.8);
+      text-shadow: 0 0 10px rgba(255, 100, 0, 0.5);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
     #overlay-score {
       font-size: 48px;
       font-weight: bold;
       color: #f0f;
       text-shadow: 0 0 15px #f0f, 0 0 30px #f0f, 0 0 60px #80f;
       letter-spacing: 3px;
+    }
+
+    #overlay-best {
+      font-size: 13px;
+      color: rgba(255, 255, 0, 0.55);
+      margin-top: 8px;
+      letter-spacing: 1px;
     }
 
     #overlay-record {
@@ -80,10 +124,17 @@
       letter-spacing: 2px;
     }
 
+    #overlay-next {
+      font-size: 12px;
+      color: rgba(0, 255, 255, 0.45);
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+
     #overlay-hint {
       font-size: 14px;
       color: rgba(255, 255, 255, 0.5);
-      margin-top: 32px;
+      margin-top: 24px;
       letter-spacing: 1px;
     }
 
@@ -151,10 +202,17 @@
   <canvas id="game"></canvas>
 
   <div id="ui">
+    <div id="hud-top">
+      <div id="arena-name"></div>
+      <div id="high-score"></div>
+    </div>
     <div id="score">0</div>
     <div id="overlay" class="hidden">
+      <div id="overlay-title"></div>
       <div id="overlay-score"></div>
+      <div id="overlay-best"></div>
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
+      <div id="overlay-next"></div>
       <div id="overlay-hint">Toucher pour rejouer</div>
     </div>
     <div id="controls" class="hidden">
@@ -195,12 +253,20 @@
       grid: 'rgba(0, 40, 60, 0.35)',
     };
 
+    const BASE_TICK = 130;
+    const MIN_TICK = 62;
+
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
+    const arenaNameEl = document.getElementById('arena-name');
+    const highScoreEl = document.getElementById('high-score');
     const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
     const overlayScore = document.getElementById('overlay-score');
+    const overlayBest = document.getElementById('overlay-best');
     const overlayRecord = document.getElementById('overlay-record');
+    const overlayNext = document.getElementById('overlay-next');
     const overlayHint = document.getElementById('overlay-hint');
     const controls = document.getElementById('controls');
     const btnLeft = document.getElementById('btn-left');
@@ -210,6 +276,9 @@
     let grid;
     let player;
     let mobileWalls;
+    let arenaState;
+    let currentArena;
+    let nextArenaPreview;
     let score;
     let highScore;
     let tickMs;
@@ -218,6 +287,161 @@
     let turnQueue;
     let particles;
     let shakeTimer;
+    let nearMissTimer;
+    let flashTimer;
+    let audioCtx;
+    let engineOsc;
+    let engineGain;
+    let audioReady;
+
+    const ARENAS = [
+      {
+        id: 'battement',
+        name: 'Le Battement',
+        next: 'Le Compresseur',
+        init() {
+          mobileWalls = [
+            {
+              x: Math.floor(gridW / 2),
+              y: Math.floor(gridH / 2),
+              dir: DIR_RIGHT,
+              min: 3,
+              max: gridW - 4,
+              interval: 4000,
+              lastMove: performance.now(),
+              warning: false,
+            },
+            {
+              x: Math.floor(gridW / 2),
+              y: Math.floor(gridH / 3),
+              dir: DIR_LEFT,
+              min: 3,
+              max: gridW - 4,
+              interval: 3000,
+              lastMove: performance.now(),
+              warning: false,
+            },
+          ];
+          arenaState = {};
+        },
+        update(now) {
+          for (const w of mobileWalls) {
+            const elapsed = now - w.lastMove;
+            w.warning = elapsed > w.interval - 800;
+            if (elapsed >= w.interval) {
+              w.lastMove = now;
+              const step = w.dir === DIR_RIGHT ? 1 : -1;
+              let next = w.x + step;
+              if (next > w.max || next < w.min) {
+                w.dir = w.dir === DIR_RIGHT ? DIR_LEFT : DIR_RIGHT;
+                next = w.x + (w.dir === DIR_RIGHT ? 1 : -1);
+              }
+              w.x = next;
+              playWallShift();
+            }
+          }
+        },
+      },
+      {
+        id: 'compresseur',
+        name: 'Le Compresseur',
+        next: 'Le Piège',
+        init() {
+          mobileWalls = [];
+          arenaState = {
+            margin: 0,
+            lastShrink: performance.now(),
+            interval: 5000,
+            warning: false,
+          };
+        },
+        update(now) {
+          const s = arenaState;
+          const elapsed = now - s.lastShrink;
+          s.warning = elapsed > s.interval - 1000;
+          if (elapsed >= s.interval) {
+            s.lastShrink = now;
+            s.margin++;
+            const m = s.margin;
+            const limit = Math.floor(Math.min(gridW, gridH) / 2) - 3;
+            if (m > limit) return;
+
+            for (let x = m; x < gridW - m; x++) {
+              setCell(x, m, CELL_WALL);
+              setCell(x, gridH - 1 - m, CELL_WALL);
+            }
+            for (let y = m; y < gridH - m; y++) {
+              setCell(m, y, CELL_WALL);
+              setCell(gridW - 1 - m, y, CELL_WALL);
+            }
+            playWallShift();
+          }
+        },
+      },
+      {
+        id: 'piege',
+        name: 'Le Piège',
+        next: 'Le Classique',
+        init() {
+          mobileWalls = [];
+          const cx = Math.floor(gridW / 2);
+          arenaState = {
+            gates: [
+              { x: cx - 2, yMin: 2, yMax: gridH - 3, open: true, interval: 4500, lastToggle: performance.now(), warning: false },
+              { x: cx + 2, yMin: 2, yMax: gridH - 3, open: true, interval: 3500, lastToggle: performance.now(), warning: false },
+            ],
+          };
+          syncGates();
+        },
+        update(now) {
+          for (const g of arenaState.gates) {
+            const elapsed = now - g.lastToggle;
+            g.warning = elapsed > g.interval - 900;
+            if (elapsed >= g.interval) {
+              g.lastToggle = now;
+              g.open = !g.open;
+              syncGate(g);
+              playWallShift();
+            }
+          }
+        },
+      },
+      {
+        id: 'classique',
+        name: 'Le Classique',
+        next: 'Le Battement',
+        init() {
+          mobileWalls = [];
+          arenaState = {};
+        },
+        update() {},
+      },
+    ];
+
+    function syncGate(g) {
+      for (let y = g.yMin; y <= g.yMax; y++) {
+        if (g.open) {
+          if (getCell(g.x, y) === CELL_WALL) setCell(g.x, y, CELL_EMPTY);
+        } else {
+          setCell(g.x, y, CELL_WALL);
+        }
+      }
+    }
+
+    function syncGates() {
+      for (const g of arenaState.gates) syncGate(g);
+    }
+
+    function selectArena() {
+      return ARENAS[Math.floor(Math.random() * ARENAS.length)];
+    }
+
+    function pickArenas(rotate) {
+      if (rotate) {
+        currentArena = nextArenaPreview;
+      }
+      nextArenaPreview = selectArena();
+    }
 
     function loadHighScore() {
       try {
@@ -233,10 +457,76 @@
       } catch { /* file:// ou mode privé */ }
     }
 
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        engineOsc = audioCtx.createOscillator();
+        engineGain = audioCtx.createGain();
+        engineOsc.type = 'sawtooth';
+        engineOsc.frequency.value = 90;
+        engineGain.gain.value = 0;
+        engineOsc.connect(engineGain);
+        engineGain.connect(audioCtx.destination);
+        engineOsc.start();
+        audioReady = true;
+      } catch { /* audio unavailable */ }
+    }
+
+    function unlockAudio() {
+      if (!audioCtx) initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      if (engineGain && playing) engineGain.gain.value = 0.028;
+    }
+
+    function updateEngineSound() {
+      if (!engineOsc || !engineGain || !playing) return;
+      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
+      engineOsc.frequency.setTargetAtTime(70 + speed * 140, audioCtx.currentTime, 0.05);
+      engineGain.gain.setTargetAtTime(0.02 + speed * 0.03, audioCtx.currentTime, 0.05);
+    }
+
+    function stopEngine() {
+      if (engineGain) engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    }
+
+    function playTone(freq, dur, type, vol) {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type || 'square';
+      osc.frequency.value = freq;
+      gain.gain.value = vol || 0.08;
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + dur);
+    }
+
+    function playTurn() {
+      playTone(320, 0.06, 'square', 0.05);
+    }
+
+    function playWallShift() {
+      playTone(180, 0.12, 'sawtooth', 0.06);
+    }
+
+    function playNearMiss() {
+      playTone(520, 0.08, 'sine', 0.07);
+    }
+
+    function playCrash() {
+      if (!audioCtx) return;
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => playTone(80 + Math.random() * 200, 0.15, 'sawtooth', 0.12), i * 40);
+      }
+    }
+
     function initGridDimensions() {
       const margin = 16;
       const availW = canvas.width - margin * 2;
-      const availH = canvas.height - margin * 2 - 60;
+      const availH = canvas.height - margin * 2 - 80;
 
       const targetCols = 18;
       const targetRows = 28;
@@ -248,7 +538,7 @@
       gridH = Math.floor(availH / cellSize);
 
       offsetX = Math.floor((canvas.width - gridW * cellSize) / 2);
-      offsetY = Math.floor((canvas.height - gridH * cellSize) / 2) + 20;
+      offsetY = Math.floor((canvas.height - gridH * cellSize) / 2) + 24;
     }
 
     function createGrid() {
@@ -274,31 +564,6 @@
       grid[y * gridW + x] = val;
     }
 
-    function createMobileWalls() {
-      mobileWalls = [
-        {
-          x: Math.floor(gridW / 2),
-          y: Math.floor(gridH / 2),
-          dir: DIR_RIGHT,
-          min: 3,
-          max: gridW - 4,
-          interval: 4000,
-          lastMove: 0,
-          warning: false,
-        },
-        {
-          x: Math.floor(gridW / 2),
-          y: Math.floor(gridH / 3),
-          dir: DIR_LEFT,
-          min: 3,
-          max: gridW - 4,
-          interval: 3000,
-          lastMove: 0,
-          warning: false,
-        },
-      ];
-    }
-
     function createPlayer() {
       const startX = Math.floor(gridW / 2);
       const startY = gridH - 4;
@@ -311,37 +576,52 @@
       };
     }
 
-    function resetGame() {
+    function updateHud() {
+      arenaNameEl.textContent = currentArena.name;
+      highScoreEl.textContent = 'BEST ' + highScore.toLocaleString('fr-FR');
+      scoreEl.textContent = score.toLocaleString('fr-FR');
+    }
+
+    function resetGame(rotateArena) {
       initGridDimensions();
       createGrid();
-      createMobileWalls();
+      if (rotateArena) pickArenas(true);
+      currentArena.init();
       createPlayer();
       score = 0;
-      tickMs = 130;
+      tickMs = BASE_TICK;
       lastTick = 0;
       turnQueue = null;
       particles = [];
       shakeTimer = 0;
+      nearMissTimer = 0;
+      flashTimer = 0;
       playing = true;
       overlay.classList.add('hidden');
       controls.classList.remove('hidden');
-      updateScoreDisplay();
-    }
-
-    function updateScoreDisplay() {
-      scoreEl.textContent = score.toLocaleString('fr-FR');
+      updateHud();
+      unlockAudio();
+      updateEngineSound();
     }
 
     function turnLeft() {
       if (!playing) return;
+      unlockAudio();
       const newDir = (player.dir + 3) % 4;
-      if (newDir !== (player.dir + 2) % 4) turnQueue = newDir;
+      if (newDir !== (player.dir + 2) % 4) {
+        turnQueue = newDir;
+        playTurn();
+      }
     }
 
     function turnRight() {
       if (!playing) return;
+      unlockAudio();
       const newDir = (player.dir + 1) % 4;
-      if (newDir !== (player.dir + 2) % 4) turnQueue = newDir;
+      if (newDir !== (player.dir + 2) % 4) {
+        turnQueue = newDir;
+        playTurn();
+      }
     }
 
     function isMobileWallAt(x, y) {
@@ -351,30 +631,25 @@
       return false;
     }
 
-    function updateMobileWalls(now) {
-      for (const w of mobileWalls) {
-        const elapsed = now - w.lastMove;
-        w.warning = elapsed > w.interval - 800;
-
-        if (elapsed >= w.interval) {
-          w.lastMove = now;
-          const step = w.dir === DIR_RIGHT ? 1 : -1;
-          let next = w.x + step;
-
-          if (next > w.max || next < w.min) {
-            w.dir = w.dir === DIR_RIGHT ? DIR_LEFT : DIR_RIGHT;
-            next = w.x + (w.dir === DIR_RIGHT ? 1 : -1);
-          }
-
-          w.x = next;
+    function checkNearMiss() {
+      for (let d = 0; d < 4; d++) {
+        const nx = player.x + DX[d];
+        const ny = player.y + DY[d];
+        const cell = getCell(nx, ny);
+        if (cell === CELL_WALL || cell === CELL_TRAIL || isMobileWallAt(nx, ny)) {
+          nearMissTimer = 200;
+          flashTimer = 120;
+          playNearMiss();
+          return;
         }
       }
     }
 
-    function spawnParticles(x, y, color) {
-      for (let i = 0; i < 24; i++) {
-        const angle = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
-        const speed = 1 + Math.random() * 3;
+    function spawnParticles(x, y, color, count) {
+      const n = count || 24;
+      for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 * i) / n + Math.random() * 0.3;
+        const speed = 1 + Math.random() * 4;
         particles.push({
           x: x * cellSize + offsetX + cellSize / 2,
           y: y * cellSize + offsetY + cellSize / 2,
@@ -391,7 +666,9 @@
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.life -= 0.03;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        p.life -= 0.025;
         if (p.life <= 0) particles.splice(i, 1);
       }
     }
@@ -423,18 +700,22 @@
       player.y = ny;
       score++;
 
-      if (score % 15 === 0 && tickMs > 65) {
-        tickMs -= 3;
+      if (score % 12 === 0 && tickMs > MIN_TICK) {
+        tickMs -= 2;
+        updateEngineSound();
       }
 
-      updateScoreDisplay();
+      checkNearMiss();
+      updateHud();
     }
 
     function die() {
       playing = false;
-      shakeTimer = 300;
-      spawnParticles(player.x, player.y, COLORS.player);
-      spawnParticles(player.x, player.y, COLORS.trail);
+      shakeTimer = 400;
+      stopEngine();
+      playCrash();
+      spawnParticles(player.x, player.y, COLORS.player, 32);
+      spawnParticles(player.x, player.y, COLORS.trail, 24);
 
       const isRecord = score > highScore;
       if (isRecord) {
@@ -442,8 +723,11 @@
         saveHighScore(highScore);
       }
 
+      overlayTitle.textContent = currentArena.name;
       overlayScore.textContent = score.toLocaleString('fr-FR');
+      overlayBest.textContent = 'Record : ' + highScore.toLocaleString('fr-FR');
       overlayRecord.classList.toggle('hidden', !isRecord);
+      overlayNext.textContent = 'Prochaine arène : ' + nextArenaPreview.name;
       overlayHint.textContent = 'Toucher pour rejouer';
       overlay.classList.remove('hidden');
       controls.classList.add('hidden');
@@ -452,11 +736,8 @@
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      if (grid) {
-        const savedScore = score;
-        resetGame();
-        score = savedScore;
-        updateScoreDisplay();
+      if (grid && playing) {
+        resetGame(false);
       }
     }
 
@@ -518,17 +799,46 @@
       }
     }
 
+    function drawPiegeGates() {
+      if (currentArena.id !== 'piege' || !arenaState.gates) return;
+      for (const g of arenaState.gates) {
+        if (g.open) continue;
+        const alpha = g.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.85;
+        for (let y = g.yMin; y <= g.yMax; y++) {
+          drawCell(g.x, y, COLORS.mobileWall, COLORS.mobileWallGlow, alpha);
+        }
+      }
+    }
+
+    function drawCompressWarning() {
+      if (currentArena.id !== 'compresseur' || !arenaState.warning) return;
+      const m = arenaState.margin + 1;
+      const alpha = 0.15 + Math.sin(Date.now() / 120) * 0.1;
+      ctx.strokeStyle = `rgba(255, 80, 0, ${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#ff4400';
+      ctx.shadowBlur = 12;
+      const x = offsetX + m * cellSize;
+      const y = offsetY + m * cellSize;
+      const w = (gridW - 2 * m) * cellSize;
+      const h = (gridH - 2 * m) * cellSize;
+      ctx.strokeRect(x, y, w, h);
+      ctx.shadowBlur = 0;
+    }
+
     function drawPlayer() {
       const px = offsetX + player.x * cellSize + cellSize / 2;
       const py = offsetY + player.y * cellSize + cellSize / 2;
-      const size = cellSize * 0.35;
+      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
+      const size = cellSize * (0.32 + speed * 0.06);
+      const glow = cellSize * (1 + speed * 0.5);
 
       ctx.save();
       ctx.translate(px, py);
       ctx.rotate((player.dir * Math.PI) / 2);
 
       ctx.shadowColor = COLORS.playerGlow;
-      ctx.shadowBlur = cellSize;
+      ctx.shadowBlur = glow;
       ctx.fillStyle = COLORS.player;
       ctx.beginPath();
       ctx.moveTo(0, -size);
@@ -538,7 +848,7 @@
       ctx.closePath();
       ctx.fill();
 
-      ctx.shadowBlur = cellSize * 0.4;
+      ctx.shadowBlur = glow * 0.4;
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.moveTo(0, -size * 0.5);
@@ -549,6 +859,16 @@
 
       ctx.restore();
       ctx.shadowBlur = 0;
+
+      if (nearMissTimer > 0) {
+        ctx.shadowColor = '#ff0';
+        ctx.shadowBlur = cellSize * 2;
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+        ctx.beginPath();
+        ctx.arc(px, py, cellSize * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
     }
 
     function drawParticles() {
@@ -568,12 +888,18 @@
       let shakeY = 0;
       if (shakeTimer > 0) {
         shakeTimer -= 16;
-        shakeX = (Math.random() - 0.5) * 6;
-        shakeY = (Math.random() - 0.5) * 6;
+        shakeX = (Math.random() - 0.5) * 8;
+        shakeY = (Math.random() - 0.5) * 8;
       }
 
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (flashTimer > 0) {
+        flashTimer -= 16;
+        ctx.fillStyle = `rgba(255, 255, 100, ${flashTimer / 400})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       ctx.save();
       ctx.translate(shakeX, shakeY);
@@ -582,6 +908,8 @@
       drawWalls();
       drawTrail();
       drawMobileWalls();
+      drawPiegeGates();
+      drawCompressWarning();
       if (playing) drawPlayer();
       drawParticles();
 
@@ -589,8 +917,10 @@
     }
 
     function gameLoop(timestamp) {
+      if (nearMissTimer > 0) nearMissTimer -= 16;
+
       if (playing && timestamp - lastTick >= tickMs) {
-        updateMobileWalls(timestamp);
+        currentArena.update(timestamp);
         gameTick(timestamp);
         lastTick = timestamp;
       }
@@ -620,26 +950,37 @@
 
     overlay.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      resetGame();
+      unlockAudio();
+      resetGame(true);
     });
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        if (!playing) resetGame();
-        else turnLeft();
+        if (!playing) {
+          unlockAudio();
+          resetGame(true);
+        } else turnLeft();
       } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        if (!playing) resetGame();
-        else turnRight();
+        if (!playing) {
+          unlockAudio();
+          resetGame(true);
+        } else turnRight();
       } else if (e.key === ' ' || e.key === 'Enter') {
-        if (!playing) resetGame();
+        if (!playing) {
+          unlockAudio();
+          resetGame(true);
+        }
       }
     });
 
     window.addEventListener('resize', resize);
 
     highScore = loadHighScore();
-    resize();
-    resetGame();
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    nextArenaPreview = selectArena();
+    currentArena = selectArena();
+    resetGame(false);
     requestAnimationFrame(gameLoop);
   })();
   </script>
