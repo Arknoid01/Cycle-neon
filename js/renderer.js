@@ -16,6 +16,7 @@ export class Renderer {
     this.camera = null;
     this.renderer = null;
     this.composer = null;
+    this.bloomPass = null;
     this.cellMeshes = new Map();
     this.riderMeshes = new Map();
     this.liveTrails = new Map();
@@ -90,9 +91,10 @@ export class Renderer {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new UnrealBloomPass(
+    this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight), 0.72, 0.42, 0.08
-    ));
+    );
+    this.composer.addPass(this.bloomPass);
   }
 
   _rebuildTrailMats() {
@@ -551,6 +553,10 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     if (this.composer) this.composer.setSize(w, h);
+  }
+
+  setBloomEnabled(on) {
+    if (this.bloomPass) this.bloomPass.enabled = on;
   }
 
   render() {

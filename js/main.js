@@ -2,8 +2,8 @@ import { Simulation } from './simulation.js';
 import { Renderer } from './renderer.js';
 import { UI } from './ui.js';
 import { pickArena, saveArenaPref } from './arenas.js';
-import {
-  initAudio, unlockAudio, updateEngineSound, stopEngine,
+import { getSettings } from './settings.js';
+import { initAudio, unlockAudio, updateEngineSound, stopEngine, setMasterVolume,
   playTurn, playWallShift, playWallWarn, playNearMiss, playCrash,
   playBotDeath, playKillBonus, playVictory,
 } from './audio.js';
@@ -26,6 +26,7 @@ function startArena(id) {
   menuVisible = false;
   renderer.clearAll();
   if (!renderer.scene) renderer.init();
+  renderer.setBloomEnabled(getSettings().bloom);
   sim.reset(currentArena.id);
   renderer.syncGrid(sim.grid);
   introUntil = ui.showIntro(currentArena);
@@ -96,8 +97,9 @@ function gameLoop(now) {
 }
 
 ui.applyScoreColor();
-ui.buildArenaMenu();
+ui.buildHomeMenu();
 ui.showMenu();
-ui.bind(startArena, showMenu, onTurn);
+ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom));
+setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => renderer.resize());
 requestAnimationFrame(gameLoop);
