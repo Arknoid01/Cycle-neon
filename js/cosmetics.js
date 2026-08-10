@@ -1,15 +1,15 @@
 export const COLOR_PRESETS = [
-  { id: 'cyan', body: 0xffe566, glow: 0xffcc00, wheel: 0x00eeff, trail: 0xb8f8ff, trailGlow: 0x00eeff },
-  { id: 'magenta', body: 0xffaacc, glow: 0xff66bb, wheel: 0xff44aa, trail: 0xffb8e8, trailGlow: 0xff0088 },
-  { id: 'orange', body: 0xffee88, glow: 0xffaa00, wheel: 0xff8800, trail: 0xffd8a8, trailGlow: 0xff6600 },
-  { id: 'lime', body: 0xeeff88, glow: 0xaaff00, wheel: 0x66ff44, trail: 0xd8ffb8, trailGlow: 0x44ff00 },
-  { id: 'violet', body: 0xddaaff, glow: 0xaa66ff, wheel: 0x8844ff, trail: 0xe8ccff, trailGlow: 0x6600ff },
-  { id: 'crimson', body: 0xffaaaa, glow: 0xff4444, wheel: 0xff0022, trail: 0xffc8c8, trailGlow: 0xff0044 },
+  { id: 'cyan', body: 0xccaa33, glow: 0xcc9900, wheel: 0x00aacc, trail: 0x66b8cc, trailGlow: 0x00aacc },
+  { id: 'magenta', body: 0xcc6699, glow: 0xcc4499, wheel: 0xcc3388, trail: 0x994466, trailGlow: 0xcc0066 },
+  { id: 'orange', body: 0xcc9944, glow: 0xcc8800, wheel: 0xcc6600, trail: 0x996633, trailGlow: 0xcc5500 },
+  { id: 'lime', body: 0x99cc44, glow: 0x77aa00, wheel: 0x44aa33, trail: 0x669944, trailGlow: 0x33aa00 },
+  { id: 'violet', body: 0x9966cc, glow: 0x7744cc, wheel: 0x6633cc, trail: 0x664499, trailGlow: 0x5500cc },
+  { id: 'crimson', body: 0xcc6666, glow: 0xcc3333, wheel: 0xcc0022, trail: 0x994444, trailGlow: 0xcc0033 },
 ];
 
 export const BOT_DEFS = [
-  { name: 'Spectre', isPlayer: false, personality: 'chasseur', difficulty: 2, body: 0xff66cc, glow: 0xff0088, wheel: 0xff88cc, trail: 0xffb8e8, trailGlow: 0xff44aa },
-  { name: 'Phantom', isPlayer: false, personality: 'prudent', difficulty: 2, body: 0x66ff88, glow: 0x00ff66, wheel: 0x88ffaa, trail: 0xb8ffd8, trailGlow: 0x44ff88 },
+  { name: 'Spectre', isPlayer: false, personality: 'chasseur', difficulty: 2, body: 0xcc4499, glow: 0xcc0066, wheel: 0xcc6699, trail: 0x994466, trailGlow: 0xcc3388 },
+  { name: 'Phantom', isPlayer: false, personality: 'prudent', difficulty: 2, body: 0x44aa66, glow: 0x00cc55, wheel: 0x55aa77, trail: 0x336644, trailGlow: 0x33aa66 },
 ];
 
 export function loadCosmetic() {

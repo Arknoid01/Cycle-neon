@@ -63,11 +63,11 @@ export class UI {
   applyScoreColor() {
     const c = getCosmeticPreset();
     this.scoreEl.style.color = hexCss(c.trailGlow);
-    this.scoreEl.style.textShadow = `0 0 10px ${hexCss(c.trailGlow)}, 0 0 20px ${hexCss(c.trailGlow)}`;
+    this.scoreEl.style.textShadow = `0 0 8px ${hexCss(c.trailGlow)}88`;
     if (this.cosmeticPreview) {
       this.cosmeticPreview.style.background =
         `linear-gradient(135deg, ${hexCss(c.body)} 0%, ${hexCss(c.trailGlow)} 100%)`;
-      this.cosmeticPreview.style.boxShadow = `0 0 24px ${hexCss(c.trailGlow)}`;
+      this.cosmeticPreview.style.boxShadow = `0 0 14px ${hexCss(c.trailGlow)}66`;
     }
   }
 
