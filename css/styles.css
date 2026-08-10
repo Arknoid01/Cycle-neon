@@ -29,32 +29,73 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .control-btn { width: 88px; height: 88px; border: 2px solid rgba(0,255,255,.22); border-radius: 18px; background: rgba(0,255,255,.06); color: rgba(0,255,255,.45); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
 .control-btn svg { width: 36px; height: 36px; fill: currentColor; filter: drop-shadow(0 0 6px rgba(0,255,255,.5)); }
 .control-btn:active, .control-btn.pressed { background: rgba(0,255,255,.18); border-color: rgba(0,255,255,.55); color: rgba(0,255,255,.95); transform: scale(.94); }
-#arena-menu { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.82); pointer-events: auto; padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px); overflow-y: auto; }
-#arena-menu.hidden { display: none; }
-#arena-menu-title { font-size: 22px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 20px #0ff; letter-spacing: 3px; margin-bottom: 4px; }
-#arena-menu-sub { font-size: 12px; color: rgba(255,136,0,.75); letter-spacing: 2px; margin-bottom: 20px; }
-#arena-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Home menu */
+#home-menu { position: absolute; inset: 0; background: rgba(0,0,0,.88); pointer-events: auto; overflow: hidden; }
+#home-menu.hidden { display: none; }
+.menu-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px); overflow-y: auto; }
+.menu-screen.hidden { display: none; }
+
+.home-header { text-align: center; margin-bottom: 28px; margin-top: 12px; }
+.home-title { font-size: 26px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 24px #0ff, 0 0 48px #08f; letter-spacing: 4px; }
+.home-sub { font-size: 11px; color: rgba(255,136,0,.8); letter-spacing: 5px; margin-top: 6px; }
+.home-best { font-size: 11px; color: rgba(0,255,120,.55); margin-top: 14px; }
+
+.tile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 380px; flex: 1; align-content: center; }
+.menu-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 130px; padding: 18px 12px; border-radius: 16px; border: 1px solid rgba(0,255,255,.22); background: linear-gradient(145deg, rgba(0,255,255,.06) 0%, rgba(0,0,0,.4) 100%); color: #fff; cursor: pointer; touch-action: manipulation; transition: transform .12s, border-color .15s, box-shadow .15s; text-align: center; }
+.menu-tile:active { transform: scale(.96); }
+.tile-icon { font-size: 28px; line-height: 1; filter: drop-shadow(0 0 8px currentColor); }
+.tile-label { font-size: 13px; font-weight: bold; letter-spacing: 1px; }
+.tile-desc { font-size: 10px; color: rgba(255,255,255,.42); line-height: 1.3; }
+
+.tile-play { border-color: rgba(0,255,255,.35); color: #7df9ff; box-shadow: inset 0 0 20px rgba(0,255,255,.05); }
+.tile-play:active { border-color: rgba(0,255,255,.7); box-shadow: 0 0 20px rgba(0,255,255,.15); }
+.tile-custom { border-color: rgba(255,100,200,.3); color: #ff88cc; box-shadow: inset 0 0 20px rgba(255,0,136,.05); }
+.tile-custom:active { border-color: rgba(255,100,200,.65); box-shadow: 0 0 20px rgba(255,0,136,.12); }
+.tile-trophies { border-color: rgba(255,220,80,.3); color: #ffdd66; box-shadow: inset 0 0 20px rgba(255,200,0,.05); }
+.tile-trophies:active { border-color: rgba(255,220,80,.65); box-shadow: 0 0 20px rgba(255,200,0,.12); }
+.tile-options { border-color: rgba(180,140,255,.3); color: #c4a0ff; box-shadow: inset 0 0 20px rgba(140,80,255,.05); }
+.tile-options:active { border-color: rgba(180,140,255,.65); box-shadow: 0 0 20px rgba(140,80,255,.12); }
+
+.menu-back { align-self: flex-start; margin-bottom: 16px; padding: 8px 14px; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(255,255,255,.04); color: rgba(255,255,255,.65); font-family: inherit; font-size: 12px; cursor: pointer; touch-action: manipulation; }
+.menu-back:active { background: rgba(255,255,255,.1); color: #fff; }
+.screen-title { font-size: 20px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 16px rgba(0,255,255,.5); letter-spacing: 2px; align-self: flex-start; }
+.screen-sub { font-size: 11px; color: rgba(255,255,255,.4); margin: 6px 0 20px; align-self: flex-start; }
+
+#arena-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .arena-btn { width: 100%; padding: 14px 16px; border: 1px solid rgba(0,255,255,.25); border-radius: 12px; background: rgba(0,255,255,.05); color: #fff; text-align: left; cursor: pointer; touch-action: manipulation; transition: background .15s, border-color .15s, transform .1s; }
 .arena-btn:active { background: rgba(0,255,255,.14); border-color: rgba(0,255,255,.55); transform: scale(.98); }
 .arena-btn-name { font-size: 15px; font-weight: bold; color: #7df9ff; margin-bottom: 4px; }
 .arena-btn-desc { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.35; }
 .arena-btn-best { font-size: 10px; color: rgba(0,255,120,.55); margin-top: 6px; }
-.arena-random { margin-top: 14px; text-align: center; border-color: rgba(255,136,0,.35); background: rgba(255,136,0,.06); }
+.arena-random { text-align: center; border-color: rgba(255,136,0,.35); background: rgba(255,136,0,.06); width: 100%; max-width: 360px; }
 .arena-random .arena-btn-name { color: rgba(255,180,80,.95); }
-#cosmetic-section { width: 100%; max-width: 360px; margin-bottom: 18px; }
-#challenges-section { width: 100%; max-width: 360px; margin-bottom: 16px; }
-#challenges-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
-#challenges-list { display: flex; flex-direction: column; gap: 6px; }
-.challenge-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.5); }
-.challenge-item.done { border-color: rgba(0,255,120,.25); color: rgba(0,255,120,.75); }
-.challenge-item.active { border-color: rgba(255,220,80,.45); background: rgba(255,220,80,.06); cursor: pointer; }
-.challenge-item:not(.done) { cursor: pointer; }
-.challenge-check { width: 14px; flex-shrink: 0; text-align: center; opacity: .35; }
-.challenge-item.done .challenge-check { opacity: 1; color: #0f8; }
-.challenge-name { font-weight: bold; color: rgba(255,220,80,.85); margin-bottom: 1px; }
-.challenge-item.done .challenge-name { color: rgba(0,255,120,.85); }
-#cosmetic-label { font-size: 10px; color: rgba(255,255,255,.4); letter-spacing: 2px; margin-bottom: 10px; text-align: center; }
-#cosmetic-picker { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-.color-swatch { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); cursor: pointer; touch-action: manipulation; position: relative; box-shadow: 0 0 10px var(--swatch-glow, #0ff); }
-.color-swatch.selected { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 16px var(--swatch-glow, #0ff); }
+
+.cosmetic-preview { width: 100%; max-width: 360px; height: 72px; border-radius: 14px; margin-bottom: 24px; border: 1px solid rgba(255,255,255,.12); transition: background .3s, box-shadow .3s; }
+#cosmetic-picker { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; width: 100%; max-width: 360px; }
+.color-swatch { width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); cursor: pointer; touch-action: manipulation; position: relative; box-shadow: 0 0 12px var(--swatch-glow, #0ff); }
+.color-swatch.selected { border-color: #fff; transform: scale(1.12); box-shadow: 0 0 20px var(--swatch-glow, #0ff); }
 .color-swatch:active { transform: scale(.95); }
+
+#challenges-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; }
+.challenge-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); font-size: 11px; color: rgba(255,255,255,.5); }
+.challenge-item.done { border-color: rgba(255,220,80,.35); background: rgba(255,220,80,.04); color: rgba(255,220,80,.8); }
+.challenge-item.active { border-color: rgba(255,220,80,.5); background: rgba(255,220,80,.08); cursor: pointer; }
+.challenge-item:not(.done) { cursor: pointer; }
+.challenge-check { width: 20px; flex-shrink: 0; text-align: center; font-size: 16px; opacity: .4; }
+.challenge-item.done .challenge-check { opacity: 1; color: #ffdd44; text-shadow: 0 0 8px #ff0; }
+.challenge-name { font-weight: bold; color: rgba(255,220,80,.9); margin-bottom: 3px; font-size: 13px; }
+.challenge-item.done .challenge-name { color: rgba(255,220,80,.95); }
+.challenge-desc { color: rgba(255,255,255,.4); line-height: 1.35; }
+.challenge-item.done .challenge-desc { color: rgba(255,220,80,.55); }
+
+.options-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.option-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
+.option-label { font-size: 13px; color: rgba(255,255,255,.75); }
+.option-row input[type="range"] { flex: 1; max-width: 160px; accent-color: #7df9ff; }
+.option-toggle { cursor: pointer; }
+.option-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track { width: 48px; height: 28px; border-radius: 14px; background: rgba(255,255,255,.12); position: relative; transition: background .2s; flex-shrink: 0; }
+.toggle-thumb { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.5); transition: transform .2s, background .2s; }
+.option-toggle input:checked + .toggle-track { background: rgba(0,255,255,.35); }
+.option-toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(20px); background: #7df9ff; box-shadow: 0 0 10px #0ff; }

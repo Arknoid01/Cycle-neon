@@ -2,12 +2,12 @@ import { Simulation } from './simulation.js';
 import { Renderer } from './renderer.js';
 import { UI } from './ui.js';
 import { pickArena, saveArenaPref } from './arenas.js';
+import { getSettings } from './settings.js';
 import {
-  initAudio, unlockAudio, updateEngineSound, stopEngine,
+  initAudio, unlockAudio, updateEngineSound, stopEngine, setMasterVolume,
   playTurn, playWallShift, playWallWarn, playNearMiss, playCrash,
   playBotDeath, playKillBonus, playVictory,
 } from './audio.js';
-import { DIR_LEFT, DIR_RIGHT } from './constants.js';
 
 const sim = new Simulation();
 const renderer = new Renderer(document.getElementById('game'));
@@ -26,6 +26,7 @@ function startArena(id) {
   menuVisible = false;
   renderer.clearAll();
   if (!renderer.scene) renderer.init();
+  renderer.setBloomEnabled(getSettings().bloom);
   sim.reset(currentArena.id);
   renderer.syncGrid(sim.grid);
   introUntil = ui.showIntro(currentArena);
@@ -44,8 +45,9 @@ function showMenu() {
 function onTurn(side) {
   if (menuVisible || !sim.playing) return;
   unlockAudio(true);
-  if (side === 'left') { sim.setTurn((sim.getPlayer().dir + 3) % 4); playTurn(); }
-  else { sim.setTurn((sim.getPlayer().dir + 1) % 4); playTurn(); }
+  const p = sim.getPlayer();
+  if (side === 'left') { sim.setTurn((p.dir + 3) % 4); playTurn(); }
+  else { sim.setTurn((p.dir + 1) % 4); playTurn(); }
 }
 
 function handleEvents(events, now) {
@@ -100,8 +102,9 @@ function gameLoop(now) {
 }
 
 ui.applyScoreColor();
-ui.buildArenaMenu();
+ui.buildHomeMenu();
 ui.showMenu();
-ui.bind(startArena, showMenu, onTurn);
+ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom));
+setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => renderer.resize());
 requestAnimationFrame(gameLoop);

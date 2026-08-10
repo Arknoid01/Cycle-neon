@@ -1,7 +1,11 @@
 import { ARENAS, ARENA_DESC, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
 import { CHALLENGES, checkChallenges, loadChallenges } from './challenges.js';
 import { COLOR_PRESETS, loadCosmetic, saveCosmetic, getCosmeticPreset, hexCss } from './cosmetics.js';
+import { getSettings, saveSettings } from './settings.js';
+import { setMasterVolume } from './audio.js';
 import { WIN_BONUS } from './constants.js';
+
+const SCREENS = ['home', 'play', 'custom', 'trophies', 'options'];
 
 export class UI {
   constructor() {
@@ -18,10 +22,14 @@ export class UI {
     this.overlayRecord = document.getElementById('overlay-record');
     this.overlayChallenge = document.getElementById('overlay-challenge');
     this.overlayNext = document.getElementById('overlay-next');
-    this.arenaMenu = document.getElementById('arena-menu');
+    this.homeMenu = document.getElementById('home-menu');
+    this.homeBest = document.getElementById('home-best');
+    this.trophySummary = document.getElementById('trophy-summary');
+    this.trophiesProgress = document.getElementById('trophies-progress');
     this.arenaList = document.getElementById('arena-list');
     this.arenaRandomBtn = document.getElementById('arena-random');
     this.cosmeticPicker = document.getElementById('cosmetic-picker');
+    this.cosmeticPreview = document.getElementById('cosmetic-preview');
     this.challengesList = document.getElementById('challenges-list');
     this.arenaIntro = document.getElementById('arena-intro');
     this.arenaIntroName = document.getElementById('arena-intro-name');
@@ -29,17 +37,60 @@ export class UI {
     this.controls = document.getElementById('controls');
     this.btnLeft = document.getElementById('btn-left');
     this.btnRight = document.getElementById('btn-right');
+    this.optVolume = document.getElementById('opt-volume');
+    this.optHaptic = document.getElementById('opt-haptic');
+    this.optBloom = document.getElementById('opt-bloom');
+
+    this.screenEls = {};
+    for (const id of SCREENS) {
+      this.screenEls[id] = document.getElementById(id + '-screen');
+    }
 
     this.highScore = loadHighScore();
     this.activeChallengeId = null;
+    this.currentScreen = 'home';
     this.onStartArena = null;
     this.onShowMenu = null;
+    this.onSettingsChange = null;
   }
 
   applyScoreColor() {
     const c = getCosmeticPreset();
     this.scoreEl.style.color = hexCss(c.trailGlow);
     this.scoreEl.style.textShadow = `0 0 10px ${hexCss(c.trailGlow)}, 0 0 20px ${hexCss(c.trailGlow)}`;
+    if (this.cosmeticPreview) {
+      this.cosmeticPreview.style.background =
+        `linear-gradient(135deg, ${hexCss(c.body)} 0%, ${hexCss(c.trailGlow)} 100%)`;
+      this.cosmeticPreview.style.boxShadow = `0 0 24px ${hexCss(c.trailGlow)}`;
+    }
+  }
+
+  trophyStats() {
+    const done = loadChallenges();
+    const count = CHALLENGES.filter(ch => done[ch.id]).length;
+    return { count, total: CHALLENGES.length };
+  }
+
+  updateHomeStats() {
+    const { count, total } = this.trophyStats();
+    this.homeBest.textContent = 'Record global : ' + this.highScore.toLocaleString('fr-FR');
+    this.trophySummary.textContent = count + ' / ' + total + ' trophées';
+    if (this.trophiesProgress) {
+      this.trophiesProgress.textContent = count + ' sur ' + total + ' trophées débloqués';
+    }
+  }
+
+  showScreen(id) {
+    if (!SCREENS.includes(id)) return;
+    this.currentScreen = id;
+    for (const [key, el] of Object.entries(this.screenEls)) {
+      el?.classList.toggle('hidden', key !== id);
+    }
+    if (id === 'home') this.updateHomeStats();
+    if (id === 'custom') this.buildCosmeticPicker();
+    if (id === 'trophies') this.buildChallengesList();
+    if (id === 'play') this.buildArenaList();
+    if (id === 'options') this.syncOptionsUI();
   }
 
   buildCosmeticPicker() {
@@ -59,6 +110,7 @@ export class UI {
       });
       this.cosmeticPicker.appendChild(btn);
     });
+    this.applyScoreColor();
   }
 
   buildChallengesList() {
@@ -70,8 +122,8 @@ export class UI {
       el.className = 'challenge-item' + (isDone ? ' done' : '') +
         (!isDone && this.activeChallengeId === ch.id ? ' active' : '');
       el.innerHTML =
-        `<span class="challenge-check">${isDone ? '✓' : '○'}</span>` +
-        `<div><div class="challenge-name">${ch.name}</div>${ch.desc}</div>`;
+        `<span class="challenge-check">${isDone ? '★' : '○'}</span>` +
+        `<div><div class="challenge-name">${ch.name}</div><div class="challenge-desc">${ch.desc}</div></div>`;
       if (!isDone) {
         el.addEventListener('click', () => {
           this.activeChallengeId = this.activeChallengeId === ch.id ? null : ch.id;
@@ -80,11 +132,10 @@ export class UI {
       }
       this.challengesList.appendChild(el);
     });
+    this.updateHomeStats();
   }
 
-  buildArenaMenu() {
-    this.buildCosmeticPicker();
-    this.buildChallengesList();
+  buildArenaList() {
     this.arenaList.innerHTML = '';
     ARENAS.forEach(a => {
       const btn = document.createElement('button');
@@ -99,10 +150,48 @@ export class UI {
     });
   }
 
+  buildHomeMenu() {
+    this.buildCosmeticPicker();
+    this.buildChallengesList();
+    this.buildArenaList();
+    this.syncOptionsUI();
+    this.updateHomeStats();
+    this.showScreen('home');
+  }
+
+  syncOptionsUI() {
+    const s = getSettings();
+    if (this.optVolume) this.optVolume.value = Math.round(s.volume * 100);
+    if (this.optHaptic) this.optHaptic.checked = s.haptic;
+    if (this.optBloom) this.optBloom.checked = s.bloom;
+  }
+
+  applySettings() {
+    const s = getSettings();
+    setMasterVolume(s.volume);
+    this.onSettingsChange?.(s);
+  }
+
+  bindOptions() {
+    this.optVolume?.addEventListener('input', () => {
+      const v = parseInt(this.optVolume.value, 10) / 100;
+      saveSettings({ volume: v });
+      setMasterVolume(v);
+    });
+    this.optHaptic?.addEventListener('change', () => {
+      saveSettings({ haptic: this.optHaptic.checked });
+    });
+    this.optBloom?.addEventListener('change', () => {
+      const s = saveSettings({ bloom: this.optBloom.checked });
+      this.onSettingsChange?.(s);
+    });
+    this.applySettings();
+  }
+
   showMenu() {
-    this.buildArenaMenu();
+    this.buildHomeMenu();
     this.challengeHudEl.textContent = '';
-    this.arenaMenu.classList.remove('hidden');
+    this.homeMenu.classList.remove('hidden');
     this.overlay.classList.add('hidden');
     this.controls.classList.add('hidden');
   }
@@ -116,7 +205,7 @@ export class UI {
   }
 
   hideMenu() {
-    this.arenaMenu.classList.add('hidden');
+    this.homeMenu.classList.add('hidden');
   }
 
   showControls() {
@@ -159,7 +248,7 @@ export class UI {
       : 'Record : ' + this.highScore.toLocaleString('fr-FR') + ' · ' + rankTxt + killTxt + winTxt;
     this.overlayRecord.classList.toggle('hidden', !rec);
     if (unlocked.length) {
-      this.overlayChallenge.textContent = 'Défi débloqué : ' + unlocked.map(c => c.name).join(', ');
+      this.overlayChallenge.textContent = 'Trophée débloqué : ' + unlocked.map(c => c.name).join(', ');
       this.overlayChallenge.classList.remove('hidden');
     } else {
       this.overlayChallenge.classList.add('hidden');
@@ -170,9 +259,19 @@ export class UI {
     this.challengeHudEl.textContent = '';
   }
 
-  bind(onStartArena, onShowMenu, onTurn) {
+  bind(onStartArena, onShowMenu, onTurn, onSettingsChange) {
     this.onStartArena = onStartArena;
     this.onShowMenu = onShowMenu;
+    this.onSettingsChange = onSettingsChange;
+
+    document.querySelectorAll('.menu-tile[data-screen]').forEach(btn => {
+      btn.addEventListener('click', () => this.showScreen(btn.dataset.screen));
+    });
+    document.querySelectorAll('[data-back]').forEach(btn => {
+      btn.addEventListener('click', () => this.showScreen('home'));
+    });
+
+    this.bindOptions();
 
     const bindBtn = (btn, dir) => {
       const press = e => { e.preventDefault(); btn.classList.add('pressed'); onTurn(dir); };

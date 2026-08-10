@@ -1,4 +1,13 @@
 let audioCtx, engineOsc, engineGain;
+let masterVolume = 1;
+
+export function setMasterVolume(v) {
+  masterVolume = Math.max(0, Math.min(1, v));
+}
+
+export function getMasterVolume() {
+  return masterVolume;
+}
 
 export function initAudio() {
   if (audioCtx) return;
@@ -18,14 +27,14 @@ export function initAudio() {
 export function unlockAudio(playing) {
   if (!audioCtx) initAudio();
   if (audioCtx?.state === 'suspended') audioCtx.resume();
-  if (engineGain && playing) engineGain.gain.value = 0.028;
+  if (engineGain && playing) engineGain.gain.value = 0.028 * masterVolume;
 }
 
 export function updateEngineSound(score) {
   if (!engineOsc) return;
   const sp = Math.min(1, score / 120);
   engineOsc.frequency.setTargetAtTime(70 + sp * 140, audioCtx.currentTime, 0.05);
-  engineGain.gain.setTargetAtTime(0.02 + sp * 0.03, audioCtx.currentTime, 0.05);
+  engineGain.gain.setTargetAtTime((0.02 + sp * 0.03) * masterVolume, audioCtx.currentTime, 0.05);
 }
 
 export function stopEngine() {
@@ -38,7 +47,8 @@ function playTone(f, d, t, v) {
   const g = audioCtx.createGain();
   o.type = t || 'square';
   o.frequency.value = f;
-  g.gain.value = v || 0.08;
+  const vol = (v || 0.08) * masterVolume;
+  g.gain.value = vol;
   g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
   o.connect(g);
   g.connect(audioCtx.destination);
@@ -46,7 +56,10 @@ function playTone(f, d, t, v) {
   o.stop(audioCtx.currentTime + d);
 }
 
+import { getSettings } from './settings.js';
+
 function haptic(pattern) {
+  if (!getSettings().haptic) return;
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
 }
 
