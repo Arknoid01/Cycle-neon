@@ -272,13 +272,9 @@
     const btnLeft = document.getElementById('btn-left');
     const btnRight = document.getElementById('btn-right');
 
-    let gridW, gridH, cellSize, offsetX, offsetY;
-    let grid;
-    let player;
-    let mobileWalls;
-    let arenaState;
-    let currentArena;
-    let nextArenaPreview;
+    let gridW, gridH, baseCellSize;
+    let groundY, horizonY, focalLength;
+    let camAngle, displayX, displayY;
     let score;
     let highScore;
     let tickMs;
@@ -287,12 +283,22 @@
     let turnQueue;
     let particles;
     let shakeTimer;
-    let nearMissTimer;
-    let flashTimer;
     let audioCtx;
     let engineOsc;
     let engineGain;
     let audioReady;
+
+    const VIEW_FORWARD = 22;
+    const VIEW_BACK = 1;
+    const VIEW_SIDE = 12;
+    const CAM_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
+
+    let grid;
+    let player;
+    let mobileWalls;
+    let arenaState;
+    let currentArena;
+    let nextArenaPreview;
 
     const ARENAS = [
       {
@@ -531,14 +537,60 @@
       const targetCols = 18;
       const targetRows = 28;
 
-      cellSize = Math.floor(Math.min(availW / targetCols, availH / targetRows));
-      cellSize = Math.max(cellSize, 12);
+      baseCellSize = Math.floor(Math.min(availW / targetCols, availH / targetRows));
+      baseCellSize = Math.max(baseCellSize, 12);
 
-      gridW = Math.floor(availW / cellSize);
-      gridH = Math.floor(availH / cellSize);
+      gridW = Math.floor(availW / baseCellSize);
+      gridH = Math.floor(availH / baseCellSize);
 
-      offsetX = Math.floor((canvas.width - gridW * cellSize) / 2);
-      offsetY = Math.floor((canvas.height - gridH * cellSize) / 2) + 24;
+      groundY = canvas.height * 0.76;
+      horizonY = canvas.height * 0.24;
+      focalLength = 5.8;
+    }
+
+    function lerpAngle(current, target, t) {
+      let diff = target - current;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      return current + diff * t;
+    }
+
+    function updateCamera() {
+      if (!player) return;
+      displayX += (player.x - displayX) * 0.3;
+      displayY += (player.y - displayY) * 0.3;
+      camAngle = lerpAngle(camAngle, CAM_ANGLES[player.dir], 0.16);
+      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
+      focalLength = 5.6 + speed * 1.1;
+    }
+
+    function worldToCamera(gx, gy) {
+      const relX = gx - displayX;
+      const relY = gy - displayY;
+      const fwdX = Math.cos(camAngle);
+      const fwdY = Math.sin(camAngle);
+      const rightX = Math.sin(camAngle);
+      const rightY = -Math.cos(camAngle);
+      return {
+        forward: relX * fwdX + relY * fwdY,
+        side: relX * rightX + relY * rightY,
+      };
+    }
+
+    function project(gx, gy) {
+      const { forward, side } = worldToCamera(gx, gy);
+      if (forward < -VIEW_BACK || forward > VIEW_FORWARD) return null;
+      if (Math.abs(side) > VIEW_SIDE + 1) return null;
+
+      const depth = forward + 4;
+      const persp = focalLength / depth;
+      const size = baseCellSize * persp * 1.05;
+      const screenX = canvas.width / 2 + side * baseCellSize * persp;
+      const screenY = groundY - forward * baseCellSize * persp * 0.94;
+
+      if (screenY < horizonY - 30 || screenY > canvas.height + size) return null;
+
+      return { screenX, screenY, size, forward, persp };
     }
 
     function createGrid() {
@@ -594,9 +646,10 @@
       turnQueue = null;
       particles = [];
       shakeTimer = 0;
-      nearMissTimer = 0;
-      flashTimer = 0;
       playing = true;
+      camAngle = CAM_ANGLES[player.dir];
+      displayX = player.x;
+      displayY = player.y;
       overlay.classList.add('hidden');
       controls.classList.remove('hidden');
       updateHud();
@@ -637,22 +690,23 @@
         const ny = player.y + DY[d];
         const cell = getCell(nx, ny);
         if (cell === CELL_WALL || cell === CELL_TRAIL || isMobileWallAt(nx, ny)) {
-          nearMissTimer = 200;
-          flashTimer = 120;
           playNearMiss();
           return;
         }
       }
     }
 
-    function spawnParticles(x, y, color, count) {
+    function spawnParticles(gx, gy, color, count) {
+      const proj = project(gx, gy);
+      const cx = proj ? proj.screenX : canvas.width / 2;
+      const cy = proj ? proj.screenY : groundY - baseCellSize * 0.2;
       const n = count || 24;
       for (let i = 0; i < n; i++) {
         const angle = (Math.PI * 2 * i) / n + Math.random() * 0.3;
         const speed = 1 + Math.random() * 4;
         particles.push({
-          x: x * cellSize + offsetX + cellSize / 2,
-          y: y * cellSize + offsetY + cellSize / 2,
+          x: cx,
+          y: cy,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
@@ -736,76 +790,126 @@
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      if (grid && playing) {
-        resetGame(false);
+      if (grid) {
+        if (playing) resetGame(false);
+        else initGridDimensions();
       }
     }
 
-    function drawCell(x, y, color, glowColor, alpha) {
-      const px = offsetX + x * cellSize;
-      const py = offsetY + y * cellSize;
-      const pad = 1;
-
+    function drawTile(proj, color, glowColor, alpha) {
+      const pad = 0.08;
+      const s = proj.size;
       ctx.globalAlpha = alpha ?? 1;
       ctx.shadowColor = glowColor;
-      ctx.shadowBlur = cellSize * 0.6;
+      ctx.shadowBlur = s * 0.7;
       ctx.fillStyle = color;
-      ctx.fillRect(px + pad, py + pad, cellSize - pad * 2, cellSize - pad * 2);
+      ctx.fillRect(proj.screenX - s / 2 + s * pad, proj.screenY - s / 2 + s * pad, s * (1 - pad * 2), s * (1 - pad * 2));
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     }
 
-    function drawGrid() {
-      ctx.strokeStyle = COLORS.grid;
+    function collectTiles() {
+      const tiles = [];
+
+      for (let y = 0; y < gridH; y++) {
+        for (let x = 0; x < gridW; x++) {
+          const cell = grid[y * gridW + x];
+          if (cell === CELL_EMPTY) continue;
+          const proj = project(x, y);
+          if (!proj) continue;
+
+          if (cell === CELL_TRAIL) {
+            tiles.push({ proj, color: COLORS.trail, glow: COLORS.trailGlow, alpha: 0.82 });
+          } else if (cell === CELL_WALL) {
+            tiles.push({ proj, color: COLORS.wall, glow: COLORS.wallGlow, alpha: 0.72 });
+          }
+        }
+      }
+
+      for (const w of mobileWalls) {
+        const proj = project(w.x, w.y);
+        if (!proj) continue;
+        const alpha = w.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.9;
+        tiles.push({ proj, color: COLORS.mobileWall, glow: COLORS.mobileWallGlow, alpha });
+      }
+
+      if (currentArena.id === 'piege' && arenaState.gates) {
+        for (const g of arenaState.gates) {
+          if (g.open) continue;
+          const alpha = g.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.85;
+          for (let y = g.yMin; y <= g.yMax; y++) {
+            const proj = project(g.x, y);
+            if (!proj) continue;
+            tiles.push({ proj, color: COLORS.mobileWall, glow: COLORS.mobileWallGlow, alpha });
+          }
+        }
+      }
+
+      tiles.sort((a, b) => b.proj.forward - a.proj.forward);
+      return tiles;
+    }
+
+    function drawSky() {
+      const grad = ctx.createLinearGradient(0, 0, 0, groundY);
+      grad.addColorStop(0, '#080018');
+      grad.addColorStop(0.45, '#0a1428');
+      grad.addColorStop(1, '#000000');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, groundY + 4);
+
+      ctx.strokeStyle = 'rgba(0, 255, 255, 0.08)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (let x = 0; x <= gridW; x++) {
-        const px = offsetX + x * cellSize;
-        ctx.moveTo(px, offsetY);
-        ctx.lineTo(px, offsetY + gridH * cellSize);
-      }
-      for (let y = 0; y <= gridH; y++) {
-        const py = offsetY + y * cellSize;
-        ctx.moveTo(offsetX, py);
-        ctx.lineTo(offsetX + gridW * cellSize, py);
-      }
+      ctx.moveTo(0, horizonY);
+      ctx.lineTo(canvas.width, horizonY);
       ctx.stroke();
     }
 
-    function drawTrail() {
-      for (let y = 0; y < gridH; y++) {
-        for (let x = 0; x < gridW; x++) {
-          if (grid[y * gridW + x] === CELL_TRAIL) {
-            drawCell(x, y, COLORS.trail, COLORS.trailGlow, 0.85);
+    function drawFloorGrid() {
+      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
+      ctx.lineWidth = 1;
+
+      for (let f = -VIEW_BACK; f <= VIEW_FORWARD; f += 1) {
+        const persp = focalLength / (f + 4);
+        const alpha = Math.max(0.04, (0.22 - f * 0.008) * persp * 0.35);
+        ctx.strokeStyle = `rgba(0, 180, 220, ${alpha})`;
+        ctx.beginPath();
+        let started = false;
+
+        for (let s = -VIEW_SIDE; s <= VIEW_SIDE; s += 0.5) {
+          const gx = displayX + Math.cos(camAngle) * f + Math.sin(camAngle) * s;
+          const gy = displayY + Math.sin(camAngle) * f - Math.cos(camAngle) * s;
+          const proj = project(gx, gy);
+          if (!proj) continue;
+          if (!started) {
+            ctx.moveTo(proj.screenX, proj.screenY);
+            started = true;
+          } else {
+            ctx.lineTo(proj.screenX, proj.screenY);
           }
         }
+        if (started) ctx.stroke();
       }
-    }
 
-    function drawWalls() {
-      for (let y = 0; y < gridH; y++) {
-        for (let x = 0; x < gridW; x++) {
-          if (grid[y * gridW + x] === CELL_WALL) {
-            drawCell(x, y, COLORS.wall, COLORS.wallGlow, 0.7);
+      for (let s = -VIEW_SIDE; s <= VIEW_SIDE; s += 1) {
+        ctx.beginPath();
+        let started = false;
+        for (let f = -VIEW_BACK; f <= VIEW_FORWARD; f += 0.5) {
+          const gx = displayX + Math.cos(camAngle) * f + Math.sin(camAngle) * s;
+          const gy = displayY + Math.sin(camAngle) * f - Math.cos(camAngle) * s;
+          const proj = project(gx, gy);
+          if (!proj) continue;
+          if (!started) {
+            ctx.moveTo(proj.screenX, proj.screenY);
+            started = true;
+          } else {
+            ctx.lineTo(proj.screenX, proj.screenY);
           }
         }
-      }
-    }
-
-    function drawMobileWalls() {
-      for (const w of mobileWalls) {
-        const alpha = w.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.9;
-        drawCell(w.x, w.y, COLORS.mobileWall, COLORS.mobileWallGlow, alpha);
-      }
-    }
-
-    function drawPiegeGates() {
-      if (currentArena.id !== 'piege' || !arenaState.gates) return;
-      for (const g of arenaState.gates) {
-        if (g.open) continue;
-        const alpha = g.warning ? 0.5 + Math.sin(Date.now() / 100) * 0.3 : 0.85;
-        for (let y = g.yMin; y <= g.yMax; y++) {
-          drawCell(g.x, y, COLORS.mobileWall, COLORS.mobileWallGlow, alpha);
+        if (started) {
+          const persp = focalLength / (VIEW_FORWARD / 2 + 4);
+          ctx.strokeStyle = `rgba(0, 140, 200, ${0.06 + speed * 0.04})`;
+          ctx.stroke();
         }
       }
     }
@@ -813,29 +917,63 @@
     function drawCompressWarning() {
       if (currentArena.id !== 'compresseur' || !arenaState.warning) return;
       const m = arenaState.margin + 1;
-      const alpha = 0.15 + Math.sin(Date.now() / 120) * 0.1;
+      const alpha = 0.12 + Math.sin(Date.now() / 120) * 0.08;
       ctx.strokeStyle = `rgba(255, 80, 0, ${alpha})`;
       ctx.lineWidth = 2;
       ctx.shadowColor = '#ff4400';
-      ctx.shadowBlur = 12;
-      const x = offsetX + m * cellSize;
-      const y = offsetY + m * cellSize;
-      const w = (gridW - 2 * m) * cellSize;
-      const h = (gridH - 2 * m) * cellSize;
-      ctx.strokeRect(x, y, w, h);
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      let started = false;
+
+      for (let i = 0; i <= 4; i++) {
+        const t = i / 4;
+        const gx = m + t * (gridW - 1 - 2 * m);
+        const proj = project(gx, m);
+        if (!proj) continue;
+        if (!started) { ctx.moveTo(proj.screenX, proj.screenY); started = true; }
+        else ctx.lineTo(proj.screenX, proj.screenY);
+      }
+      for (let i = 0; i <= 4; i++) {
+        const t = i / 4;
+        const gx = m + t * (gridW - 1 - 2 * m);
+        const proj = project(gx, gridH - 1 - m);
+        if (proj) ctx.lineTo(proj.screenX, proj.screenY);
+      }
+      if (started) ctx.stroke();
       ctx.shadowBlur = 0;
     }
 
-    function drawPlayer() {
-      const px = offsetX + player.x * cellSize + cellSize / 2;
-      const py = offsetY + player.y * cellSize + cellSize / 2;
+    function drawSpeedLines() {
       const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
-      const size = cellSize * (0.32 + speed * 0.06);
-      const glow = cellSize * (1 + speed * 0.5);
+      if (speed < 0.25) return;
+      const count = Math.floor(speed * 10);
+      ctx.strokeStyle = `rgba(0, 255, 255, ${0.04 + speed * 0.08})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < count; i++) {
+        const side = (Math.random() - 0.5) * VIEW_SIDE * 1.6;
+        const forward = Math.random() * VIEW_FORWARD * 0.7;
+        const gx = displayX + Math.cos(camAngle) * forward + Math.sin(camAngle) * side;
+        const gy = displayY + Math.sin(camAngle) * forward - Math.cos(camAngle) * side;
+        const proj = project(gx, gy);
+        if (!proj) continue;
+        const len = baseCellSize * proj.persp * (0.4 + speed);
+        ctx.beginPath();
+        ctx.moveTo(proj.screenX, proj.screenY);
+        ctx.lineTo(proj.screenX, proj.screenY + len);
+        ctx.stroke();
+      }
+    }
+
+    function drawPlayer() {
+      const speed = (BASE_TICK - tickMs) / (BASE_TICK - MIN_TICK);
+      const bob = Math.sin(Date.now() / (90 - speed * 25)) * speed * 2.5;
+      const px = canvas.width / 2;
+      const py = groundY - baseCellSize * 0.22 + bob;
+      const size = baseCellSize * (0.42 + speed * 0.14);
+      const glow = baseCellSize * (1.2 + speed * 0.8);
 
       ctx.save();
       ctx.translate(px, py);
-      ctx.rotate((player.dir * Math.PI) / 2);
 
       ctx.shadowColor = COLORS.playerGlow;
       ctx.shadowBlur = glow;
@@ -848,7 +986,7 @@
       ctx.closePath();
       ctx.fill();
 
-      ctx.shadowBlur = glow * 0.4;
+      ctx.shadowBlur = glow * 0.45;
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.moveTo(0, -size * 0.5);
@@ -859,16 +997,6 @@
 
       ctx.restore();
       ctx.shadowBlur = 0;
-
-      if (nearMissTimer > 0) {
-        ctx.shadowColor = '#ff0';
-        ctx.shadowBlur = cellSize * 2;
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-        ctx.beginPath();
-        ctx.arc(px, py, cellSize * 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
     }
 
     function drawParticles() {
@@ -895,20 +1023,18 @@
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      if (flashTimer > 0) {
-        flashTimer -= 16;
-        ctx.fillStyle = `rgba(255, 255, 100, ${flashTimer / 400})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
       ctx.save();
       ctx.translate(shakeX, shakeY);
 
-      drawGrid();
-      drawWalls();
-      drawTrail();
-      drawMobileWalls();
-      drawPiegeGates();
+      drawSky();
+      drawFloorGrid();
+      drawSpeedLines();
+
+      const tiles = collectTiles();
+      for (const t of tiles) {
+        drawTile(t.proj, t.color, t.glow, t.alpha);
+      }
+
       drawCompressWarning();
       if (playing) drawPlayer();
       drawParticles();
@@ -917,7 +1043,7 @@
     }
 
     function gameLoop(timestamp) {
-      if (nearMissTimer > 0) nearMissTimer -= 16;
+      updateCamera();
 
       if (playing && timestamp - lastTick >= tickMs) {
         currentArena.update(timestamp);
