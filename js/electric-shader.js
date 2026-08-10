@@ -63,9 +63,9 @@ const FRAG = /* glsl */`
     vec3 body = uColor * band * uBody * 0.35;
     body *= (1.0 - boltCore * 0.65);
 
-    vec3 elecHalo = mix(uColor, uSparkColor, 0.45) * bolt * uIntensity * 0.55;
-    vec3 elecCore = uSparkColor * boltCore * uIntensity * 2.6;
-    vec3 flash = uSparkColor * spark * 4.0;
+    vec3 elecHalo = mix(uColor, uSparkColor, 0.32) * bolt * uIntensity * 0.38;
+    vec3 elecCore = uSparkColor * boltCore * uIntensity * 1.5;
+    vec3 flash = uSparkColor * spark * 2.0;
 
     vec3 col = body + elecHalo + elecCore + flash;
     float alpha = clamp(band * uBody * 0.35 + bolt * 0.55 + boltCore * 0.95, 0.0, 1.0);
@@ -79,10 +79,10 @@ export function createElectricMaterial(opts) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uColor: { value: new THREE.Color(opts.color) },
-      uSparkColor: { value: new THREE.Color(opts.sparkColor ?? 0xffffff) },
+      uSparkColor: { value: new THREE.Color(opts.sparkColor ?? 0xcccccc) },
       uTime: { value: 0 },
       uSpeed: { value: opts.speed ?? 1.4 },
-      uIntensity: { value: opts.intensity ?? 1.2 },
+      uIntensity: { value: opts.intensity ?? 0.95 },
       uScale: { value: opts.scale ?? 1.1 },
       uBody: { value: opts.body ?? 0.55 },
     },
@@ -93,7 +93,7 @@ export function createElectricMaterial(opts) {
     side: THREE.DoubleSide,
   });
   mat.userData.baseSpeed = opts.speed ?? 1.4;
-  mat.userData.baseIntensity = opts.intensity ?? 1.2;
+  mat.userData.baseIntensity = opts.intensity ?? 0.95;
   return mat;
 }
 

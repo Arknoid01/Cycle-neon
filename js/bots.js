@@ -12,23 +12,23 @@ export const DIFFICULTY = { EASY: 1, NORMAL: 2, HARD: 3 };
 export const CHAMPIONSHIP_BOTS = [
   {
     id: 'sage', name: 'Sage', personality: PERSONALITY.PRUDENT, difficulty: DIFFICULTY.NORMAL,
-    body: 0x88ffaa, glow: 0x44ff88, wheel: 0x66ff99, trail: 0xccffdd, trailGlow: 0x22ff66,
+    body: 0x44aa66, glow: 0x22cc55, wheel: 0x55aa77, trail: 0x336644, trailGlow: 0x22aa55,
   },
   {
     id: 'reaper', name: 'Faucheur', personality: PERSONALITY.CHASSEUR, difficulty: DIFFICULTY.HARD,
-    body: 0xff8888, glow: 0xff2222, wheel: 0xff4444, trail: 0xffcccc, trailGlow: 0xff0044,
+    body: 0xcc5555, glow: 0xcc1111, wheel: 0xcc3333, trail: 0x883333, trailGlow: 0xcc0033,
   },
   {
     id: 'bolt', name: 'Éclair', personality: PERSONALITY.RAPIDE, difficulty: DIFFICULTY.HARD,
-    body: 0xffee88, glow: 0xffaa00, wheel: 0xffcc44, trail: 0xffffcc, trailGlow: 0xff8800,
+    body: 0xcc9944, glow: 0xcc8800, wheel: 0xccaa33, trail: 0x886622, trailGlow: 0xcc6600,
   },
   {
     id: 'myst', name: 'Mystère', personality: PERSONALITY.IMPREVISIBLE, difficulty: DIFFICULTY.NORMAL,
-    body: 0xddaaff, glow: 0xaa44ff, wheel: 0xbb66ff, trail: 0xeeddff, trailGlow: 0x8800ff,
+    body: 0x9966cc, glow: 0x7733cc, wheel: 0x8855cc, trail: 0x553366, trailGlow: 0x6600cc,
   },
   {
     id: 'ghost', name: 'Spectre', personality: PERSONALITY.CHASSEUR, difficulty: DIFFICULTY.EASY,
-    body: 0xffaacc, glow: 0xff44aa, wheel: 0xff66cc, trail: 0xffddee, trailGlow: 0xff0088,
+    body: 0xcc6699, glow: 0xcc3388, wheel: 0xcc5599, trail: 0x884466, trailGlow: 0xcc0066,
   },
 ];
 
