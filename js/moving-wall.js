@@ -1,5 +1,5 @@
 import {
-  CELL_WALL, CELL_EMPTY, DX, DY, PATTERN,
+  CELL_WALL, CELL_EMPTY, PATTERN,
   WARNING_DIM_MS, WARNING_PULSE_MS, WARNING_IMMINENT_MS,
 } from './constants.js';
 
@@ -17,6 +17,7 @@ export class MovingWall {
     this.open = cfg.open ?? true;
     this.yMin = cfg.yMin;
     this.yMax = cfg.yMax;
+    this.waveIndex = cfg.waveIndex ?? 0;
     this.margin = 0;
     this.lastMove = 0;
     this.warningLevel = 0;
@@ -64,7 +65,7 @@ export class MovingWall {
       }
       return cells;
     }
-    if (this.pattern === PATTERN.PINGPONG) {
+    if (this.pattern === PATTERN.PINGPONG || this.pattern === PATTERN.WAVE) {
       return [{ x: this.x, y: this.y }];
     }
     return [];
@@ -74,16 +75,15 @@ export class MovingWall {
     return now - this.lastMove >= this.interval;
   }
 
-  /** @returns {{ moved: boolean, imminent: boolean }} */
   tick(grid, now, gridW, gridH, border) {
     this.updateWarning(now);
     const imminent = this.warningLevel === 3;
-    if (!this.shouldMove(now)) return { moved: false, imminent: this.warningLevel === 3 };
+    if (!this.shouldMove(now)) return { moved: false, imminent };
 
     this.lastMove = now;
     if (this.pattern !== PATTERN.CLOSING) this.clearOccupied(grid);
 
-    if (this.pattern === PATTERN.PINGPONG) {
+    if (this.pattern === PATTERN.PINGPONG || this.pattern === PATTERN.WAVE) {
       const step = this.direction;
       if (this.axis === 'x') {
         let nx = this.x + step;
@@ -140,33 +140,56 @@ export class MovingWallSystem {
     this.walls = wallConfigs.map((cfg, i) => new MovingWall({ ...cfg, id: i }));
     const now = performance.now();
     for (const w of this.walls) {
-      w.lastMove = now;
+      w.lastMove = now - (w.waveIndex ?? 0) * (w.interval ?? 4000) * 0.25;
       w.syncOccupied(grid);
     }
   }
 
-  /** @returns {{ moved: boolean, pulseSound: boolean, haptic: boolean }} */
   simulationTick(grid, now, gridW, gridH, border) {
     let moved = false;
     let pulseSound = false;
-    let haptic = false;
     for (const w of this.walls) {
       const prevLevel = w.warningLevel;
       w.updateWarning(now);
       if (w.warningLevel === 2 && prevLevel < 2) pulseSound = true;
       const result = w.tick(grid, now, gridW, gridH, border);
-      if (result.moved) { moved = true; haptic = true; }
+      if (result.moved) moved = true;
     }
-    return { moved, pulseSound, haptic };
+    return { moved, pulseSound, haptic: moved };
   }
 
-  allRenderCells() {
-    const out = [];
-    for (const w of this.walls) {
-      for (const c of w.renderPositions()) out.push({ ...c, wall: w });
-    }
-    return out;
+  maxWarningLevel() {
+    return Math.max(0, ...this.walls.map(w => w.warningLevel));
   }
+
+  isPlayerNearMobile(player, gridW, gridH) {
+    if (!player?.alive) return false;
+    for (const w of this.walls) {
+      if (w.warningLevel < 1) continue;
+      for (const c of w.renderPositions()) {
+        if (Math.abs(c.x - player.x) + Math.abs(c.y - player.y) <= 2) return true;
+      }
+    }
+    return false;
+  }
+}
+
+export function getStaticWalls(arenaId, gridW, gridH, border) {
+  const walls = [];
+  const cx = Math.floor(gridW / 2);
+  if (arenaId === 'labyrinthe') {
+    for (let x = cx - 8; x <= cx + 8; x += 8) {
+      for (let y = border + 3; y < gridH - border - 3; y++) {
+        if ((x + y) % 5 !== 0) walls.push({ x, y });
+      }
+    }
+  }
+  if (arenaId === 'duel') {
+    for (let y = border + 5; y < gridH - border - 5; y += 5) {
+      walls.push({ x: cx - 3, y }, { x: cx + 3, y });
+    }
+  }
+  return walls;
 }
 
 export function createWallConfigs(arenaId, gridW, gridH, border) {
@@ -189,6 +212,18 @@ export function createWallConfigs(arenaId, gridW, gridH, border) {
       return [
         { pattern: PATTERN.GATE, x: cx - 4, yMin, yMax, open: true, interval: 4500 },
         { pattern: PATTERN.GATE, x: cx + 4, yMin, yMax, open: true, interval: 3500 },
+      ];
+    case 'vague':
+      return [0, 1, 2, 3].map(i => ({
+        pattern: PATTERN.WAVE, axis: 'x', x: minX + i * 6, y: cy - 4 + i * 2,
+        range: [minX, maxX], direction: i % 2 ? -1 : 1,
+        interval: 3200, waveIndex: i,
+      }));
+    case 'chaos':
+      return [
+        { pattern: PATTERN.PINGPONG, axis: 'y', x: cx - 8, y: cy, range: [yMin, yMax], direction: 1, interval: 2800 },
+        { pattern: PATTERN.PINGPONG, axis: 'y', x: cx + 8, y: cy, range: [yMin, yMax], direction: -1, interval: 2600 },
+        { pattern: PATTERN.GATE, x: cx, yMin, yMax, open: true, interval: 3800 },
       ];
     default:
       return [];

@@ -1,4 +1,4 @@
-import { ARENAS, ARENA_DESC, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
+import { ARENAS, ARENA_DESC, ARENA_FAMILIES, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
 import { CHALLENGES, checkChallenges, loadChallenges } from './challenges.js';
 import { COLOR_PRESETS, loadCosmetic, saveCosmetic, getCosmeticPreset, hexCss } from './cosmetics.js';
 import { getSettings, saveSettings } from './settings.js';
@@ -15,6 +15,8 @@ export class UI {
     this.highScoreEl = document.getElementById('high-score');
     this.rivalsEl = document.getElementById('rivals');
     this.challengeHudEl = document.getElementById('challenge-hud');
+    this.multiplierEl = document.getElementById('multiplier-hud');
+    this.champHudEl = document.getElementById('champ-hud');
     this.overlay = document.getElementById('overlay');
     this.overlayTitle = document.getElementById('overlay-title');
     this.overlayScore = document.getElementById('overlay-score');
@@ -22,6 +24,7 @@ export class UI {
     this.overlayRecord = document.getElementById('overlay-record');
     this.overlayChallenge = document.getElementById('overlay-challenge');
     this.overlayNext = document.getElementById('overlay-next');
+    this.overlayHint = document.getElementById('overlay-hint');
     this.homeMenu = document.getElementById('home-menu');
     this.homeBest = document.getElementById('home-best');
     this.trophySummary = document.getElementById('trophy-summary');
@@ -51,6 +54,9 @@ export class UI {
     this.currentScreen = 'home';
     this.onStartArena = null;
     this.onShowMenu = null;
+    this.onStartChampionship = null;
+    this.onContinueChampionship = null;
+    this.overlayMode = 'menu';
     this.onSettingsChange = null;
   }
 
@@ -137,7 +143,15 @@ export class UI {
 
   buildArenaList() {
     this.arenaList.innerHTML = '';
+    let lastFamily = null;
     ARENAS.forEach(a => {
+      if (a.family !== lastFamily) {
+        lastFamily = a.family;
+        const label = document.createElement('div');
+        label.className = 'family-label';
+        label.textContent = ARENA_FAMILIES[a.family]?.name ?? a.family;
+        this.arenaList.appendChild(label);
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'arena-btn';
@@ -191,6 +205,8 @@ export class UI {
   showMenu() {
     this.buildHomeMenu();
     this.challengeHudEl.textContent = '';
+    this.multiplierEl?.classList.add('hidden');
+    this.champHudEl?.classList.add('hidden');
     this.homeMenu.classList.remove('hidden');
     this.overlay.classList.add('hidden');
     this.controls.classList.add('hidden');
@@ -212,18 +228,69 @@ export class UI {
     this.controls.classList.remove('hidden');
   }
 
-  updateHud(sim, arena, now, playing) {
+  updateHud(sim, arena, now, playing, championship = null) {
     this.arenaNameEl.textContent = arena.name;
     this.highScoreEl.textContent = 'BEST ' + this.highScore.toLocaleString('fr-FR');
     this.scoreEl.textContent = sim.score.toLocaleString('fr-FR');
-    const bots = sim.aliveBots().length;
-    this.rivalsEl.textContent = bots > 0
-      ? bots + ' adversaire' + (bots > 1 ? 's' : '')
+    const rivals = sim.aliveRiders().length - (sim.getPlayer()?.alive ? 1 : 0);
+    this.rivalsEl.textContent = rivals > 0
+      ? rivals + ' en course'
       : 'DERNIER EN VIE !';
     if (playing) this.timerEl.textContent = 'T : ' + sim.getElapsedSeconds(now).toFixed(2);
     const ch = this.activeChallengeId
       ? CHALLENGES.find(c => c.id === this.activeChallengeId) : null;
     this.challengeHudEl.textContent = ch ? 'Défi : ' + ch.name : '';
+
+    if (sim.multiplier > 1 && this.multiplierEl) {
+      this.multiplierEl.classList.remove('hidden');
+      this.multiplierEl.textContent = '×' + sim.multiplier;
+      this.multiplierEl.dataset.level = String(sim.multiplier);
+    } else if (this.multiplierEl) {
+      this.multiplierEl.classList.add('hidden');
+    }
+
+    if (championship?.active && this.champHudEl) {
+      const p = championship.standings.find(s => s.isPlayer);
+      this.champHudEl.classList.remove('hidden');
+      this.champHudEl.textContent =
+        `Manche ${Math.min(championship.round + 1, championship.totalRounds)}/${championship.totalRounds} · ${p?.points ?? 0} pts`;
+    }
+  }
+
+  showChampionshipRoundResults(championship, roundResults) {
+    this.overlayMode = 'champRound';
+    const lines = roundResults.map(r =>
+      `${r.place}. ${r.name} +${r.pointsEarned}`
+    ).join(' · ');
+    this.overlayTitle.textContent = `Manche ${championship.round}/${championship.totalRounds}`;
+    this.overlayScore.textContent = lines;
+    const p = championship.standings.find(s => s.isPlayer);
+    this.overlayBest.textContent = 'Total : ' + (p?.points ?? 0) + ' pts';
+    this.overlayRecord.classList.add('hidden');
+    this.overlayChallenge.classList.add('hidden');
+    this.overlayNext.textContent = championship.isComplete()
+      ? 'Toucher pour voir le classement final'
+      : 'Toucher pour la manche suivante';
+    this.overlayHint.textContent = this.overlayNext.textContent;
+    this.overlay.classList.remove('hidden');
+    this.controls.classList.add('hidden');
+  }
+
+  showChampionshipFinal(championship) {
+    this.overlayMode = 'champFinal';
+    const sorted = championship.getSortedStandings();
+    const winner = sorted[0];
+    const p = sorted.find(s => s.isPlayer);
+    this.overlayTitle.textContent = winner.isPlayer ? 'CHAMPION !' : winner.name + ' gagne';
+    this.overlayScore.textContent = sorted.map((s, i) =>
+      `${i + 1}. ${s.name} — ${s.points} pts`
+    ).join('\n');
+    this.overlayBest.textContent = p ? `Ta place : ${sorted.indexOf(p) + 1}e · ${p.points} pts` : '';
+    this.overlayRecord.classList.add('hidden');
+    this.overlayChallenge.classList.add('hidden');
+    this.overlayNext.textContent = 'Toucher pour revenir au menu';
+    this.overlayHint.textContent = 'Toucher pour revenir au menu';
+    this.overlay.classList.remove('hidden');
   }
 
   showGameOver(sim, arena, won, now) {
@@ -254,15 +321,20 @@ export class UI {
       this.overlayChallenge.classList.add('hidden');
     }
     this.overlayNext.textContent = 'Arène : ' + arena.name;
+    this.overlayMode = 'menu';
+    this.overlayHint.textContent = 'Toucher pour revenir au menu';
     this.overlay.classList.remove('hidden');
     this.controls.classList.add('hidden');
     this.challengeHudEl.textContent = '';
+    this.multiplierEl?.classList.add('hidden');
   }
 
-  bind(onStartArena, onShowMenu, onTurn, onSettingsChange) {
+  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship) {
     this.onStartArena = onStartArena;
     this.onShowMenu = onShowMenu;
     this.onSettingsChange = onSettingsChange;
+    this.onStartChampionship = onStartChampionship;
+    this.onContinueChampionship = onContinueChampionship;
 
     document.querySelectorAll('.menu-tile[data-screen]').forEach(btn => {
       btn.addEventListener('click', () => this.showScreen(btn.dataset.screen));
@@ -284,8 +356,16 @@ export class UI {
     bindBtn(this.btnLeft, 'left');
     bindBtn(this.btnRight, 'right');
 
-    this.overlay.addEventListener('pointerdown', e => { e.preventDefault(); onShowMenu(); });
+    this.overlay.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (this.overlayMode === 'champRound' || this.overlayMode === 'champFinal') {
+        onContinueChampionship?.();
+      } else {
+        onShowMenu();
+      }
+    });
     this.arenaRandomBtn.addEventListener('click', () => onStartArena('random'));
+    document.getElementById('start-championship')?.addEventListener('click', () => onStartChampionship?.());
     window.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') onTurn('left');
       else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') onTurn('right');

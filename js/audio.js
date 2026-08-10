@@ -30,11 +30,28 @@ export function unlockAudio(playing) {
   if (engineGain && playing) engineGain.gain.value = 0.028 * masterVolume;
 }
 
-export function updateEngineSound(score) {
+export function updateEngineSound(score, intensity = 0) {
   if (!engineOsc) return;
-  const sp = Math.min(1, score / 120);
-  engineOsc.frequency.setTargetAtTime(70 + sp * 140, audioCtx.currentTime, 0.05);
-  engineGain.gain.setTargetAtTime((0.02 + sp * 0.03) * masterVolume, audioCtx.currentTime, 0.05);
+  const sp = Math.min(1, score / 120 + intensity * 0.4);
+  engineOsc.frequency.setTargetAtTime(70 + sp * 160, audioCtx.currentTime, 0.05);
+  engineGain.gain.setTargetAtTime((0.02 + sp * 0.04) * masterVolume, audioCtx.currentTime, 0.05);
+}
+
+export function updateGameplayIntensity(multiplier, maxMult = 5) {
+  if (!engineOsc) return;
+  const t = (multiplier - 1) / Math.max(1, maxMult - 1);
+  engineOsc.frequency.setTargetAtTime(90 + t * 120, audioCtx.currentTime, 0.08);
+}
+
+export function playMultiplierUp() {
+  playTone(680 + Math.random() * 80, .08, 'sine', .06);
+  haptic(12);
+}
+
+export function playNearMissBonus() {
+  playTone(560, .06, 'sine', .08);
+  playTone(880, .05, 'sine', .05);
+  haptic(15);
 }
 
 export function stopEngine() {

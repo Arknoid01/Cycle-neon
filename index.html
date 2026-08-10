@@ -19,7 +19,8 @@
     <div id="score">0</div>
     <div id="high-score"></div>
     <div id="rivals"></div>
-    <div id="challenge-hud"></div>
+    <div id="multiplier-hud" class="hidden">×1</div>
+    <div id="champ-hud" class="hidden"></div>
     <div id="overlay" class="hidden">
       <div id="overlay-title"></div>
       <div id="overlay-score"></div>
@@ -64,7 +65,11 @@
       <div id="play-screen" class="menu-screen hidden">
         <button type="button" class="menu-back" data-back>← Accueil</button>
         <h2 class="screen-title">Nouvelle partie</h2>
-        <p class="screen-sub">Choisis ton scénario</p>
+        <button type="button" id="start-championship" class="arena-btn arena-championship">
+          <div class="arena-btn-name">🏆 Championnat</div>
+          <div class="arena-btn-desc">5 manches · 6 concurrents · points cumulés</div>
+        </button>
+        <p class="screen-sub section-label">Arène rapide</p>
         <div id="arena-list"></div>
         <button type="button" id="arena-random" class="arena-btn arena-random">
           <div class="arena-btn-name">Aléatoire</div>

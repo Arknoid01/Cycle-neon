@@ -86,8 +86,9 @@ export class Renderer {
     if (!this.electricMats.includes(mat)) this.electricMats.push(mat);
   }
 
-  _rebuildTrailMats() {
-    this.trailMats = getRiderDefs().map(d => {
+  _rebuildTrailMats(defs) {
+    const list = defs ?? getRiderDefs();
+    this.trailMats = list.map(d => {
       const mat = createElectricMaterial({
         color: d.trailGlow, sparkColor: 0xccffff,
         speed: 2.0, intensity: 2.4, scale: 1.15, body: 0.2,
@@ -100,6 +101,10 @@ export class Renderer {
     ].filter(Boolean);
   }
 
+  prepareRiders(riderDefs) {
+    this._rebuildTrailMats(riderDefs);
+  }
+
   _cellKey(x, y) { return x + ',' + y; }
 
   gridToWorld(gx, gy, out) {
@@ -109,7 +114,7 @@ export class Renderer {
     return v;
   }
 
-  clearAll() {
+  clearAll(riderDefs) {
     this.cellMeshes.forEach(m => this.scene.remove(m));
     this.cellMeshes.clear();
     this.riderMeshes.forEach(g => this.scene.remove(g));
@@ -124,7 +129,7 @@ export class Renderer {
     this.explosions = [];
     this.mobileBurstUntil = 0;
     this.electricMats = [];
-    this._rebuildTrailMats();
+    this._rebuildTrailMats(riderDefs);
     this.camReady = false;
   }
 
@@ -441,6 +446,21 @@ export class Renderer {
 
   setBloomEnabled(on) {
     if (this.bloomPass) this.bloomPass.enabled = on;
+  }
+
+  setBloomIntensity(intensity) {
+    if (!this.bloomPass) return;
+    const i = Math.max(0, Math.min(1, intensity));
+    this.bloomPass.strength = 0.45 + i * 0.35;
+  }
+
+  flashNearMiss() {
+    if (!this.bloomPass) return;
+    const prev = this.bloomPass.strength;
+    this.bloomPass.strength = Math.min(1.2, prev + 0.35);
+    setTimeout(() => {
+      if (this.bloomPass) this.bloomPass.strength = prev;
+    }, 120);
   }
 
   render() {

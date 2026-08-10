@@ -24,6 +24,11 @@ export const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
 
 export const KILL_BONUS = 300;
 export const WIN_BONUS = 500;
+export const NEAR_MISS_BONUS = 50;
+export const MULTIPLIER_MAX = 5;
+export const CHAMPIONSHIP_ROUNDS = 5;
+export const CHAMPIONSHIP_RIDERS = 6;
+export const CHAMP_POINTS = [10, 7, 5, 3, 2, 1];
 
 export const WARNING_DIM_MS = 800;
 export const WARNING_PULSE_MS = 400;
@@ -33,6 +38,15 @@ export const PATTERN = {
   PINGPONG: 'pingpong',
   GATE: 'gate',
   CLOSING: 'closing',
+  WAVE: 'wave',
+};
+
+export const ARENA_FAMILY = {
+  CLASSIC: 'classic',
+  MAZE: 'maze',
+  DYNAMIC: 'dynamic',
+  CHAOS: 'chaos',
+  ARENA: 'arena',
 };
 
 export function trailVal(id) { return TRAIL_BASE + id; }
