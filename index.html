@@ -44,6 +44,29 @@
     .control-btn { width: 88px; height: 88px; border: 2px solid rgba(0,255,255,.22); border-radius: 18px; background: rgba(0,255,255,.06); color: rgba(0,255,255,.45); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
     .control-btn svg { width: 36px; height: 36px; fill: currentColor; filter: drop-shadow(0 0 6px rgba(0,255,255,.5)); }
     .control-btn:active, .control-btn.pressed { background: rgba(0,255,255,.18); border-color: rgba(0,255,255,.55); color: rgba(0,255,255,.95); transform: scale(.94); }
+    #arena-menu {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,.82); pointer-events: auto;
+      padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px);
+      overflow-y: auto;
+    }
+    #arena-menu.hidden { display: none; }
+    #arena-menu-title { font-size: 22px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 20px #0ff; letter-spacing: 3px; margin-bottom: 4px; }
+    #arena-menu-sub { font-size: 12px; color: rgba(255,136,0,.75); letter-spacing: 2px; margin-bottom: 20px; }
+    #arena-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 10px; }
+    .arena-btn {
+      width: 100%; padding: 14px 16px; border: 1px solid rgba(0,255,255,.25);
+      border-radius: 12px; background: rgba(0,255,255,.05); color: #fff;
+      text-align: left; cursor: pointer; touch-action: manipulation;
+      transition: background .15s, border-color .15s, transform .1s;
+    }
+    .arena-btn:active { background: rgba(0,255,255,.14); border-color: rgba(0,255,255,.55); transform: scale(.98); }
+    .arena-btn-name { font-size: 15px; font-weight: bold; color: #7df9ff; margin-bottom: 4px; }
+    .arena-btn-desc { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.35; }
+    .arena-btn-best { font-size: 10px; color: rgba(0,255,120,.55); margin-top: 6px; }
+    .arena-random { margin-top: 14px; text-align: center; border-color: rgba(255,136,0,.35); background: rgba(255,136,0,.06); }
+    .arena-random .arena-btn-name { color: rgba(255,180,80,.95); }
   </style>
 </head>
 <body>
@@ -59,7 +82,16 @@
       <div id="overlay-best"></div>
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
       <div id="overlay-next"></div>
-      <div id="overlay-hint">Toucher pour rejouer</div>
+      <div id="overlay-hint">Toucher pour choisir une arène</div>
+    </div>
+    <div id="arena-menu">
+      <div id="arena-menu-title">LIGHT CYCLE</div>
+      <div id="arena-menu-sub">CHOISIR UNE ARÈNE</div>
+      <div id="arena-list"></div>
+      <button type="button" id="arena-random" class="arena-btn arena-random">
+        <div class="arena-btn-name">Aléatoire</div>
+        <div class="arena-btn-desc">Une arène surprise à chaque partie</div>
+      </button>
     </div>
     <div id="arena-intro" class="hidden">
       <div id="arena-intro-label">ARÈNE</div>
@@ -103,6 +135,10 @@
     const overlayBest = document.getElementById('overlay-best');
     const overlayRecord = document.getElementById('overlay-record');
     const overlayNext = document.getElementById('overlay-next');
+    const overlayHint = document.getElementById('overlay-hint');
+    const arenaMenu = document.getElementById('arena-menu');
+    const arenaList = document.getElementById('arena-list');
+    const arenaRandomBtn = document.getElementById('arena-random');
     const arenaIntro = document.getElementById('arena-intro');
     const arenaIntroName = document.getElementById('arena-intro-name');
     const arenaIntroDesc = document.getElementById('arena-intro-desc');
@@ -110,7 +146,7 @@
     const btnLeft = document.getElementById('btn-left');
     const btnRight = document.getElementById('btn-right');
 
-    let gridW, gridH, grid, riders = [], mobileWalls, arenaState, currentArena, nextArenaPreview;
+    let gridW, gridH, grid, riders = [], mobileWalls, arenaState, currentArena;
     let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime, kills;
     let audioCtx, engineOsc, engineGain;
     let scene, camera, renderer, mobileMeshes, cellMeshes, trailMats;
@@ -192,12 +228,51 @@
       }
     }
     function syncGates() { for (const g of arenaState.gates) syncGate(g); }
-    function selectArena() { return ARENAS[Math.floor(Math.random()*ARENAS.length)]; }
-    function pickArenas(r) { if (r) currentArena = nextArenaPreview; nextArenaPreview = selectArena(); }
     function loadHighScore() { try { return parseInt(localStorage.getItem('lc_highscore')||'0',10); } catch { return 0; } }
     function saveHighScore(v) { try { localStorage.setItem('lc_highscore', String(v)); } catch {} }
     function loadArenaBest(id) { try { return parseInt(localStorage.getItem('lc_best_'+id)||'0',10); } catch { return 0; } }
     function saveArenaBest(id, v) { try { localStorage.setItem('lc_best_'+id, String(v)); } catch {} }
+
+    function getArenaById(id) { return ARENAS.find(a => a.id === id); }
+    function loadArenaPref() { try { return localStorage.getItem('lc_arena_pref') || 'random'; } catch { return 'random'; } }
+    function saveArenaPref(id) { try { localStorage.setItem('lc_arena_pref', id); } catch {} }
+
+    function buildArenaMenu() {
+      arenaList.innerHTML = '';
+      ARENAS.forEach(a => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'arena-btn';
+        btn.innerHTML =
+          '<div class="arena-btn-name">'+a.name+'</div>'+
+          '<div class="arena-btn-desc">'+(ARENA_DESC[a.id]||'')+'</div>'+
+          '<div class="arena-btn-best">Record : '+loadArenaBest(a.id).toLocaleString('fr-FR')+'</div>';
+        btn.addEventListener('click', () => startWithArena(a.id));
+        arenaList.appendChild(btn);
+      });
+    }
+
+    function showArenaMenu() {
+      buildArenaMenu();
+      playing = false;
+      stopEngine();
+      arenaMenu.classList.remove('hidden');
+      overlay.classList.add('hidden');
+      controls.classList.add('hidden');
+    }
+
+    function startWithArena(id) {
+      unlockAudio();
+      if (id === 'random') {
+        currentArena = ARENAS[Math.floor(Math.random() * ARENAS.length)];
+        saveArenaPref('random');
+      } else {
+        currentArena = getArenaById(id);
+        saveArenaPref(id);
+      }
+      arenaMenu.classList.add('hidden');
+      resetGame();
+    }
 
     function trailVal(id) { return TRAIL_BASE + id; }
     function isTrail(v) { return v >= TRAIL_BASE; }
@@ -486,11 +561,10 @@
       setTimeout(() => arenaIntro.classList.add('hidden'), 1100);
     }
 
-    function resetGame(rotateArena) {
+    function resetGame() {
       initGridDimensions();
       if (!scene) initThree();
       createGrid();
-      if (rotateArena) pickArenas(true);
       currentArena.init();
       syncMobileMeshes();
       createRiders();
@@ -657,7 +731,7 @@
         ? 'Record arène : '+score.toLocaleString('fr-FR')+' · '+rankTxt+killTxt
         : 'Record : '+highScore.toLocaleString('fr-FR')+' · '+rankTxt+killTxt;
       overlayRecord.classList.toggle('hidden', !rec);
-      overlayNext.textContent = 'Prochaine arène : '+nextArenaPreview.name;
+      overlayNext.textContent = 'Arène : '+currentArena.name;
       overlay.classList.remove('hidden'); controls.classList.add('hidden');
     }
 
@@ -753,9 +827,11 @@
     }
 
     function gameLoop(ts) {
-      updateRenderPositions(ts);
-      updateRiderMeshes();
-      updateCamera();
+      if (scene) {
+        updateRenderPositions(ts);
+        updateRiderMeshes();
+        updateCamera();
+      }
       if (playing && ts >= introUntil && ts - lastTick >= tickMs) {
         currentArena.update(ts);
         gameTick();
@@ -778,19 +854,20 @@
     bindControlButton(btnLeft, turnLeft);
     bindControlButton(btnRight, turnRight);
 
-    overlay.addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); resetGame(true); });
+    overlay.addEventListener('pointerdown', e => { e.preventDefault(); showArenaMenu(); });
+    arenaRandomBtn.addEventListener('click', () => startWithArena('random'));
     window.addEventListener('keydown', e => {
-      if (e.key==='ArrowLeft'||e.key==='a'||e.key==='A') { if (!playing){unlockAudio();resetGame(true);} else turnLeft(); }
-      else if (e.key==='ArrowRight'||e.key==='d'||e.key==='D') { if (!playing){unlockAudio();resetGame(true);} else turnRight(); }
-      else if ((e.key===' '||e.key==='Enter') && !playing) { unlockAudio(); resetGame(true); }
+      if (e.key==='ArrowLeft'||e.key==='a'||e.key==='A') { if (playing) turnLeft(); }
+      else if (e.key==='ArrowRight'||e.key==='d'||e.key==='D') { if (playing) turnRight(); }
+      else if ((e.key===' '||e.key==='Enter') && !playing && !arenaMenu.classList.contains('hidden')) { /* menu */ }
+      else if ((e.key===' '||e.key==='Enter') && !playing) { showArenaMenu(); }
     });
     window.addEventListener('resize', resize);
 
     highScore = loadHighScore();
     initGridDimensions();
-    nextArenaPreview = selectArena();
-    currentArena = selectArena();
-    resetGame(false);
+    buildArenaMenu();
+    showArenaMenu();
     requestAnimationFrame(gameLoop);
   })();
   </script>
