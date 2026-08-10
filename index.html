@@ -117,11 +117,19 @@
       <button type="button" id="btn-right" class="control-btn" aria-label="Droite"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
     </div>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script>
-  (function () {
-    'use strict';
-    const THREE = window.THREE;
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
     const CELL_EMPTY = 0, CELL_WALL = 2, TRAIL_BASE = 10;
     const DIR_UP = 0, DIR_RIGHT = 1, DIR_DOWN = 2, DIR_LEFT = 3;
@@ -172,7 +180,7 @@
     let gridW, gridH, grid, riders = [], mobileWalls, arenaState, currentArena;
     let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime, kills;
     let audioCtx, engineOsc, engineGain;
-    let scene, camera, renderer, mobileMeshes, cellMeshes, trailMats;
+    let scene, camera, renderer, composer, bloomPass, mobileMeshes, cellMeshes, trailMats;
     let smoothCamX = 0, smoothCamZ = 0, smoothCamAngle = -Math.PI / 2;
     let camReady = false;
     let introUntil = 0;
@@ -390,9 +398,19 @@
 
     function makeMat(color, emissive, opacity, tall) {
       return new THREE.MeshStandardMaterial({
-        color, emissive, emissiveIntensity: tall ? 1.2 : 0.9,
-        transparent: true, opacity, metalness: 0.15, roughness: 0.35,
+        color, emissive, emissiveIntensity: tall ? 1.5 : 1.05,
+        transparent: true, opacity, metalness: 0.1, roughness: 0.4,
       });
+    }
+
+    function initBloom() {
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.55, 0.38, 0.1
+      );
+      composer.addPass(bloomPass);
     }
 
     function initThree() {
@@ -404,8 +422,10 @@
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
 
-      scene.add(new THREE.AmbientLight(0x334466, 0.5));
+      scene.add(new THREE.AmbientLight(0x334466, 0.45));
       const dl = new THREE.DirectionalLight(0xffffff, 0.35);
       dl.position.set(10, 20, 5); scene.add(dl);
 
@@ -420,6 +440,7 @@
 
       cellMeshes = new Map();
       mobileMeshes = [];
+      initBloom();
     }
 
     function buildBike(def) {
@@ -878,9 +899,11 @@
 
     function resize() {
       if (!renderer) return;
-      camera.aspect = window.innerWidth/window.innerHeight;
+      const w = window.innerWidth, h = window.innerHeight;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(w, h);
+      if (composer) composer.setSize(w, h);
     }
 
     function gameLoop(ts) {
@@ -896,7 +919,8 @@
       }
       updateMobileWarnings(ts);
       updateExplosions();
-      if (renderer) renderer.render(scene, camera);
+      if (composer) composer.render();
+      else if (renderer) renderer.render(scene, camera);
       requestAnimationFrame(gameLoop);
     }
 
@@ -927,7 +951,6 @@
     buildArenaMenu();
     showArenaMenu();
     requestAnimationFrame(gameLoop);
-  })();
   </script>
 </body>
 </html>
