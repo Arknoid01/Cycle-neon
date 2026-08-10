@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#00eeff">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
   <title>Light Cycle Neon</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -23,6 +28,16 @@
     #overlay-record { font-size: 18px; color: #ff0; text-shadow: 0 0 10px #ff0; margin-top: 12px; }
     #overlay-next { font-size: 12px; color: rgba(0,255,255,.45); margin-top: 8px; }
     #overlay-hint { font-size: 14px; color: rgba(255,255,255,.5); margin-top: 24px; }
+    #arena-intro {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,.7); pointer-events: none;
+      transition: opacity 0.4s;
+    }
+    #arena-intro.hidden { opacity: 0; pointer-events: none; }
+    #arena-intro-label { font-size: 12px; color: rgba(255,136,0,.7); letter-spacing: 3px; margin-bottom: 12px; }
+    #arena-intro-name { font-size: 32px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 20px #0ff, 0 0 40px #08f; letter-spacing: 2px; }
+    #arena-intro-desc { font-size: 13px; color: rgba(255,255,255,.45); margin-top: 16px; max-width: 80%; text-align: center; line-height: 1.4; }
     #controls { position: absolute; bottom: env(safe-area-inset-bottom, 20px); left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 20px; pointer-events: auto; }
     #controls.hidden { display: none; }
     .control-btn { width: 88px; height: 88px; border: 2px solid rgba(0,255,255,.22); border-radius: 18px; background: rgba(0,255,255,.06); color: rgba(0,255,255,.45); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
@@ -43,6 +58,11 @@
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
       <div id="overlay-next"></div>
       <div id="overlay-hint">Toucher pour rejouer</div>
+    </div>
+    <div id="arena-intro" class="hidden">
+      <div id="arena-intro-label">ARÈNE</div>
+      <div id="arena-intro-name"></div>
+      <div id="arena-intro-desc"></div>
     </div>
     <div id="controls" class="hidden">
       <button type="button" id="btn-left" class="control-btn" aria-label="Gauche"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
@@ -73,6 +93,9 @@
     const overlayBest = document.getElementById('overlay-best');
     const overlayRecord = document.getElementById('overlay-record');
     const overlayNext = document.getElementById('overlay-next');
+    const arenaIntro = document.getElementById('arena-intro');
+    const arenaIntroName = document.getElementById('arena-intro-name');
+    const arenaIntroDesc = document.getElementById('arena-intro-desc');
     const controls = document.getElementById('controls');
     const btnLeft = document.getElementById('btn-left');
     const btnRight = document.getElementById('btn-right');
@@ -84,8 +107,19 @@
     let smoothCamX = 0, smoothCamZ = 0, smoothCamAngle = -Math.PI / 2;
     let smoothPlayerAngle = -Math.PI / 2;
     let camReady = false;
+    let introUntil = 0;
+    let explodePoints = null;
+    let explodeVel = [];
+    let explodeLife = 0;
     let matWall, matTrail, matMobile, matPerimeter, boxGeo;
     const _worldPos = new THREE.Vector3();
+
+    const ARENA_DESC = {
+      battement: 'Des murs oscillent — apprends le rythme.',
+      compresseur: 'L\'arène se resserre progressivement.',
+      piege: 'Des portes s\'ouvrent et se ferment.',
+      classique: 'Juste toi et ta trace.',
+    };
 
     const ARENAS = [
       { id: 'battement', name: 'Le Battement',
@@ -155,6 +189,12 @@
     function pickArenas(r) { if (r) currentArena = nextArenaPreview; nextArenaPreview = selectArena(); }
     function loadHighScore() { try { return parseInt(localStorage.getItem('lc_highscore')||'0',10); } catch { return 0; } }
     function saveHighScore(v) { try { localStorage.setItem('lc_highscore', String(v)); } catch {} }
+    function loadArenaBest(id) { try { return parseInt(localStorage.getItem('lc_best_'+id)||'0',10); } catch { return 0; } }
+    function saveArenaBest(id, v) { try { localStorage.setItem('lc_best_'+id, String(v)); } catch {} }
+
+    function haptic(pattern) {
+      try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
+    }
 
     function initAudio() {
       if (audioCtx) return;
@@ -180,10 +220,13 @@
       g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+d);
       o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d);
     }
-    const playTurn = () => playTone(320,.06,'square',.05);
-    const playWallShift = () => playTone(180,.12,'sawtooth',.06);
-    const playNearMiss = () => playTone(520,.08,'sine',.07);
-    function playCrash() { for (let i=0;i<5;i++) setTimeout(()=>playTone(80+Math.random()*200,.15,'sawtooth',.12), i*40); }
+    const playTurn = () => { playTone(320,.06,'square',.05); haptic(10); };
+    const playWallShift = () => { playTone(180,.12,'sawtooth',.06); haptic(18); };
+    const playNearMiss = () => { playTone(520,.08,'sine',.07); haptic(25); };
+    function playCrash() {
+      haptic([60, 40, 100, 40, 140]);
+      for (let i=0;i<5;i++) setTimeout(()=>playTone(80+Math.random()*200,.15,'sawtooth',.12), i*40);
+    }
 
     function initGridDimensions() {
       gridW = 18 * ARENA_SCALE;
@@ -291,7 +334,7 @@
       mobileMeshes.forEach(m => scene.remove(m));
       mobileMeshes = [];
       for (const w of mobileWalls) {
-        const mesh = new THREE.Mesh(boxGeo, matMobile);
+        const mesh = new THREE.Mesh(boxGeo, matMobile.clone());
         const p = gridToWorld(w.x, w.y);
         mesh.position.set(p.x, WALL_H/2, p.z);
         mesh.scale.y = WALL_H;
@@ -352,6 +395,14 @@
       if (playing) timerEl.textContent = 'T : '+((performance.now()-gameStartTime)/1000).toFixed(2);
     }
 
+    function showArenaIntro() {
+      arenaIntroName.textContent = currentArena.name;
+      arenaIntroDesc.textContent = ARENA_DESC[currentArena.id] || '';
+      arenaIntro.classList.remove('hidden');
+      introUntil = performance.now() + 1300;
+      setTimeout(() => arenaIntro.classList.add('hidden'), 1100);
+    }
+
     function resetGame(rotateArena) {
       initGridDimensions();
       if (!scene) initThree();
@@ -364,7 +415,10 @@
       playing = true; gameStartTime = performance.now();
       camReady = false;
       smoothPlayerAngle = CAM_DIR_ANGLES[player.dir];
+      if (playerMesh) playerMesh.visible = true;
+      if (explodePoints) { scene.remove(explodePoints); explodePoints = null; explodeLife = 0; }
       overlay.classList.add('hidden'); controls.classList.remove('hidden');
+      showArenaIntro();
       updateHud(); unlockAudio(); updateEngineSound();
       updatePlayerMesh();
     }
@@ -404,13 +458,73 @@
       checkNearMiss(); updateHud();
     }
 
+    function spawnExplosion() {
+      if (!player || !scene) return;
+      const p = gridToWorld(player.x, player.y, _worldPos);
+      const count = 50;
+      const positions = new Float32Array(count * 3);
+      explodeVel = [];
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = p.x;
+        positions[i * 3 + 1] = TRAIL_H + 0.2;
+        positions[i * 3 + 2] = p.z;
+        explodeVel.push({
+          x: (Math.random() - 0.5) * 0.35,
+          y: 0.05 + Math.random() * 0.2,
+          z: (Math.random() - 0.5) * 0.35,
+        });
+      }
+      if (explodePoints) scene.remove(explodePoints);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      explodePoints = new THREE.Points(geo, new THREE.PointsMaterial({
+        color: 0xffe566, size: 0.3, transparent: true, opacity: 1,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      scene.add(explodePoints);
+      explodeLife = 1;
+      if (playerMesh) playerMesh.visible = false;
+    }
+
+    function updateExplosion() {
+      if (!explodePoints || explodeLife <= 0) return;
+      explodeLife -= 0.028;
+      const pos = explodePoints.geometry.attributes.position;
+      for (let i = 0; i < explodeVel.length; i++) {
+        pos.array[i * 3] += explodeVel[i].x;
+        pos.array[i * 3 + 1] += explodeVel[i].y;
+        pos.array[i * 3 + 2] += explodeVel[i].z;
+        explodeVel[i].y -= 0.01;
+      }
+      pos.needsUpdate = true;
+      explodePoints.material.opacity = Math.max(0, explodeLife);
+      if (explodeLife <= 0) {
+        scene.remove(explodePoints);
+        explodePoints = null;
+      }
+    }
+
+    function updateMobileWarnings(now) {
+      mobileMeshes.forEach((mesh, i) => {
+        const w = mobileWalls[i];
+        if (!w || !mesh.material.emissiveIntensity) return;
+        mesh.material.emissiveIntensity = w.warning
+          ? 0.8 + Math.sin(now / 70) * 0.6
+          : 1.2;
+      });
+    }
+
     function die() {
-      playing = false; stopEngine(); playCrash();
+      playing = false; stopEngine(); playCrash(); spawnExplosion();
       const rec = score > highScore;
       if (rec) { highScore = score; saveHighScore(highScore); }
+      const arenaRec = score > loadArenaBest(currentArena.id);
+      if (arenaRec) saveArenaBest(currentArena.id, score);
       overlayTitle.textContent = currentArena.name;
       overlayScore.textContent = score.toLocaleString('fr-FR');
-      overlayBest.textContent = 'Record : '+highScore.toLocaleString('fr-FR');
+      overlayBest.textContent = arenaRec
+        ? 'Record arène : '+score.toLocaleString('fr-FR')
+        : 'Record : '+highScore.toLocaleString('fr-FR')+' · Arène : '+loadArenaBest(currentArena.id).toLocaleString('fr-FR');
       overlayRecord.classList.toggle('hidden', !rec);
       overlayNext.textContent = 'Prochaine arène : '+nextArenaPreview.name;
       overlay.classList.remove('hidden'); controls.classList.add('hidden');
@@ -498,11 +612,13 @@
       updateRenderPosition(ts);
       updatePlayerMesh();
       updateCamera();
-      if (playing && ts - lastTick >= tickMs) {
+      if (playing && ts >= introUntil && ts - lastTick >= tickMs) {
         currentArena.update(ts);
         gameTick();
         lastTick = ts;
       }
+      updateMobileWarnings(ts);
+      updateExplosion();
       if (renderer) renderer.render(scene, camera);
       requestAnimationFrame(gameLoop);
     }
