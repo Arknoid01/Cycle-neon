@@ -9,7 +9,7 @@ import {
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
-import { createElectricMaterial, updateElectricMaterial } from './electric-shader.js';
+import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -59,12 +59,15 @@ export class Renderer {
 
     this.matWall = createElectricMaterial({
       color: 0x7c3aed, sparkColor: 0xc4b5fd, speed: 0.5, intensity: 1.15, scale: 1.0, body: 0.2,
+      alongDir: AXIS_Y, acrossDir: AXIS_Z,
     });
     this.matMobile = createElectricMaterial({
       color: 0xff6600, sparkColor: 0xffcc88, speed: 0.75, intensity: 1.25, scale: 1.2, body: 0.22,
+      alongDir: AXIS_Y, acrossDir: AXIS_Z,
     });
     this.matPerimeter = createElectricMaterial({
       color: 0x9333ea, sparkColor: 0xddd6fe, speed: 0.4, intensity: 1.05, scale: 0.85, body: 0.24,
+      alongDir: AXIS_Y, acrossDir: AXIS_Z,
     });
     this._rebuildTrailMats();
 
@@ -90,15 +93,19 @@ export class Renderer {
   _rebuildTrailMats(defs) {
     const list = defs ?? getRiderDefs();
     this.trailMats = list.map(d => {
-      const mat = createElectricMaterial({
+      const base = {
         color: d.trailGlow, sparkColor: d.trail,
         speed: 1.0, intensity: 1.5, scale: 1.15, body: 0.2,
-      });
-      this._trackElectric(mat);
-      return mat;
+      };
+      const panel = createElectricMaterial({ ...base, alongDir: AXIS_Y, acrossDir: AXIS_Z });
+      const segment = createElectricMaterial({ ...base, alongDir: AXIS_X, acrossDir: AXIS_Z });
+      this._trackElectric(panel);
+      this._trackElectric(segment);
+      return { panel, segment };
     });
     this.electricMats = [
-      this.matWall, this.matMobile, this.matPerimeter, ...this.trailMats,
+      this.matWall, this.matMobile, this.matPerimeter,
+      ...this.trailMats.flatMap(t => [t.panel, t.segment]),
     ].filter(Boolean);
   }
 
@@ -176,7 +183,7 @@ export class Renderer {
 
     let mat, h;
     if (isTrail(type)) {
-      mat = this.trailMats[type - TRAIL_BASE];
+      mat = this.trailMats[type - TRAIL_BASE].panel;
       h = TRAIL_H;
     } else if (type === CELL_WALL && grid.isPerimeter(x, y)) {
       mat = this.matPerimeter;
@@ -234,10 +241,16 @@ export class Renderer {
 
   _buildBike(def) {
     const g = new THREE.Group();
-    const stripMat = createElectricMaterial({
+    const roofStripMat = createElectricMaterial({
       color: def.glow, sparkColor: def.wheel, speed: 1.5, intensity: 1.0, scale: 3.2, body: 0.35,
+      alongDir: AXIS_X, acrossDir: AXIS_Y,
     });
-    this._trackElectric(stripMat);
+    const sideStripMat = createElectricMaterial({
+      color: def.glow, sparkColor: def.wheel, speed: 1.5, intensity: 1.0, scale: 3.2, body: 0.35,
+      alongDir: AXIS_Z, acrossDir: AXIS_X,
+    });
+    this._trackElectric(roofStripMat);
+    this._trackElectric(sideStripMat);
 
     const bodyMat = new THREE.MeshStandardMaterial({
       color: def.body, emissive: def.glow, emissiveIntensity: 0.75,
@@ -256,12 +269,12 @@ export class Renderer {
     g.add(nose);
 
     const stripGeo = new THREE.BoxGeometry(0.5, 0.06, 0.12);
-    const roofStrip = new THREE.Mesh(stripGeo, stripMat);
+    const roofStrip = new THREE.Mesh(stripGeo, roofStripMat);
     roofStrip.position.set(0, 0.32, 0);
     g.add(roofStrip);
 
     [-0.2, 0.2].forEach(s => {
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.12, 0.62), stripMat);
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.12, 0.62), sideStripMat);
       side.position.set(s, 0.22, 0.02);
       g.add(side);
     });
@@ -279,6 +292,7 @@ export class Renderer {
 
     const emitterMat = createElectricMaterial({
       color: def.trailGlow, sparkColor: def.wheel, speed: 2.0, intensity: 1.2, scale: 4.5, body: 0.4,
+      alongDir: AXIS_Y, acrossDir: AXIS_X,
     });
     this._trackElectric(emitterMat);
     const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.14), emitterMat);
@@ -289,10 +303,10 @@ export class Renderer {
     return g;
   }
 
-  _buildLiveTrail(mat) {
-    const head = new THREE.Mesh(this.panelGeo, mat);
+  _buildLiveTrail(trailMats) {
+    const head = new THREE.Mesh(this.panelGeo, trailMats.panel);
     head.scale.y = TRAIL_H;
-    const segment = new THREE.Mesh(this.segGeo, mat);
+    const segment = new THREE.Mesh(this.segGeo, trailMats.segment);
     segment.scale.y = TRAIL_H;
     segment.visible = false;
     const g = new THREE.Group();
