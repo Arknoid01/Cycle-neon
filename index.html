@@ -20,6 +20,7 @@
     #timer { font-size: 13px; color: rgba(255,255,255,.92); text-align: right; }
     #score { position: absolute; top: env(safe-area-inset-top, 16px); left: 0; right: 0; text-align: center; font-size: 28px; font-weight: bold; color: #7df9ff; text-shadow: 0 0 10px #0ff, 0 0 20px #0ff; padding-top: 28px; }
     #high-score { position: absolute; top: env(safe-area-inset-top, 52px); left: 12px; font-size: 10px; color: rgba(0,255,120,.55); }
+    #rivals { position: absolute; top: env(safe-area-inset-top, 52px); right: 12px; font-size: 10px; color: rgba(255,100,180,.7); text-align: right; }
     #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.55); pointer-events: auto; }
     #overlay.hidden { display: none; }
     #overlay-title { font-size: 14px; color: rgba(255,136,0,.8); margin-bottom: 8px; }
@@ -51,6 +52,7 @@
     <div id="hud-top"><div id="arena-name"></div><div id="timer">T : 0.00</div></div>
     <div id="score">0</div>
     <div id="high-score"></div>
+    <div id="rivals"></div>
     <div id="overlay" class="hidden">
       <div id="overlay-title"></div>
       <div id="overlay-score"></div>
@@ -75,18 +77,26 @@
     'use strict';
     const THREE = window.THREE;
 
-    const CELL_EMPTY = 0, CELL_TRAIL = 1, CELL_WALL = 2;
+    const CELL_EMPTY = 0, CELL_WALL = 2, TRAIL_BASE = 10;
     const DIR_UP = 0, DIR_RIGHT = 1, DIR_DOWN = 2, DIR_LEFT = 3;
     const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
     const BASE_TICK = 130, MIN_TICK = 62, ARENA_BORDER = 2, ARENA_SCALE = 3;
     const CELL_SIZE = 1, WALL_H = 1.5, TRAIL_H = 1.1, PERIM_H = 1.8;
     const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
+    const KILL_BONUS = 300;
+
+    const RIDER_DEFS = [
+      { name: 'Toi', isPlayer: true, body: 0xffe566, glow: 0xffcc00, wheel: 0x00eeff, trail: 0xb8f8ff, trailGlow: 0x00eeff },
+      { name: 'Spectre', isPlayer: false, body: 0xff66cc, glow: 0xff0088, wheel: 0xff88cc, trail: 0xffb8e8, trailGlow: 0xff44aa },
+      { name: 'Phantom', isPlayer: false, body: 0x66ff88, glow: 0x00ff66, wheel: 0x88ffaa, trail: 0xb8ffd8, trailGlow: 0x44ff88 },
+    ];
 
     const canvas = document.getElementById('game');
     const scoreEl = document.getElementById('score');
     const arenaNameEl = document.getElementById('arena-name');
     const timerEl = document.getElementById('timer');
     const highScoreEl = document.getElementById('high-score');
+    const rivalsEl = document.getElementById('rivals');
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
     const overlayScore = document.getElementById('overlay-score');
@@ -100,25 +110,22 @@
     const btnLeft = document.getElementById('btn-left');
     const btnRight = document.getElementById('btn-right');
 
-    let gridW, gridH, grid, player, mobileWalls, arenaState, currentArena, nextArenaPreview;
-    let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime;
-    let trailPoints, audioCtx, engineOsc, engineGain;
-    let scene, camera, renderer, playerMesh, mobileMeshes, cellMeshes, liveTrailMesh;
+    let gridW, gridH, grid, riders = [], mobileWalls, arenaState, currentArena, nextArenaPreview;
+    let score, highScore, tickMs, lastTick, playing, turnQueue, gameStartTime, kills;
+    let audioCtx, engineOsc, engineGain;
+    let scene, camera, renderer, mobileMeshes, cellMeshes, trailMats;
     let smoothCamX = 0, smoothCamZ = 0, smoothCamAngle = -Math.PI / 2;
-    let smoothPlayerAngle = -Math.PI / 2;
     let camReady = false;
     let introUntil = 0;
-    let explodePoints = null;
-    let explodeVel = [];
-    let explodeLife = 0;
-    let matWall, matTrail, matMobile, matPerimeter, boxGeo;
+    let explosions = [];
+    let matWall, matMobile, matPerimeter, boxGeo;
     const _worldPos = new THREE.Vector3();
 
     const ARENA_DESC = {
-      battement: 'Des murs oscillent — apprends le rythme.',
-      compresseur: 'L\'arène se resserre progressivement.',
-      piege: 'Des portes s\'ouvrent et se ferment.',
-      classique: 'Juste toi et ta trace.',
+      battement: 'Des murs oscillent — évite les adversaires.',
+      compresseur: 'L\'arène se resserre — survive aux autres cycles.',
+      piege: 'Des portes piègent — et les Spectres aussi.',
+      classique: 'Affrontement classique — dernier en vie gagne.',
     };
 
     const ARENAS = [
@@ -191,6 +198,12 @@
     function saveHighScore(v) { try { localStorage.setItem('lc_highscore', String(v)); } catch {} }
     function loadArenaBest(id) { try { return parseInt(localStorage.getItem('lc_best_'+id)||'0',10); } catch { return 0; } }
     function saveArenaBest(id, v) { try { localStorage.setItem('lc_best_'+id, String(v)); } catch {} }
+
+    function trailVal(id) { return TRAIL_BASE + id; }
+    function isTrail(v) { return v >= TRAIL_BASE; }
+    function isBlocked(v) { return v !== CELL_EMPTY; }
+    function getPlayer() { return riders.find(r => r.isPlayer); }
+    function aliveBots() { return riders.filter(r => !r.isPlayer && r.alive); }
 
     function haptic(pattern) {
       try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
@@ -265,26 +278,23 @@
       dl.position.set(10, 20, 5); scene.add(dl);
 
       matWall = makeMat(0xb794f6, 0x7c3aed, 0.82, false);
-      matTrail = makeMat(0xb8f8ff, 0x00eeff, 0.55, false);
       matMobile = makeMat(0xffaa44, 0xff6600, 0.85, false);
       matPerimeter = makeMat(0xc4b5fd, 0x9333ea, 0.92, true);
       boxGeo = new THREE.BoxGeometry(CELL_SIZE*0.92, 1, CELL_SIZE*0.92);
+      trailMats = [];
 
       const floor = new THREE.GridHelper(Math.max(gridW, gridH), Math.max(gridW, gridH), 0x00ff66, 0x003318);
       floor.position.y = 0.01; scene.add(floor);
-
-      playerMesh = buildBike();
-      scene.add(playerMesh);
 
       cellMeshes = new Map();
       mobileMeshes = [];
     }
 
-    function buildBike() {
+    function buildBike(def) {
       const g = new THREE.Group();
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(0.5, 0.22, 0.85),
-        makeMat(0xffe566, 0xffcc00, 1, true)
+        makeMat(def.body, def.glow, 1, true)
       );
       body.position.y = 0.25; g.add(body);
       const cockpit = new THREE.Mesh(
@@ -293,14 +303,14 @@
       );
       cockpit.position.set(0, 0.38, -0.15); g.add(cockpit);
       const wheelGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12);
-      const wMat = makeMat(0xffffff, 0x00eeff, 1, true);
+      const wMat = makeMat(0xffffff, def.wheel, 1, true);
       [-0.28, 0.28].forEach(s => {
         const w = new THREE.Mesh(wheelGeo, wMat);
         w.rotation.z = Math.PI/2; w.position.set(s, 0.12, 0.28); g.add(w);
       });
       const emitter = new THREE.Mesh(
         new THREE.SphereGeometry(0.08, 8, 8),
-        makeMat(0x00eeff, 0x00eeff, 1, true)
+        makeMat(def.wheel, def.wheel, 1, true)
       );
       emitter.position.set(0, 0.3, 0.45); g.add(emitter);
       return g;
@@ -313,7 +323,7 @@
       removeCellMesh(x, y);
       const perimeter = type === CELL_WALL && isPerimeterCell(x,y);
       let mat, h;
-      if (type === CELL_TRAIL) { mat = matTrail; h = TRAIL_H; }
+      if (isTrail(type)) { mat = trailMats[type - TRAIL_BASE]; h = TRAIL_H; }
       else if (perimeter) { mat = matPerimeter; h = PERIM_H; }
       else { mat = type === CELL_WALL ? matWall : matMobile; h = WALL_H; }
       const mesh = new THREE.Mesh(boxGeo, mat);
@@ -348,7 +358,9 @@
       cellMeshes.clear();
       mobileMeshes.forEach(m => scene.remove(m));
       mobileMeshes = [];
-      if (liveTrailMesh) { scene.remove(liveTrailMesh); liveTrailMesh = null; }
+      (riders || []).forEach(r => {
+        if (r.liveTrailMesh) { scene.remove(r.liveTrailMesh); r.liveTrailMesh = null; }
+      });
     }
 
     function createGrid() {
@@ -376,22 +388,93 @@
       else addCellMesh(x,y,val);
     }
 
-    function initTrail(x,y) { trailPoints = [{x,y}]; }
-    function updateTrailCorner() {
-      const last = trailPoints[trailPoints.length-1];
-      if (last.x !== player.x || last.y !== player.y) trailPoints.push({x:player.x, y:player.y});
+    function createRiders() {
+      (riders || []).forEach(r => { if (r.mesh) scene.remove(r.mesh); });
+      riders = [];
+      trailMats = RIDER_DEFS.map(d => makeMat(d.trail, d.trailGlow, 0.55, false));
+
+      const spawns = [
+        { x: Math.floor(gridW/2), y: gridH - ARENA_BORDER - 6, dir: DIR_UP },
+        { x: Math.floor(gridW/4), y: ARENA_BORDER + 6, dir: DIR_DOWN },
+        { x: Math.floor(3*gridW/4), y: ARENA_BORDER + 6, dir: DIR_DOWN },
+      ];
+
+      RIDER_DEFS.forEach((def, i) => {
+        const s = spawns[i];
+        const rider = {
+          id: i, name: def.name, isPlayer: def.isPlayer, def, alive: true,
+          x: s.x, y: s.y, dir: s.dir,
+          prevX: s.x, prevY: s.y, renderX: s.x, renderY: s.y,
+          smoothAngle: CAM_DIR_ANGLES[s.dir],
+          mesh: null, liveTrailMesh: null, liveTrailMat: makeMat(def.trail, def.trailGlow, 0.35, false),
+        };
+        rider.mesh = buildBike(def);
+        scene.add(rider.mesh);
+        riders.push(rider);
+      });
     }
 
-    function createPlayer() {
-      const sx = Math.floor(gridW/2), sy = gridH - ARENA_BORDER - 6;
-      player = { x:sx, y:sy, dir:DIR_UP, prevX:sx, prevY:sy, renderX:sx, renderY:sy };
-      initTrail(sx, sy);
+    function spaceInDir(rider, dir, maxLook) {
+      let x = rider.x, y = rider.y, n = 0;
+      for (let i = 0; i < maxLook; i++) {
+        x += DX[dir]; y += DY[dir];
+        if (isBlocked(getCell(x, y)) || isMobileWallAt(x, y)) return n;
+        n++;
+      }
+      return n;
+    }
+
+    function canRiderGo(rider, dir, moves) {
+      const nx = rider.x + DX[dir], ny = rider.y + DY[dir];
+      return !isMoveBlocked(nx, ny, rider, moves);
+    }
+
+    function isMoveBlocked(x, y, rider, moves) {
+      if (isBlocked(getCell(x, y)) || isMobileWallAt(x, y)) return true;
+      for (const r of riders) {
+        if (!r.alive || r === rider) continue;
+        if (r.x !== x || r.y !== y) continue;
+        const mv = moves && moves.find(m => m.rider === r);
+        if (mv && (mv.nx !== r.x || mv.ny !== r.y)) continue;
+        return true;
+      }
+      return false;
+    }
+
+    function chooseAiTurn(rider, moves) {
+      const fwd = rider.dir, left = (rider.dir + 3) % 4, right = (rider.dir + 1) % 4;
+      if (!canRiderGo(rider, fwd, moves)) {
+        const lOk = canRiderGo(rider, left, moves), rOk = canRiderGo(rider, right, moves);
+        if (lOk && rOk) return spaceInDir(rider, left) >= spaceInDir(rider, right) ? left : right;
+        if (lOk) return left;
+        if (rOk) return right;
+        return fwd;
+      }
+      for (let look = 1; look <= 3; look++) {
+        const tx = rider.x + DX[fwd] * look, ty = rider.y + DY[fwd] * look;
+        if (isBlocked(getCell(tx, ty)) || isMobileWallAt(tx, ty)) {
+          const lOk = canRiderGo(rider, left, moves), rOk = canRiderGo(rider, right, moves);
+          if (lOk && rOk) {
+            if (Math.random() < 0.12) return Math.random() < 0.5 ? left : right;
+            return spaceInDir(rider, left) >= spaceInDir(rider, right) ? left : right;
+          }
+          if (lOk) return left;
+          if (rOk) return right;
+          break;
+        }
+      }
+      if (Math.random() < 0.018 && canRiderGo(rider, left, moves)) return left;
+      if (Math.random() < 0.018 && canRiderGo(rider, right, moves)) return right;
+      return fwd;
     }
 
     function updateHud() {
+      const player = getPlayer();
       arenaNameEl.textContent = currentArena.name;
       highScoreEl.textContent = 'BEST '+highScore.toLocaleString('fr-FR');
       scoreEl.textContent = score.toLocaleString('fr-FR');
+      const bots = aliveBots().length;
+      rivalsEl.textContent = bots > 0 ? bots+' adversaire'+(bots>1?'s':'') : 'DERNIER EN VIE !';
       if (playing) timerEl.textContent = 'T : '+((performance.now()-gameStartTime)/1000).toFixed(2);
     }
 
@@ -410,26 +493,29 @@
       if (rotateArena) pickArenas(true);
       currentArena.init();
       syncMobileMeshes();
-      createPlayer();
-      score = 0; tickMs = BASE_TICK; lastTick = 0; turnQueue = null;
+      createRiders();
+      score = 0; kills = 0; tickMs = BASE_TICK; lastTick = 0; turnQueue = null;
       playing = true; gameStartTime = performance.now();
       camReady = false;
-      smoothPlayerAngle = CAM_DIR_ANGLES[player.dir];
-      if (playerMesh) playerMesh.visible = true;
-      if (explodePoints) { scene.remove(explodePoints); explodePoints = null; explodeLife = 0; }
+      const player = getPlayer();
+      if (player) player.smoothAngle = CAM_DIR_ANGLES[player.dir];
+      riders.forEach(r => { if (r.mesh) r.mesh.visible = true; });
+      clearExplosions();
       overlay.classList.add('hidden'); controls.classList.remove('hidden');
       showArenaIntro();
       updateHud(); unlockAudio(); updateEngineSound();
-      updatePlayerMesh();
+      updateRiderMeshes();
     }
 
     function turnLeft() {
-      if (!playing) return; unlockAudio();
+      const player = getPlayer();
+      if (!playing || !player?.alive) return; unlockAudio();
       const nd = (player.dir+3)%4;
       if (nd !== (player.dir+2)%4) { turnQueue = nd; playTurn(); }
     }
     function turnRight() {
-      if (!playing) return; unlockAudio();
+      const player = getPlayer();
+      if (!playing || !player?.alive) return; unlockAudio();
       const nd = (player.dir+1)%4;
       if (nd !== (player.dir+2)%4) { turnQueue = nd; playTurn(); }
     }
@@ -437,71 +523,142 @@
     function isMobileWallAt(x,y) { return mobileWalls.some(w => w.x===x && w.y===y); }
 
     function checkNearMiss() {
+      const player = getPlayer();
+      if (!player?.alive) return;
       for (let d=0; d<4; d++) {
         const c = getCell(player.x+DX[d], player.y+DY[d]);
-        if (c===CELL_WALL||c===CELL_TRAIL||isMobileWallAt(player.x+DX[d], player.y+DY[d])) { playNearMiss(); return; }
+        if (isBlocked(c)||isMobileWallAt(player.x+DX[d], player.y+DY[d])) { playNearMiss(); return; }
       }
     }
 
     function gameTick() {
       if (!playing) return;
-      if (turnQueue !== null) {
-        if (player.dir !== turnQueue) updateTrailCorner();
-        player.dir = turnQueue; turnQueue = null;
+      const moves = [];
+      for (const r of riders) {
+        if (!r.alive) continue;
+        let newDir = r.dir;
+        if (r.isPlayer && turnQueue !== null) {
+          newDir = turnQueue;
+          turnQueue = null;
+        } else if (!r.isPlayer) {
+          newDir = chooseAiTurn(r, moves);
+        }
+        moves.push({
+          rider: r, newDir,
+          nx: r.x + DX[newDir], ny: r.y + DY[newDir],
+        });
       }
-      player.prevX = player.x; player.prevY = player.y;
-      const nx = player.x+DX[player.dir], ny = player.y+DY[player.dir];
-      if (getCell(nx,ny)===CELL_WALL || getCell(nx,ny)===CELL_TRAIL || isMobileWallAt(nx,ny)) { die(); return; }
-      setCell(player.x, player.y, CELL_TRAIL);
-      player.x = nx; player.y = ny; score++;
-      if (score%12===0 && tickMs>MIN_TICK) { tickMs -= 2; updateEngineSound(); }
-      checkNearMiss(); updateHud();
+
+      const targets = new Map();
+      for (const m of moves) {
+        const key = m.nx+','+m.ny;
+        if (!targets.has(key)) targets.set(key, []);
+        targets.get(key).push(m.rider);
+      }
+
+      const dead = new Set();
+      for (const m of moves) {
+        if (isMoveBlocked(m.nx, m.ny, m.rider, moves)) dead.add(m.rider);
+        else if ((targets.get(m.nx+','+m.ny)||[]).length > 1) dead.add(m.rider);
+      }
+
+      let playerDied = false;
+      for (const m of moves) {
+        if (dead.has(m.rider)) {
+          if (m.rider.isPlayer) playerDied = true;
+          else if (getPlayer()?.alive) { kills++; score += KILL_BONUS; playTone(640,.1,'sine',.06); }
+          killRider(m.rider);
+          continue;
+        }
+        m.rider.prevX = m.rider.x; m.rider.prevY = m.rider.y;
+        m.rider.dir = m.newDir;
+        setCell(m.rider.x, m.rider.y, trailVal(m.rider.id));
+        m.rider.x = m.nx; m.rider.y = m.ny;
+        if (m.rider.isPlayer) {
+          score++;
+          if (score%12===0 && tickMs>MIN_TICK) { tickMs -= 2; updateEngineSound(); }
+        }
+      }
+
+      if (playerDied) endGame();
+      else { checkNearMiss(); updateHud(); }
     }
 
-    function spawnExplosion() {
-      if (!player || !scene) return;
-      const p = gridToWorld(player.x, player.y, _worldPos);
-      const count = 50;
+    function clearExplosions() {
+      explosions.forEach(e => scene.remove(e.points));
+      explosions = [];
+    }
+
+    function spawnExplosion(rider) {
+      if (!rider || !scene) return;
+      const p = gridToWorld(rider.x, rider.y, _worldPos);
+      const count = 40;
       const positions = new Float32Array(count * 3);
-      explodeVel = [];
+      const vel = [];
       for (let i = 0; i < count; i++) {
         positions[i * 3] = p.x;
         positions[i * 3 + 1] = TRAIL_H + 0.2;
         positions[i * 3 + 2] = p.z;
-        explodeVel.push({
+        vel.push({
           x: (Math.random() - 0.5) * 0.35,
           y: 0.05 + Math.random() * 0.2,
           z: (Math.random() - 0.5) * 0.35,
         });
       }
-      if (explodePoints) scene.remove(explodePoints);
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      explodePoints = new THREE.Points(geo, new THREE.PointsMaterial({
-        color: 0xffe566, size: 0.3, transparent: true, opacity: 1,
+      const points = new THREE.Points(geo, new THREE.PointsMaterial({
+        color: rider.def.body, size: 0.3, transparent: true, opacity: 1,
         blending: THREE.AdditiveBlending, depthWrite: false,
       }));
-      scene.add(explodePoints);
-      explodeLife = 1;
-      if (playerMesh) playerMesh.visible = false;
+      scene.add(points);
+      explosions.push({ points, vel, life: 1 });
+      if (rider.mesh) rider.mesh.visible = false;
     }
 
-    function updateExplosion() {
-      if (!explodePoints || explodeLife <= 0) return;
-      explodeLife -= 0.028;
-      const pos = explodePoints.geometry.attributes.position;
-      for (let i = 0; i < explodeVel.length; i++) {
-        pos.array[i * 3] += explodeVel[i].x;
-        pos.array[i * 3 + 1] += explodeVel[i].y;
-        pos.array[i * 3 + 2] += explodeVel[i].z;
-        explodeVel[i].y -= 0.01;
-      }
-      pos.needsUpdate = true;
-      explodePoints.material.opacity = Math.max(0, explodeLife);
-      if (explodeLife <= 0) {
-        scene.remove(explodePoints);
-        explodePoints = null;
-      }
+    function updateExplosions() {
+      explosions = explosions.filter(e => {
+        e.life -= 0.028;
+        const pos = e.points.geometry.attributes.position;
+        for (let i = 0; i < e.vel.length; i++) {
+          pos.array[i * 3] += e.vel[i].x;
+          pos.array[i * 3 + 1] += e.vel[i].y;
+          pos.array[i * 3 + 2] += e.vel[i].z;
+          e.vel[i].y -= 0.01;
+        }
+        pos.needsUpdate = true;
+        e.points.material.opacity = Math.max(0, e.life);
+        if (e.life <= 0) { scene.remove(e.points); return false; }
+        return true;
+      });
+    }
+
+    function killRider(rider) {
+      if (!rider.alive) return;
+      rider.alive = false;
+      if (rider.isPlayer) playCrash();
+      else playTone(120,.08,'sawtooth',.05);
+      spawnExplosion(rider);
+    }
+
+    function endGame() {
+      playing = false; stopEngine();
+      const player = getPlayer();
+      const rank = 1 + aliveBots().length;
+      const rec = score > highScore;
+      if (rec) { highScore = score; saveHighScore(highScore); }
+      const arenaRec = score > loadArenaBest(currentArena.id);
+      if (arenaRec) saveArenaBest(currentArena.id, score);
+      overlayTitle.textContent = rank === 1 ? 'VICTOIRE !' : currentArena.name;
+      overlayScore.textContent = score.toLocaleString('fr-FR');
+      const rankTxt = rank === 1 ? '1er — tous éliminés !' : rank+'e place';
+      const killTxt = kills > 0 ? ' · '+kills+' kill'+(kills>1?'s':'') : '';
+      overlayBest.textContent = arenaRec
+        ? 'Record arène : '+score.toLocaleString('fr-FR')+' · '+rankTxt+killTxt
+        : 'Record : '+highScore.toLocaleString('fr-FR')+' · '+rankTxt+killTxt;
+      overlayRecord.classList.toggle('hidden', !rec);
+      overlayNext.textContent = 'Prochaine arène : '+nextArenaPreview.name;
+      overlay.classList.remove('hidden'); controls.classList.add('hidden');
     }
 
     function updateMobileWarnings(now) {
@@ -514,61 +671,48 @@
       });
     }
 
-    function die() {
-      playing = false; stopEngine(); playCrash(); spawnExplosion();
-      const rec = score > highScore;
-      if (rec) { highScore = score; saveHighScore(highScore); }
-      const arenaRec = score > loadArenaBest(currentArena.id);
-      if (arenaRec) saveArenaBest(currentArena.id, score);
-      overlayTitle.textContent = currentArena.name;
-      overlayScore.textContent = score.toLocaleString('fr-FR');
-      overlayBest.textContent = arenaRec
-        ? 'Record arène : '+score.toLocaleString('fr-FR')
-        : 'Record : '+highScore.toLocaleString('fr-FR')+' · Arène : '+loadArenaBest(currentArena.id).toLocaleString('fr-FR');
-      overlayRecord.classList.toggle('hidden', !rec);
-      overlayNext.textContent = 'Prochaine arène : '+nextArenaPreview.name;
-      overlay.classList.remove('hidden'); controls.classList.add('hidden');
+    function updateRenderPositions(ts) {
+      for (const r of riders) {
+        if (!r.alive) continue;
+        if (!playing || !lastTick) { r.renderX = r.x; r.renderY = r.y; continue; }
+        let t = Math.min(1, (ts-lastTick)/tickMs);
+        t = t*t*(3-2*t);
+        r.renderX = r.prevX + (r.x-r.prevX)*t;
+        r.renderY = r.prevY + (r.y-r.prevY)*t;
+      }
     }
 
-    function updateRenderPosition(ts) {
-      if (!player) return;
-      if (!playing || !lastTick) { player.renderX = player.x; player.renderY = player.y; return; }
-      let t = Math.min(1, (ts-lastTick)/tickMs);
-      t = t*t*(3-2*t);
-      player.renderX = player.prevX + (player.x-player.prevX)*t;
-      player.renderY = player.prevY + (player.y-player.prevY)*t;
-    }
-
-    function updateLiveTrail() {
-      if (!playing || !player) {
-        if (liveTrailMesh) { scene.remove(liveTrailMesh); liveTrailMesh = null; }
+    function updateLiveTrail(r) {
+      if (!r.alive || !playing) {
+        if (r.liveTrailMesh) { scene.remove(r.liveTrailMesh); r.liveTrailMesh = null; }
         return;
       }
-      if (!liveTrailMesh) {
-        liveTrailMesh = new THREE.Mesh(boxGeo, makeMat(0xb8f8ff, 0x00eeff, 0.35, false));
-        scene.add(liveTrailMesh);
+      if (!r.liveTrailMesh) {
+        r.liveTrailMesh = new THREE.Mesh(boxGeo, r.liveTrailMat);
+        scene.add(r.liveTrailMesh);
       }
-      const p = gridToWorld(player.renderX, player.renderY);
-      liveTrailMesh.position.set(p.x, TRAIL_H/2, p.z);
-      liveTrailMesh.scale.y = TRAIL_H;
+      const p = gridToWorld(r.renderX, r.renderY);
+      r.liveTrailMesh.position.set(p.x, TRAIL_H/2, p.z);
+      r.liveTrailMesh.scale.y = TRAIL_H;
     }
 
-    function updatePlayerMesh() {
-      if (!playerMesh || !player) return;
-      const p = gridToWorld(player.renderX, player.renderY, _worldPos);
-      playerMesh.position.set(p.x, 0, p.z);
-
-      const targetAngle = CAM_DIR_ANGLES[player.dir];
-      let angleDiff = targetAngle - smoothPlayerAngle;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      smoothPlayerAngle += angleDiff * 0.28;
-      playerMesh.rotation.y = smoothPlayerAngle;
-
-      updateLiveTrail();
+    function updateRiderMeshes() {
+      for (const r of riders) {
+        if (!r.mesh || !r.alive) continue;
+        const p = gridToWorld(r.renderX, r.renderY, _worldPos);
+        r.mesh.position.set(p.x, 0, p.z);
+        const targetAngle = CAM_DIR_ANGLES[r.dir];
+        let angleDiff = targetAngle - r.smoothAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        r.smoothAngle += angleDiff * 0.28;
+        r.mesh.rotation.y = r.smoothAngle;
+        updateLiveTrail(r);
+      }
     }
 
     function updateCamera() {
+      const player = getPlayer();
       if (!player) return;
 
       const p = gridToWorld(player.renderX, player.renderY, _worldPos);
@@ -609,8 +753,8 @@
     }
 
     function gameLoop(ts) {
-      updateRenderPosition(ts);
-      updatePlayerMesh();
+      updateRenderPositions(ts);
+      updateRiderMeshes();
       updateCamera();
       if (playing && ts >= introUntil && ts - lastTick >= tickMs) {
         currentArena.update(ts);
@@ -618,7 +762,7 @@
         lastTick = ts;
       }
       updateMobileWarnings(ts);
-      updateExplosion();
+      updateExplosions();
       if (renderer) renderer.render(scene, camera);
       requestAnimationFrame(gameLoop);
     }
