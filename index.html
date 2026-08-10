@@ -87,25 +87,63 @@
       letter-spacing: 1px;
     }
 
-    #controls-hint {
+    #controls {
       position: absolute;
-      bottom: env(safe-area-inset-bottom, 24px);
+      bottom: env(safe-area-inset-bottom, 20px);
       left: 0;
       right: 0;
       display: flex;
       justify-content: space-between;
-      padding: 0 32px;
-      opacity: 0.25;
+      padding: 0 20px;
+      pointer-events: auto;
     }
 
-    #controls-hint.hidden {
+    #controls.hidden {
       display: none;
     }
 
-    .left-zone, .right-zone {
-      font-size: 24px;
-      color: #0ff;
-      text-shadow: 0 0 8px #0ff;
+    .control-btn {
+      width: 88px;
+      height: 88px;
+      border: 2px solid rgba(0, 255, 255, 0.22);
+      border-radius: 18px;
+      background: rgba(0, 255, 255, 0.06);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      color: rgba(0, 255, 255, 0.45);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.08s, border-color 0.08s, color 0.08s, transform 0.08s;
+      touch-action: manipulation;
+    }
+
+    .control-btn svg {
+      width: 36px;
+      height: 36px;
+      fill: currentColor;
+      filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.5));
+    }
+
+    .control-btn:active,
+    .control-btn.pressed {
+      background: rgba(0, 255, 255, 0.18);
+      border-color: rgba(0, 255, 255, 0.55);
+      color: rgba(0, 255, 255, 0.95);
+      transform: scale(0.94);
+    }
+
+    @media (min-height: 700px) {
+      .control-btn {
+        width: 100px;
+        height: 100px;
+      }
+
+      .control-btn svg {
+        width: 42px;
+        height: 42px;
+      }
     }
   </style>
 </head>
@@ -119,9 +157,13 @@
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
       <div id="overlay-hint">Toucher pour rejouer</div>
     </div>
-    <div id="controls-hint" class="hidden">
-      <span class="left-zone">◀</span>
-      <span class="right-zone">▶</span>
+    <div id="controls" class="hidden">
+      <button type="button" id="btn-left" class="control-btn" aria-label="Tourner à gauche">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <button type="button" id="btn-right" class="control-btn" aria-label="Tourner à droite">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
     </div>
   </div>
 
@@ -160,7 +202,9 @@
     const overlayScore = document.getElementById('overlay-score');
     const overlayRecord = document.getElementById('overlay-record');
     const overlayHint = document.getElementById('overlay-hint');
-    const controlsHint = document.getElementById('controls-hint');
+    const controls = document.getElementById('controls');
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
 
     let gridW, gridH, cellSize, offsetX, offsetY;
     let grid;
@@ -280,7 +324,7 @@
       shakeTimer = 0;
       playing = true;
       overlay.classList.add('hidden');
-      controlsHint.classList.remove('hidden');
+      controls.classList.remove('hidden');
       updateScoreDisplay();
     }
 
@@ -402,7 +446,7 @@
       overlayRecord.classList.toggle('hidden', !isRecord);
       overlayHint.textContent = 'Toucher pour rejouer';
       overlay.classList.remove('hidden');
-      controlsHint.classList.add('hidden');
+      controls.classList.add('hidden');
     }
 
     function resize() {
@@ -556,24 +600,23 @@
       requestAnimationFrame(gameLoop);
     }
 
-    function handleInput(clientX) {
-      if (!playing) {
-        resetGame();
-        return;
-      }
+    function bindControlButton(btn, action) {
+      const press = (e) => {
+        e.preventDefault();
+        if (!playing) return;
+        btn.classList.add('pressed');
+        action();
+      };
+      const release = () => btn.classList.remove('pressed');
 
-      const half = canvas.width / 2;
-      if (clientX < half) {
-        turnLeft();
-      } else {
-        turnRight();
-      }
+      btn.addEventListener('pointerdown', press);
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointerleave', release);
+      btn.addEventListener('pointercancel', release);
     }
 
-    canvas.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      handleInput(e.clientX);
-    });
+    bindControlButton(btnLeft, turnLeft);
+    bindControlButton(btnRight, turnRight);
 
     overlay.addEventListener('pointerdown', (e) => {
       e.preventDefault();

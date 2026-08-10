@@ -16,7 +16,7 @@ Aucun serveur, aucune installation, aucune dépendance.
 
 ## Contrôles
 
-- **Mobile** : toucher gauche = tourner à gauche, toucher droite = tourner à droite
+- **Mobile** : boutons flèches transparents (style émulateur) en bas à gauche / droite
 - **Desktop** : `A` / `←` = gauche, `D` / `→` = droite, `Espace` = rejouer
 
 ## V1 prototype
