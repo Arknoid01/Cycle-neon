@@ -1,16 +1,11 @@
 import * as THREE from 'three';
 
 const VERT = /* glsl */`
-  varying vec2 vUv;
-  varying vec3 vWorldPos;
   varying vec3 vLocalPos;
 
   void main() {
-    vUv = uv;
     vLocalPos = position;
-    vec4 wp = modelMatrix * vec4(position, 1.0);
-    vWorldPos = wp.xyz;
-    gl_Position = projectionMatrix * viewMatrix * wp;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
@@ -22,9 +17,9 @@ const FRAG = /* glsl */`
   uniform float uIntensity;
   uniform float uScale;
   uniform float uBody;
+  uniform vec3 uAlongDir;
+  uniform vec3 uAcrossDir;
 
-  varying vec2 vUv;
-  varying vec3 vWorldPos;
   varying vec3 vLocalPos;
 
   float hash(vec2 p) {
@@ -44,8 +39,8 @@ const FRAG = /* glsl */`
 
   void main() {
     float t = uTime * uSpeed;
-    float along = dot(vWorldPos.xz, vec2(1.0, 0.85)) * uScale + t * 0.35;
-    float across = vLocalPos.z;
+    float along = dot(vLocalPos, uAlongDir) * uScale + t * 0.35;
+    float across = dot(vLocalPos, uAcrossDir);
 
     float band = exp(-across * across * 38.0);
 
@@ -75,7 +70,11 @@ const FRAG = /* glsl */`
   }
 `;
 
-/** @param {{ color: number, sparkColor?: number, speed?: number, intensity?: number, scale?: number, body?: number }} opts */
+const AXIS_Y = new THREE.Vector3(0, 1, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+
+/** @param {{ color: number, sparkColor?: number, speed?: number, intensity?: number, scale?: number, body?: number, alongDir?: THREE.Vector3, acrossDir?: THREE.Vector3 }} opts */
 export function createElectricMaterial(opts) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
@@ -86,6 +85,8 @@ export function createElectricMaterial(opts) {
       uIntensity: { value: opts.intensity ?? 0.95 },
       uScale: { value: opts.scale ?? 1.1 },
       uBody: { value: opts.body ?? 0.55 },
+      uAlongDir: { value: (opts.alongDir ?? AXIS_Y).clone() },
+      uAcrossDir: { value: (opts.acrossDir ?? AXIS_Z).clone() },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -111,3 +112,5 @@ export function setElectricColor(mat, color, sparkColor) {
   mat.uniforms.uColor.value.set(color);
   if (sparkColor !== undefined) mat.uniforms.uSparkColor.value.set(sparkColor);
 }
+
+export { AXIS_X, AXIS_Y, AXIS_Z };
