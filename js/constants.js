@@ -21,6 +21,8 @@ export const TRAIL_H = 1.25;
 export const PERIM_H = 1.95;
 
 export const CAM_DIR_ANGLES = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
+/** Bike mesh forward is -Z at rotation 0; differs from camera bearing. */
+export const BIKE_DIR_ANGLES = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
 
 export const KILL_BONUS = 300;
 export const WIN_BONUS = 500;

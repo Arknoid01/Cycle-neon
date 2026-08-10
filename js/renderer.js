@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import {
   CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, PERIM_H,
   CAM_DIR_ANGLES,
+  BIKE_DIR_ANGLES,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
@@ -342,7 +343,7 @@ export class Renderer {
       mesh.visible = true;
       const p = this.gridToWorld(r.renderX, r.renderY, this._worldPos);
       mesh.position.set(p.x, 0, p.z);
-      const targetAngle = CAM_DIR_ANGLES[r.dir];
+      const targetAngle = BIKE_DIR_ANGLES[r.dir];
       let diff = targetAngle - r.smoothAngle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -406,6 +407,10 @@ export class Renderer {
       }
       return true;
     });
+  }
+
+  getCameraYaw() {
+    return this.smoothCamAngle;
   }
 
   updateCamera(player) {

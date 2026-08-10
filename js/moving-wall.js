@@ -178,9 +178,12 @@ export function getStaticWalls(arenaId, gridW, gridH, border) {
   const walls = [];
   const cx = Math.floor(gridW / 2);
   if (arenaId === 'labyrinthe') {
-    for (let x = cx - 8; x <= cx + 8; x += 8) {
+    const corridorPeriod = 6;
+    const corridorHeight = 2;
+    for (let x = cx - 16; x <= cx + 16; x += 8) {
+      if (x <= border || x >= gridW - border) continue;
       for (let y = border + 3; y < gridH - border - 3; y++) {
-        if ((x + y) % 5 !== 0) walls.push({ x, y });
+        if ((y % corridorPeriod) >= corridorHeight) walls.push({ x, y });
       }
     }
   }
