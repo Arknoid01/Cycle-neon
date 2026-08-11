@@ -1,5 +1,6 @@
 import { ARENAS, ARENA_DESC, ARENA_FAMILIES, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
 import { CHALLENGES, checkChallenges, loadChallenges } from './challenges.js';
+import { recordRunEnd } from './stats.js';
 import {
   COLOR_PRESETS, BIKE_SKINS, SKIN_TIER_LABELS,
   loadCosmetic, saveCosmetic, loadSkin, saveSkin,
@@ -371,8 +372,12 @@ export class UI {
     if (rec) { this.highScore = sim.score; saveHighScore(this.highScore); }
     const arenaRec = sim.score > loadArenaBest(arena.id);
     if (arenaRec) saveArenaBest(arena.id, sim.score);
+    const lifetime = recordRunEnd({
+      won, kills: sim.kills, nearMisses: sim.nearMissCount, maxMultiplier: sim.maxMultiplier,
+    });
     const unlocked = checkChallenges({
       won, kills: sim.kills, score: sim.score, time, arenaId: arena.id,
+      maxMultiplier: sim.maxMultiplier, nearMisses: sim.nearMissCount, lifetime,
     });
     this.buildChallengesList();
 

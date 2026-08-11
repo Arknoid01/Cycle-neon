@@ -1,6 +1,7 @@
 import { getChassisPreset } from './bike-builder.js';
 import { BIKE_SKINS, getBikeSkin, getDefaultSkinId } from './bike-skins.js';
 import { isSkinUnlocked, syncEarnedSkins } from './skin-unlocks.js';
+import { CHAMPIONSHIP_BOTS } from './bots.js';
 
 export { CHASSIS_PRESETS, getChassisPreset } from './bike-builder.js';
 export { BIKE_SKINS, getBikeSkin, SKIN_TIER_LABELS } from './bike-skins.js';
@@ -17,10 +18,17 @@ export const COLOR_PRESETS = [
   { id: 'crimson', body: 0xcc6666, glow: 0xcc3333, wheel: 0xcc0022, trail: 0x994444, trailGlow: 0xcc0033 },
 ];
 
-export const BOT_DEFS = [
-  { name: 'Spectre', isPlayer: false, personality: 'chasseur', difficulty: 2, body: 0xcc4499, glow: 0xcc0066, wheel: 0xcc6699, trail: 0x994466, trailGlow: 0xcc3388, skinId: 'specter' },
-  { name: 'Phantom', isPlayer: false, personality: 'prudent', difficulty: 2, body: 0x44aa66, glow: 0x00cc55, wheel: 0x55aa77, trail: 0x336644, trailGlow: 0x33aa66, skinId: 'phantom' },
-];
+/** Tire `n` rivaux distincts parmi le roster nommé — un nouveau duo (ou
+ * trio) à chaque partie plutôt que toujours les deux mêmes adversaires. */
+export function pickRandomBots(n) {
+  const pool = [...CHAMPIONSHIP_BOTS];
+  const picked = [];
+  while (picked.length < n && pool.length) {
+    const i = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(i, 1)[0]);
+  }
+  return picked;
+}
 
 export function loadCosmetic() {
   try { return localStorage.getItem('lc_cosmetic') || 'cyan'; } catch { return 'cyan'; }
@@ -97,14 +105,14 @@ export function getRiderDefs() {
       key: 'player', name: 'Toi', isPlayer: true,
       ...getRiderColorDef(colors),
     }, skin.id),
-    ...BOT_DEFS.map((b, i) => buildRiderDef({
+    ...pickRandomBots(2).map((b, i) => buildRiderDef({
       key: 'bot' + i,
       name: b.name,
-      isPlayer: b.isPlayer,
+      isPlayer: false,
       personality: b.personality,
       difficulty: b.difficulty,
       body: b.body, glow: b.glow, wheel: b.wheel, trail: b.trail, trailGlow: b.trailGlow,
-    }, b.skinId ?? (i === 0 ? 'specter' : 'phantom'))),
+    }, b.skinId)),
   ];
 }
 

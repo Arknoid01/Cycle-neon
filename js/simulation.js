@@ -16,6 +16,8 @@ export class Simulation {
     this.score = 0;
     this.kills = 0;
     this.multiplier = 1;
+    this.maxMultiplier = 1;
+    this.nearMissCount = 0;
     this.simTick = 0;
     this.lastSimTime = 0;
     this.tickIntervalMs = 130;
@@ -55,6 +57,8 @@ export class Simulation {
     this.score = 0;
     this.kills = 0;
     this.multiplier = 1;
+    this.maxMultiplier = 1;
+    this.nearMissCount = 0;
     this.simTick = 0;
     this.lastSimTime = 0;
     this.tickIntervalMs = getTickInterval(0);
@@ -255,6 +259,7 @@ export class Simulation {
   _bumpMultiplier(events, reason) {
     const prev = this.multiplier;
     this.multiplier = Math.min(MULTIPLIER_MAX, this.multiplier + 1);
+    if (this.multiplier > this.maxMultiplier) this.maxMultiplier = this.multiplier;
     if (this.multiplier > prev) events.push({ type: 'multiplierUp', value: this.multiplier, reason });
   }
 
@@ -275,6 +280,7 @@ export class Simulation {
 
     if (this._adjacentBlocked(p)) {
       this.nearMissCooldown = 10;
+      this.nearMissCount++;
       this.score += NEAR_MISS_BONUS * this.multiplier;
       this._bumpMultiplier(events, 'nearMiss');
       events.push({ type: 'nearMiss' });

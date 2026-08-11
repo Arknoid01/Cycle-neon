@@ -7,6 +7,8 @@ import { getSettings } from './settings.js';
 import { preloadBikeModels } from './bike-model-loader.js';
 import { BIKE_SKINS } from './bike-skins.js';
 import { getUnlockedSkinIds } from './skin-unlocks.js';
+import { checkChallenges } from './challenges.js';
+import { recordChampionshipEnd } from './stats.js';
 import {
   initAudio, unlockAudio, updateEngineSound, updateGameplayIntensity, stopEngine, setMasterVolume,
   playTurn, playWallShift, playWallWarn, playNearMissBonus, playCrash,
@@ -89,6 +91,9 @@ function continueChampionship() {
   if (championship.isComplete()) {
     const p = championship.getSortedStandings().find(s => s.isPlayer);
     if (p?.points > loadChampBest()) saveChampBest(p.points);
+    const won = championship.getWinner()?.isPlayer === true;
+    const lifetime = recordChampionshipEnd({ won, points: p?.points ?? 0 });
+    checkChallenges({ championshipWon: won, championshipPoints: p?.points ?? 0, lifetime });
     showMenu();
     return;
   }

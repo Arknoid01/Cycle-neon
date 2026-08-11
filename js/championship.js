@@ -39,9 +39,8 @@ export class Championship {
         chassisId: playerSkin.chassisId,
         chassis: getChassisPreset(playerSkin.chassisId),
       },
-      ...CHAMPIONSHIP_BOTS.map((b, i) => {
-        const botSkinIds = ['specter', 'phantom', 'vanguard', 'inferno'];
-        const skinDef = getBikeSkin(botSkinIds[i % botSkinIds.length]);
+      ...CHAMPIONSHIP_BOTS.map((b) => {
+        const skinDef = getBikeSkin(b.skinId);
         return {
           key: b.id, name: b.name, isPlayer: false,
           body: b.body, glow: b.glow, wheel: b.wheel, trail: b.trail, trailGlow: b.trailGlow,
