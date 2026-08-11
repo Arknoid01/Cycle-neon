@@ -270,7 +270,7 @@ def build_bike(dims, flavor, root_name='Bike'):
         else:
             add_cylinder(f'wheel_{side}', wheel_r, wheel_w,
                          (sign * (W * 0.5), wheel_y, wheel_r),
-                         mats['wheel'], root, rotation=(0, 0, math.radians(90)))
+                         mats['wheel'], root, rotation=(0, math.radians(90), 0))
 
     # Soubassement / traînée (trail)
     add_box('trail_underglow', (W * 0.8, L * 0.7, 0.015),
