@@ -26,7 +26,6 @@ export class UI {
     this.overlayNext = document.getElementById('overlay-next');
     this.overlayHint = document.getElementById('overlay-hint');
     this.homeMenu = document.getElementById('home-menu');
-    this.gameHud = document.getElementById('game-hud');
     this.homeBest = document.getElementById('home-best');
     this.trophySummary = document.getElementById('trophy-summary');
     this.trophiesProgress = document.getElementById('trophies-progress');
@@ -205,7 +204,6 @@ export class UI {
 
   showMenu() {
     this.buildHomeMenu();
-    this.setViewRotation(0);
     if (this.challengeHudEl) this.challengeHudEl.textContent = '';
     this.multiplierEl?.classList.add('hidden');
     this.champHudEl?.classList.add('hidden');
@@ -224,13 +222,6 @@ export class UI {
 
   hideMenu() {
     this.homeMenu.classList.add('hidden');
-  }
-
-  /** Counter-rotate in-game HUD so it stays aligned when the camera turns sideways. */
-  setViewRotation(camYaw) {
-    if (!this.gameHud) return;
-    const deg = -(camYaw + Math.PI / 2) * (180 / Math.PI);
-    this.gameHud.style.transform = Math.abs(deg) < 0.05 ? '' : `rotate(${deg}deg)`;
   }
 
   showControls() {

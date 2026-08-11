@@ -1,10 +1,14 @@
 import { CELL_EMPTY, CELL_WALL, ARENA_BORDER, ARENA_SCALE, isTrail } from './constants.js';
 
+const NO_TRAIL_DIR = 255;
+
 export class Grid {
   constructor(w, h) {
     this.w = w;
     this.h = h;
     this.cells = new Uint8Array(w * h);
+    this.trailDirs = new Uint8Array(w * h);
+    this.trailDirs.fill(NO_TRAIL_DIR);
   }
 
   idx(x, y) { return y * this.w + x; }
@@ -18,11 +22,26 @@ export class Grid {
     return this.cells[this.idx(x, y)];
   }
 
+  getTrailDir(x, y) {
+    if (!this.inBounds(x, y)) return 0;
+    const d = this.trailDirs[this.idx(x, y)];
+    return d === NO_TRAIL_DIR ? 0 : d;
+  }
+
   set(x, y, val) {
     if (!this.inBounds(x, y)) return false;
     const i = this.idx(x, y);
     if (this.cells[i] === val) return false;
     this.cells[i] = val;
+    if (!isTrail(val)) this.trailDirs[i] = NO_TRAIL_DIR;
+    return true;
+  }
+
+  setTrail(x, y, val, dir) {
+    if (!this.inBounds(x, y)) return false;
+    const i = this.idx(x, y);
+    this.cells[i] = val;
+    this.trailDirs[i] = dir;
     return true;
   }
 
@@ -38,7 +57,9 @@ export class Grid {
   clear(x, y) {
     const v = this.get(x, y);
     if (v === CELL_WALL || isTrail(v)) {
-      this.set(x, y, CELL_EMPTY);
+      const i = this.idx(x, y);
+      this.cells[i] = CELL_EMPTY;
+      this.trailDirs[i] = NO_TRAIL_DIR;
       return true;
     }
     return false;

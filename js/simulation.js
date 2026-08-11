@@ -233,7 +233,7 @@ export class Simulation {
 
     for (const m of moves) {
       if (dead.has(m.rider)) continue;
-      this.grid.set(m.rider.prevX, m.rider.prevY, trailVal(m.rider.id));
+      this.grid.setTrail(m.rider.prevX, m.rider.prevY, trailVal(m.rider.id), m.newDir);
       m.rider.x = m.nx;
       m.rider.y = m.ny;
       if (m.rider.isPlayer) {

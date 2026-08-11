@@ -138,11 +138,6 @@ function gameLoop(now) {
     renderer.updateShaders(now);
     renderer.syncRiders(sim.riders, sim.playing, now);
     renderer.updateCamera(sim.getPlayer());
-    if (!menuVisible && sim.getPlayer()?.alive) {
-      ui.setViewRotation(renderer.getCameraYaw());
-    } else if (menuVisible) {
-      ui.setViewRotation(0);
-    }
     renderer.syncMobileWarnings(sim.walls, now);
     if (sim.playing) {
       renderer.setBloomIntensity(sim.getIntensity());

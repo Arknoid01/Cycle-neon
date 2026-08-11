@@ -3,7 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {
-  CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, PERIM_H,
+  CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, PERIM_H,
   CAM_DIR_ANGLES,
   BIKE_DIR_ANGLES,
 } from './constants.js';
@@ -29,7 +29,8 @@ export class Renderer {
     this.matMobile = null;
     this.matPerimeter = null;
     this.panelGeo = null;
-    this.segGeo = null;
+    this.trailPlateGeo = null;
+    this.liveTrailGeo = null;
     this.mobileBurstUntil = 0;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
@@ -55,7 +56,8 @@ export class Renderer {
     this.scene.add(new THREE.AmbientLight(0x223355, 0.18));
 
     this.panelGeo = new THREE.BoxGeometry(CELL_SIZE * 0.9, 1, CELL_SIZE * 0.14);
-    this.segGeo = new THREE.BoxGeometry(1, 1, CELL_SIZE * 0.14);
+    this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, CELL_SIZE * 0.92);
+    this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = createElectricMaterial({
       color: 0x7c3aed, sparkColor: 0xc4b5fd, speed: 0.5, intensity: 1.15, scale: 1.0, body: 0.2,
@@ -93,19 +95,16 @@ export class Renderer {
   _rebuildTrailMats(defs) {
     const list = defs ?? getRiderDefs();
     this.trailMats = list.map(d => {
-      const base = {
+      const mat = createElectricMaterial({
         color: d.trailGlow, sparkColor: d.trail,
         speed: 1.0, intensity: 1.5, scale: 1.15, body: 0.2,
-      };
-      const panel = createElectricMaterial({ ...base, alongDir: AXIS_Y, acrossDir: AXIS_Z });
-      const segment = createElectricMaterial({ ...base, alongDir: AXIS_X, acrossDir: AXIS_Z });
-      this._trackElectric(panel);
-      this._trackElectric(segment);
-      return { panel, segment };
+        alongDir: AXIS_Z, acrossDir: AXIS_X,
+      });
+      this._trackElectric(mat);
+      return mat;
     });
     this.electricMats = [
-      this.matWall, this.matMobile, this.matPerimeter,
-      ...this.trailMats.flatMap(t => [t.panel, t.segment]),
+      this.matWall, this.matMobile, this.matPerimeter, ...this.trailMats,
     ].filter(Boolean);
   }
 
@@ -173,6 +172,10 @@ export class Renderer {
     return false;
   }
 
+  _trailRotation(dir) {
+    return BIKE_DIR_ANGLES[dir];
+  }
+
   _setCellMesh(x, y, type, grid, wallSystem) {
     const key = this._cellKey(x, y);
     const existing = this.cellMeshes.get(key);
@@ -181,11 +184,20 @@ export class Renderer {
       this.cellMeshes.delete(key);
     }
 
-    let mat, h;
     if (isTrail(type)) {
-      mat = this.trailMats[type - TRAIL_BASE].panel;
-      h = TRAIL_H;
-    } else if (type === CELL_WALL && grid.isPerimeter(x, y)) {
+      const mat = this.trailMats[type - TRAIL_BASE];
+      const mesh = new THREE.Mesh(this.trailPlateGeo, mat);
+      const p = this.gridToWorld(x, y);
+      const dir = grid.getTrailDir(x, y);
+      mesh.position.set(p.x, TRAIL_H / 2, p.z);
+      mesh.rotation.y = this._trailRotation(dir);
+      this.scene.add(mesh);
+      this.cellMeshes.set(key, mesh);
+      return;
+    }
+
+    let mat, h;
+    if (type === CELL_WALL && grid.isPerimeter(x, y)) {
       mat = this.matPerimeter;
       h = PERIM_H;
     } else if (type === CELL_WALL && this._isMobileCell(x, y, wallSystem)) {
@@ -303,33 +315,39 @@ export class Renderer {
     return g;
   }
 
-  _buildLiveTrail(trailMats) {
-    const head = new THREE.Mesh(this.panelGeo, trailMats.panel);
-    head.scale.y = TRAIL_H;
-    const segment = new THREE.Mesh(this.segGeo, trailMats.segment);
-    segment.scale.y = TRAIL_H;
+  _buildLiveTrail(mat) {
+    const segment = new THREE.Mesh(this.liveTrailGeo, mat);
     segment.visible = false;
     const g = new THREE.Group();
-    g.add(head, segment);
-    g.userData.head = head;
+    g.add(segment);
     g.userData.segment = segment;
     return g;
   }
 
-  _updateLiveTrail(lt, rider) {
-    const p = this.gridToWorld(rider.renderX, rider.renderY, this._worldPos);
-    const prev = this.gridToWorld(rider.prevX, rider.prevY, this._worldPos2);
-    lt.userData.head.position.set(p.x, TRAIL_H / 2, p.z);
+  _bikeRearWorld(rider, bikeMesh, out) {
+    const p = this.gridToWorld(rider.renderX, rider.renderY, out);
+    const angle = bikeMesh?.rotation.y ?? rider.smoothAngle;
+    const backOff = 0.38;
+    const fx = Math.sin(angle);
+    const fz = -Math.cos(angle);
+    return {
+      x: p.x - fx * backOff,
+      z: p.z - fz * backOff,
+    };
+  }
 
-    const dx = p.x - prev.x;
-    const dz = p.z - prev.z;
-    const dist = Math.hypot(dx, dz);
+  _updateLiveTrail(lt, rider, bikeMesh) {
+    const prev = this.gridToWorld(rider.prevX, rider.prevY, this._worldPos2);
+    const rear = this._bikeRearWorld(rider, bikeMesh, this._worldPos);
     const seg = lt.userData.segment;
+    const dx = rear.x - prev.x;
+    const dz = rear.z - prev.z;
+    const dist = Math.hypot(dx, dz);
     if (dist > 0.02) {
       seg.visible = true;
-      seg.position.set((p.x + prev.x) / 2, TRAIL_H / 2, (p.z + prev.z) / 2);
-      seg.rotation.y = -Math.atan2(dz, dx);
-      seg.scale.set(dist, TRAIL_H, 1);
+      seg.position.set((rear.x + prev.x) / 2, TRAIL_H / 2, (rear.z + prev.z) / 2);
+      seg.rotation.y = bikeMesh?.rotation.y ?? this._trailRotation(rider.dir);
+      seg.scale.set(1, 1, dist);
     } else {
       seg.visible = false;
     }
@@ -371,7 +389,7 @@ export class Renderer {
           this.scene.add(lt);
           this.liveTrails.set(r.id, lt);
         }
-        this._updateLiveTrail(lt, r);
+        this._updateLiveTrail(lt, r, mesh);
       }
     }
   }
@@ -421,10 +439,6 @@ export class Renderer {
       }
       return true;
     });
-  }
-
-  getCameraYaw() {
-    return this.smoothCamAngle;
   }
 
   updateCamera(player) {
