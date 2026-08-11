@@ -1,8 +1,9 @@
 import { ARENAS, ARENA_DESC, ARENA_FAMILIES, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
 import { CHALLENGES, checkChallenges, loadChallenges } from './challenges.js';
 import {
-  COLOR_PRESETS, CHASSIS_PRESETS, loadCosmetic, saveCosmetic, loadChassis, saveChassis,
-  getCosmeticPreset, hexCss,
+  COLOR_PRESETS, BIKE_SKINS, SKIN_TIER_LABELS,
+  loadCosmetic, saveCosmetic, loadSkin, saveSkin,
+  getCosmeticPreset, hexCss, isSkinUnlocked, skinLockHint, syncEarnedSkins,
 } from './cosmetics.js';
 import { getSettings, saveSettings } from './settings.js';
 import { setMasterVolume } from './audio.js';
@@ -48,7 +49,8 @@ export class UI {
     this.optHaptic = document.getElementById('opt-haptic');
     this.optBloom = document.getElementById('opt-bloom');
     this.bikePreviewCanvas = document.getElementById('bike-preview-canvas');
-    this.chassisPicker = document.getElementById('chassis-picker');
+    this.skinPicker = document.getElementById('skin-picker');
+    this.skinPickerHint = document.getElementById('skin-picker-hint');
     this.gameHud = document.getElementById('game-hud');
     this.bikePreview = this.bikePreviewCanvas ? new BikePreview(this.bikePreviewCanvas) : null;
 
@@ -98,7 +100,7 @@ export class UI {
     if (id === 'home') this.updateHomeStats();
     if (id === 'custom') {
       this.buildCosmeticPicker();
-      this.buildChassisPicker();
+      this.buildSkinPicker();
       this.startBikePreview();
     } else {
       this.stopBikePreview();
@@ -129,21 +131,35 @@ export class UI {
     this.applyScoreColor();
   }
 
-  buildChassisPicker() {
-    if (!this.chassisPicker) return;
-    const current = loadChassis();
-    this.chassisPicker.innerHTML = '';
-    CHASSIS_PRESETS.forEach(c => {
+  buildSkinPicker() {
+    if (!this.skinPicker) return;
+    syncEarnedSkins();
+    const current = loadSkin();
+    this.skinPicker.innerHTML = '';
+    BIKE_SKINS.forEach(skin => {
+      const unlocked = isSkinUnlocked(skin.id);
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'chassis-btn' + (c.id === current ? ' selected' : '');
-      btn.innerHTML = `<span class="chassis-name">${c.name}</span><span class="chassis-desc">${c.desc}</span>`;
+      btn.className = 'skin-btn' +
+        (skin.id === current ? ' selected' : '') +
+        (!unlocked ? ' locked' : '') +
+        (skin.tier === 'premium' ? ' tier-premium' : '');
+      btn.innerHTML =
+        `<span class="skin-tier">${SKIN_TIER_LABELS[skin.tier] || skin.tier}</span>` +
+        `<span class="skin-name">${skin.name}</span>` +
+        `<span class="skin-desc">${unlocked ? skin.desc : skinLockHint(skin)}</span>` +
+        (!unlocked ? '<span class="skin-lock">🔒</span>' : '');
       btn.addEventListener('click', () => {
-        saveChassis(c.id);
-        this.buildChassisPicker();
+        if (!unlocked) {
+          if (this.skinPickerHint) this.skinPickerHint.textContent = skinLockHint(skin);
+          return;
+        }
+        saveSkin(skin.id);
+        if (this.skinPickerHint) this.skinPickerHint.textContent = '';
+        this.buildSkinPicker();
         this.bikePreview?.refresh();
       });
-      this.chassisPicker.appendChild(btn);
+      this.skinPicker.appendChild(btn);
     });
   }
 
@@ -163,6 +179,7 @@ export class UI {
   }
 
   buildChallengesList() {
+    syncEarnedSkins();
     const done = loadChallenges();
     this.challengesList.innerHTML = '';
     CHALLENGES.forEach(ch => {

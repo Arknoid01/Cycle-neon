@@ -1,6 +1,7 @@
 import { CHAMPIONSHIP_ROUNDS, CHAMP_POINTS } from './constants.js';
 import { CHAMPIONSHIP_BOTS } from './bots.js';
-import { getCosmeticPreset, getChassisPreset, loadChassis } from './cosmetics.js';
+import { getCosmeticPreset, getChassisPreset, getActiveSkin } from './cosmetics.js';
+import { getBikeSkin } from './bike-skins.js';
 import { pickArenaByFamily, ARENA_FAMILIES } from './arenas.js';
 
 export class Championship {
@@ -28,21 +29,29 @@ export class Championship {
 
   getRiderDefs() {
     const c = getCosmeticPreset();
-    const playerChassis = getChassisPreset(loadChassis());
-    const botShapes = ['blade', 'tank', 'racer', 'classic'];
+    const playerSkin = getActiveSkin();
     return [
       {
         key: 'player', name: 'Toi', isPlayer: true,
         body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow,
-        chassisId: playerChassis.id, chassis: playerChassis,
+        skinId: playerSkin.id,
+        skin: playerSkin,
+        chassisId: playerSkin.chassisId,
+        chassis: getChassisPreset(playerSkin.chassisId),
       },
-      ...CHAMPIONSHIP_BOTS.map((b, i) => ({
-        key: b.id, name: b.name, isPlayer: false,
-        body: b.body, glow: b.glow, wheel: b.wheel, trail: b.trail, trailGlow: b.trailGlow,
-        personality: b.personality, difficulty: b.difficulty,
-        chassisId: botShapes[i % botShapes.length],
-        chassis: getChassisPreset(botShapes[i % botShapes.length]),
-      })),
+      ...CHAMPIONSHIP_BOTS.map((b, i) => {
+        const botSkinIds = ['specter', 'phantom', 'vanguard', 'inferno'];
+        const skinDef = getBikeSkin(botSkinIds[i % botSkinIds.length]);
+        return {
+          key: b.id, name: b.name, isPlayer: false,
+          body: b.body, glow: b.glow, wheel: b.wheel, trail: b.trail, trailGlow: b.trailGlow,
+          personality: b.personality, difficulty: b.difficulty,
+          skinId: skinDef.id,
+          skin: skinDef,
+          chassisId: skinDef.chassisId,
+          chassis: getChassisPreset(skinDef.chassisId),
+        };
+      }),
     ];
   }
 
