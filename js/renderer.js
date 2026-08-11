@@ -11,7 +11,7 @@ import { gridDimensions } from './grid.js';
 import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 import {
   loadBikeSpriteSheet, createBikeFrameMaterials, bikeSpriteTint,
-  BIKE_SPRITE_W, BIKE_SPRITE_H, BIKE_SPRITE_Y, BIKE_REAR_OFFSET,
+  BIKE_SPRITE_W, BIKE_SPRITE_H, BIKE_SPRITE_Y, BIKE_REAR_OFFSET, BIKE_SPRITE_FLIP,
 } from './bike-sprites.js';
 
 export class Renderer {
@@ -542,7 +542,7 @@ export class Renderer {
           mesh.userData.frameDir = r.dir;
           sprite.material = mesh.userData.frameMats[r.dir];
         }
-        sprite.lookAt(this.camera.position.x, mesh.position.y + BIKE_SPRITE_Y, this.camera.position.z);
+        sprite.rotation.y = BIKE_DIR_ANGLES[r.dir] + (BIKE_SPRITE_FLIP[r.dir] ? Math.PI : 0);
         mesh.rotation.y = 0;
       } else {
         const targetAngle = BIKE_DIR_ANGLES[r.dir];
