@@ -113,7 +113,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .family-label { font-size: 10px; letter-spacing: 3px; color: rgba(0,255,255,.55); margin: 12px 0 6px; align-self: flex-start; width: 100%; max-width: 360px; }
 #overlay-score { white-space: pre-line; font-size: 20px; line-height: 1.5; max-width: 90%; text-align: center; }
 
-.options-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.options-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; flex-shrink: 0; }
+#options-screen { justify-content: flex-start; }
 .option-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
 .option-label { font-size: 13px; color: rgba(255,255,255,.75); }
 .option-row input[type="range"] { flex: 1; max-width: 160px; accent-color: #7df9ff; }
@@ -128,9 +129,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
   width: 100%; padding: 16px 18px; border-radius: 14px;
   border: 1px solid rgba(125,249,255,.35); background: rgba(0,255,255,.08);
   color: #7df9ff; font-size: 13px; font-weight: 600; letter-spacing: .5px;
-  cursor: pointer; pointer-events: auto;
+  font-family: inherit; cursor: pointer; pointer-events: auto; touch-action: manipulation;
 }
-.option-sandbox-btn:hover { background: rgba(0,255,255,.14); }
+.option-sandbox-btn:active { background: rgba(0,255,255,.18); transform: scale(.98); }
 .option-sandbox-hint { margin: -4px 0 0; font-size: 11px; opacity: .55; line-height: 1.35; text-align: center; }
 
 .sandbox-exit {
