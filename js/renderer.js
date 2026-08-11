@@ -10,7 +10,7 @@ import {
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
 import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
-import { buildProceduralBike } from './bike-builder.js';
+import { buildBikeSkin } from './bike-builder.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -429,7 +429,7 @@ export class Renderer {
   }
 
   _buildBike(def) {
-    return buildProceduralBike(def, def.chassis, m => this._trackElectric(m));
+    return buildBikeSkin(def, def.skin, m => this._trackElectric(m));
   }
 
   _buildLiveTrail(mat) {

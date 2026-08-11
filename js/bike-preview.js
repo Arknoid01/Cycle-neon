@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { buildProceduralBike } from './bike-builder.js';
-import { getCosmeticPreset, getChassisPreset, loadChassis } from './cosmetics.js';
+import { buildBikeSkin } from './bike-builder.js';
+import { getCosmeticPreset, getActiveSkin, getRiderColorDef } from './cosmetics.js';
 import { updateElectricMaterial } from './electric-shader.js';
 
 export class BikePreview {
@@ -38,12 +38,9 @@ export class BikePreview {
     if (!this.scene) return;
     this._disposeBike();
     const colors = getCosmeticPreset();
-    const chassis = getChassisPreset(loadChassis());
-    const def = {
-      body: colors.body, glow: colors.glow, wheel: colors.wheel,
-      trail: colors.trail, trailGlow: colors.trailGlow,
-    };
-    this.bike = buildProceduralBike(def, chassis, m => this.electricMats.push(m));
+    const skin = getActiveSkin();
+    const def = { ...getRiderColorDef(colors), skinId: skin.id, skin };
+    this.bike = buildBikeSkin(def, skin, m => this.electricMats.push(m));
     this.bike.position.y = 0.05;
     this.scene.add(this.bike);
   }
