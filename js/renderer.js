@@ -271,7 +271,7 @@ export class Renderer {
         p.z += DY[outDir] * CELL_SIZE * 0.5;
         return p;
       }
-      if (this._isPreCornerCell(grid, gx, gy, outDir)) {
+      if (this._isPreCornerCell(grid, gx, gy, outDir) || this._isPostCornerCell(grid, gx, gy, outDir)) {
         p.x += DX[outDir] * CELL_SIZE * 0.5;
         p.z += DY[outDir] * CELL_SIZE * 0.5;
         return p;
