@@ -170,6 +170,17 @@ export class Renderer {
         const val = grid.get(x, y);
         const key = this._cellKey(x, y);
         if (val === 0) continue;
+        if (isTrail(val)) {
+          const existing = this.cellMeshes.get(key);
+          if (existing?.userData?.isTrail) {
+            const inDir = grid.getTrailInDir(x, y);
+            const outDir = grid.getTrailDir(x, y);
+            if (existing.userData.trailIn !== inDir || existing.userData.trailOut !== outDir) {
+              this._setCellMesh(x, y, val, grid, wallSystem);
+            }
+            continue;
+          }
+        }
         if (this.cellMeshes.has(key)) continue;
         this._setCellMesh(x, y, val, grid, wallSystem);
       }
@@ -297,6 +308,15 @@ export class Renderer {
     return g;
   }
 
+  /** Straight cell between two corners: arms toward both turns. */
+  _addBridgeCornerPlate(x, y, geo, geoHalf, mat, height, outDir) {
+    const g = this._createTrailCellGroup(x, y);
+    this._addOrientedPlateLocal(geo, mat, height, outDir, g);
+    this._addTrailArmLocal(g, geoHalf, mat, height, outDir, false);
+    this._addTrailArmLocal(g, geoHalf, mat, height, outDir, true);
+    return g;
+  }
+
   /** Straight cell after a turn: extend back toward the corner cell. */
   _addPostCornerPlate(x, y, geo, geoHalf, mat, height, outDir) {
     const g = this._createTrailCellGroup(x, y);
@@ -322,16 +342,36 @@ export class Renderer {
     if (inDir !== outDir) {
       return this._addCornerPlate(x, y, this.trailCornerArmGeo, mat, TRAIL_H, inDir, outDir);
     }
-    if (this._isPostCornerCell(grid, x, y, outDir)) {
+    const isPost = this._isPostCornerCell(grid, x, y, outDir);
+    const isPre = this._isPreCornerCell(grid, x, y, outDir);
+    if (isPost && isPre) {
+      return this._addBridgeCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
+    }
+    if (isPost) {
       return this._addPostCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
     }
-    if (this._isPreCornerCell(grid, x, y, outDir)) {
+    if (isPre) {
       return this._addPreCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
     }
     return this._addStraightTrailPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
   }
 
-  _setCellMesh(x, y, type, grid, wallSystem) {
+  _refreshTrailNeighbors(x, y, grid, wallSystem) {
+    const inDir = grid.getTrailInDir(x, y);
+    const outDir = grid.getTrailDir(x, y);
+    const px = x - DX[inDir];
+    const py = y - DY[inDir];
+    if (grid.inBounds(px, py) && isTrail(grid.get(px, py))) {
+      this._setCellMesh(px, py, grid.get(px, py), grid, wallSystem, false);
+    }
+    const sx = x + DX[outDir];
+    const sy = y + DY[outDir];
+    if (grid.inBounds(sx, sy) && isTrail(grid.get(sx, sy))) {
+      this._setCellMesh(sx, sy, grid.get(sx, sy), grid, wallSystem, false);
+    }
+  }
+
+  _setCellMesh(x, y, type, grid, wallSystem, refreshNeighbors = true) {
     const key = this._cellKey(x, y);
     const existing = this.cellMeshes.get(key);
     if (existing) {
@@ -344,15 +384,10 @@ export class Renderer {
       const inDir = grid.getTrailInDir(x, y);
       const mesh = this._buildTrailMesh(x, y, grid, type);
       mesh.userData.isTrail = true;
+      mesh.userData.trailIn = inDir;
+      mesh.userData.trailOut = outDir;
       this.cellMeshes.set(key, mesh);
-
-      if (inDir !== outDir) {
-        const px = x - DX[inDir];
-        const py = y - DY[inDir];
-        if (grid.inBounds(px, py) && isTrail(grid.get(px, py))) {
-          this._setCellMesh(px, py, grid.get(px, py), grid, wallSystem);
-        }
-      }
+      if (refreshNeighbors) this._refreshTrailNeighbors(x, y, grid, wallSystem);
       return;
     }
 
