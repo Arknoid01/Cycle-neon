@@ -16,6 +16,7 @@ import {
   getFrameIndexForDir, getBikeSpriteRotation, getBikeSpriteScaleX,
   loadBikeSpriteTuningFromStorage,
 } from './bike-sprites.js';
+import { makeSandboxRider, createSandboxPair } from './bike-sprite-sandbox.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -39,7 +40,9 @@ export class Renderer {
     this.trailPlateGeo = null;
     this.liveTrailGeo = null;
     this.bikeSheet = null;
-    this.debugForceSpriteDir = null;
+    this.sandboxMode = false;
+    this.sandboxRiders = null;
+    this.sandboxDisplayDirs = null;
     this.mobileBurstUntil = 0;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
@@ -94,9 +97,39 @@ export class Renderer {
     loadBikeSpriteTuningFromStorage();
   }
 
-  setDebugForceSpriteDir(dir) {
-    this.debugForceSpriteDir = dir === null || dir === undefined ? null : dir;
+  setSandboxBikeDir(bikeId, dir) {
+    if (!this.sandboxMode || !this.sandboxDisplayDirs) return;
+    this.sandboxDisplayDirs.set(bikeId, dir);
+    const r = this.sandboxRiders?.find(x => x.id === bikeId);
+    if (r) r.dir = dir;
     this.invalidateBikeSpriteFrames();
+  }
+
+  enterSpriteSandbox(riderDefs) {
+    this.sandboxMode = true;
+    this.clearAll(riderDefs);
+    const { cx, cy, gap } = createSandboxPair();
+    this.sandboxDisplayDirs = new Map([[0, 0], [1, 2]]);
+    this.sandboxRiders = [
+      makeSandboxRider(0, riderDefs[0], cx, cy + gap, 0, true),
+      makeSandboxRider(1, riderDefs[1], cx, cy - gap, 2, false),
+    ];
+    this.camReady = false;
+  }
+
+  exitSpriteSandbox() {
+    this.sandboxMode = false;
+    this.sandboxRiders = null;
+    this.sandboxDisplayDirs = null;
+    this.clearAll(getRiderDefs());
+    this.camReady = false;
+  }
+
+  _spriteDirFor(r) {
+    if (this.sandboxMode) {
+      return this.sandboxDisplayDirs?.get(r.id) ?? r.dir;
+    }
+    return r.dir;
   }
 
   invalidateBikeSpriteFrames() {
@@ -513,9 +546,7 @@ export class Renderer {
 
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
-    const spriteDir = bikeMesh?.userData?.isSprite && this.debugForceSpriteDir !== null
-      ? this.debugForceSpriteDir
-      : rider.dir;
+    const spriteDir = this._spriteDirFor(rider);
     const angle = bikeMesh?.userData?.isSprite
       ? getBikeSpriteRotation(spriteDir)
       : (bikeMesh?.rotation.y ?? rider.smoothAngle);
@@ -554,7 +585,7 @@ export class Renderer {
       seg.visible = true;
       seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
       seg.rotation.y = bikeMesh?.userData?.isSprite
-        ? getBikeSpriteRotation(this.debugForceSpriteDir ?? rider.dir)
+        ? getBikeSpriteRotation(this._spriteDirFor(rider))
         : (bikeMesh?.rotation.y ?? this._trailRotation(dir));
       seg.scale.set(1, 1, dist);
     } else {
@@ -593,7 +624,7 @@ export class Renderer {
 
       if (mesh.userData.isSprite) {
         const sprite = mesh.userData.sprite;
-        const spriteDir = this.debugForceSpriteDir ?? r.dir;
+        const spriteDir = this._spriteDirFor(r);
         const frameIdx = getFrameIndexForDir(spriteDir);
         const frameKey = `${spriteDir}:${frameIdx}`;
         if (mesh.userData.frameKey !== frameKey) {
@@ -617,7 +648,7 @@ export class Renderer {
       const underMesh = this.cellMeshes.get(underKey);
       if (underMesh?.userData?.isTrail) underMesh.visible = false;
 
-      if (playing) {
+      if (playing && !this.sandboxMode) {
         let lt = this.liveTrails.get(r.id);
         if (!lt) {
           lt = this._buildLiveTrail(this.trailMats[r.id]);
@@ -679,6 +710,18 @@ export class Renderer {
       }
       return true;
     });
+  }
+
+  updateSandboxCamera() {
+    if (!this.sandboxRiders?.length) return;
+    const a = this.sandboxRiders[0];
+    const b = this.sandboxRiders[1];
+    const p0 = this.gridToWorld(a.renderX, a.renderY, this._worldPos);
+    const p1 = this.gridToWorld(b.renderX, b.renderY, this._worldPos2);
+    const cx = (p0.x + p1.x) * 0.5;
+    const cz = (p0.z + p1.z) * 0.5;
+    this.camera.position.set(cx, 13, cz + 9);
+    this.camera.lookAt(cx, 0.35, cz);
   }
 
   updateCamera(player) {

@@ -43,7 +43,8 @@ export class UI {
     this.optVolume = document.getElementById('opt-volume');
     this.optHaptic = document.getElementById('opt-haptic');
     this.optBloom = document.getElementById('opt-bloom');
-    this.optBikeDebug = document.getElementById('opt-bike-debug');
+    this.optSpriteSandbox = document.getElementById('opt-sprite-sandbox');
+    this.gameHud = document.getElementById('game-hud');
 
     this.screenEls = {};
     for (const id of SCREENS) {
@@ -59,7 +60,7 @@ export class UI {
     this.onContinueChampionship = null;
     this.overlayMode = 'menu';
     this.onSettingsChange = null;
-    this.onBikeDebugChange = null;
+    this.onOpenSpriteSandbox = null;
   }
 
   applyScoreColor() {
@@ -180,7 +181,6 @@ export class UI {
     if (this.optVolume) this.optVolume.value = Math.round(s.volume * 100);
     if (this.optHaptic) this.optHaptic.checked = s.haptic;
     if (this.optBloom) this.optBloom.checked = s.bloom;
-    if (this.optBikeDebug) this.optBikeDebug.checked = s.bikeDebug;
   }
 
   applySettings() {
@@ -202,10 +202,7 @@ export class UI {
       const s = saveSettings({ bloom: this.optBloom.checked });
       this.onSettingsChange?.(s);
     });
-    this.optBikeDebug?.addEventListener('change', () => {
-      const s = saveSettings({ bikeDebug: this.optBikeDebug.checked });
-      this.onBikeDebugChange?.(s.bikeDebug);
-    });
+    this.optSpriteSandbox?.addEventListener('click', () => this.onOpenSpriteSandbox?.());
     this.applySettings();
   }
 
@@ -229,6 +226,14 @@ export class UI {
 
   hideMenu() {
     this.homeMenu.classList.add('hidden');
+  }
+
+  hideGameHud() {
+    this.gameHud?.classList.add('hidden');
+  }
+
+  showGameHud() {
+    this.gameHud?.classList.remove('hidden');
   }
 
   showControls() {
@@ -336,12 +341,13 @@ export class UI {
     this.multiplierEl?.classList.add('hidden');
   }
 
-  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship) {
+  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship, onOpenSpriteSandbox) {
     this.onStartArena = onStartArena;
     this.onShowMenu = onShowMenu;
     this.onSettingsChange = onSettingsChange;
     this.onStartChampionship = onStartChampionship;
     this.onContinueChampionship = onContinueChampionship;
+    this.onOpenSpriteSandbox = onOpenSpriteSandbox;
 
     document.querySelectorAll('.menu-tile[data-screen]').forEach(btn => {
       btn.addEventListener('click', () => this.showScreen(btn.dataset.screen));

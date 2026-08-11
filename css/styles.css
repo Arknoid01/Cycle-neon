@@ -113,7 +113,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .family-label { font-size: 10px; letter-spacing: 3px; color: rgba(0,255,255,.55); margin: 12px 0 6px; align-self: flex-start; width: 100%; max-width: 360px; }
 #overlay-score { white-space: pre-line; font-size: 20px; line-height: 1.5; max-width: 90%; text-align: center; }
 
-.options-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.options-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; flex-shrink: 0; }
+#options-screen { justify-content: flex-start; }
 .option-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
 .option-label { font-size: 13px; color: rgba(255,255,255,.75); }
 .option-row input[type="range"] { flex: 1; max-width: 160px; accent-color: #7df9ff; }
@@ -124,8 +125,27 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .option-toggle input:checked + .toggle-track { background: rgba(0,255,255,.35); }
 .option-toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(20px); background: #7df9ff; box-shadow: 0 0 10px #0ff; }
 
+.option-sandbox-btn {
+  width: 100%; padding: 16px 18px; border-radius: 14px;
+  border: 1px solid rgba(125,249,255,.35); background: rgba(0,255,255,.08);
+  color: #7df9ff; font-size: 13px; font-weight: 600; letter-spacing: .5px;
+  font-family: inherit; cursor: pointer; pointer-events: auto; touch-action: manipulation;
+}
+.option-sandbox-btn:active { background: rgba(0,255,255,.18); transform: scale(.98); }
+.option-sandbox-hint { margin: -4px 0 0; font-size: 11px; opacity: .55; line-height: 1.35; text-align: center; }
+
+.sandbox-exit {
+  position: fixed; top: 14px; left: 14px; z-index: 130;
+  padding: 10px 16px; border-radius: 10px; pointer-events: auto;
+  border: 1px solid rgba(255,255,255,.2); background: rgba(4,8,20,.85);
+  color: #fff; font-size: 13px; cursor: pointer;
+}
+.sandbox-exit.hidden { display: none; }
+
+#game-hud.hidden { visibility: hidden; pointer-events: none; }
+
 .bike-sprite-debug {
-  position: fixed; left: 12px; bottom: 12px; z-index: 120;
+  position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 120;
   width: min(320px, calc(100vw - 24px)); max-height: min(78vh, 520px);
   overflow-y: auto; padding: 12px 14px; border-radius: 14px;
   border: 1px solid rgba(125,249,255,.35); background: rgba(4,8,20,.92);

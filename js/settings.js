@@ -1,4 +1,4 @@
-const DEFAULTS = { volume: 1, haptic: true, bloom: true, bikeDebug: false };
+const DEFAULTS = { volume: 1, haptic: true, bloom: true };
 
 export function getSettings() {
   try {

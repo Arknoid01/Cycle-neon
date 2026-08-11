@@ -109,6 +109,10 @@
         <button type="button" class="menu-back" data-back>← Accueil</button>
         <h2 class="screen-title">Options</h2>
         <div class="options-list">
+          <button type="button" id="opt-sprite-sandbox" class="option-sandbox-btn">
+            Atelier sprite moto
+          </button>
+          <p class="option-sandbox-hint">Scène figée · deux motos face à face · réglage des orientations</p>
           <label class="option-row">
             <span class="option-label">Volume</span>
             <input type="range" id="opt-volume" min="0" max="100" value="100">
@@ -123,22 +127,28 @@
             <input type="checkbox" id="opt-bloom" checked>
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
           </label>
-          <label class="option-row option-toggle">
-            <span class="option-label">Debug sprite moto</span>
-            <input type="checkbox" id="opt-bike-debug">
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          </label>
         </div>
       </div>
     </div>
   </div>
 
+  <button type="button" id="sandbox-exit" class="sandbox-exit hidden" aria-label="Quitter l'atelier">← Menu</button>
+
   <div id="bike-sprite-debug" class="bike-sprite-debug hidden">
-    <div class="bsd-title">Debug orientation moto</div>
-    <p class="bsd-hint">Réglage commun joueur + bots. Copie le code exporté pour l’intégrer.</p>
+    <div class="bsd-title">Atelier sprite moto</div>
+    <p class="bsd-hint">Scène figée — choisis une moto, tourne-la, puis exporte le code.</p>
 
     <div class="bsd-section">
-      <span class="bsd-label">Direction éditée</span>
+      <span class="bsd-label">Moto sélectionnée</span>
+      <div class="bsd-btn-row">
+        <button type="button" class="bsd-btn active" data-bsd-bike="0">Ma moto</button>
+        <button type="button" class="bsd-btn" data-bsd-bike="1">Adversaire</button>
+      </div>
+      <div class="bsd-values" id="bsd-bike-label">Ma moto</div>
+    </div>
+
+    <div class="bsd-section">
+      <span class="bsd-label">Direction</span>
       <div class="bsd-btn-row">
         <button type="button" class="bsd-btn active" data-bsd-dir="0">↑</button>
         <button type="button" class="bsd-btn" data-bsd-dir="1">→</button>
@@ -171,19 +181,6 @@
         <button type="button" class="bsd-btn" id="bsd-apply-all-rot">Rot → toutes</button>
       </div>
       <div class="bsd-values" id="bsd-rot-label">0°</div>
-    </div>
-
-    <div class="bsd-section">
-      <label class="bsd-check">
-        <input type="checkbox" id="bsd-force-preview">
-        Forcer cette direction (tous les sprites en jeu)
-      </label>
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn" data-bsd-preview-dir="0">Preview ↑</button>
-        <button type="button" class="bsd-btn" data-bsd-preview-dir="1">→</button>
-        <button type="button" class="bsd-btn" data-bsd-preview-dir="2">↓</button>
-        <button type="button" class="bsd-btn" data-bsd-preview-dir="3">←</button>
-      </div>
     </div>
 
     <div class="bsd-section">
