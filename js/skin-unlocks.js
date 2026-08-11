@@ -3,6 +3,14 @@ import { loadChallenges } from './challenges.js';
 
 const STORAGE_KEY = 'lc_unlocked_skins';
 
+/**
+ * Bascule temporaire de développement : tous les skins sont déverrouillés,
+ * quel que soit leur tier (premium/earn). Les tiers restent intacts dans
+ * bike-skins.js — il suffira de repasser ce flag à false pour réactiver le
+ * système de déblocage (boutique + trophées) avant la sortie.
+ */
+const ALL_UNLOCKED_DEV = true;
+
 const FREE_SKIN_IDS = BIKE_SKINS.filter(s => s.tier === 'free').map(s => s.id);
 
 export function loadGrantedSkins() {
@@ -25,6 +33,7 @@ export function grantSkin(skinId) {
 export function isSkinUnlocked(skinId) {
   const skin = getBikeSkin(skinId);
   if (!skin) return false;
+  if (ALL_UNLOCKED_DEV) return true;
   if (skin.tier === 'free') return true;
   if (loadGrantedSkins().includes(skinId)) return true;
   if (skin.tier === 'earn' && skin.unlockChallenge) {
