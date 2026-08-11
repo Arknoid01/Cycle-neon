@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { getCosmeticPreset, getActiveSkin, getRiderColorDef } from './cosmetics.js';
 import { createBikeMesh, pulseBikeMaterials, disposeBikeMesh } from './bike-model-loader.js';
+import { BIKE_SCALE } from './constants.js';
 
 export class BikePreview {
   constructor(canvas) {
@@ -42,6 +43,7 @@ export class BikePreview {
     }
     this.bike = bike;
     this.bike.position.y = 0.05;
+    this.bike.scale.setScalar(BIKE_SCALE);
     this.scene.add(this.bike);
   }
 
@@ -54,8 +56,8 @@ export class BikePreview {
     this.scene.background = new THREE.Color(0x02040c);
 
     this.camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 50);
-    this.camera.position.set(2.2, 1.6, 2.4);
-    this.camera.lookAt(0, 0.25, 0);
+    this.camera.position.set(2.2 * BIKE_SCALE, 1.6 * BIKE_SCALE, 2.4 * BIKE_SCALE);
+    this.camera.lookAt(0, 0.25 * BIKE_SCALE, 0);
 
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true });
     this.renderer.setSize(w, h, false);

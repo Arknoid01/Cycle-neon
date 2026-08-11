@@ -624,7 +624,7 @@ export class Renderer {
     if (!player?.alive) return;
     const p = this.gridToWorld(player.renderX, player.renderY, this._worldPos);
     const targetAngle = CAM_DIR_ANGLES[player.dir];
-    const dist = 14, height = 12.5, lookAhead = 4.5;
+    const dist = 17, height = 15, lookAhead = 5.3;
 
     if (!this.camReady) {
       this.smoothCamX = p.x; this.smoothCamZ = p.z;
