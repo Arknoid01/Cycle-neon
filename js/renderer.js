@@ -4,11 +4,11 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {
   CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, TRAIL_PLATE_LEN, PERIM_H,
-  CAM_DIR_ANGLES, BIKE_DIR_ANGLES, ARENA_BORDER, DX, DY,
+  CAM_DIR_ANGLES, BIKE_DIR_ANGLES, ARENA_BORDER, DX, DY, TRAIL_OPACITY, WALL_CUBE_SIZE, TRAIL_SPAWN_MS,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
-import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y } from './electric-shader.js';
+import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -27,8 +27,8 @@ export class Renderer {
     this.matWall = null;
     this.matMobile = null;
     this.matPerimeter = null;
-    this.wallPlateGeo = null;
-    this.perimPlateGeo = null;
+    this.wallCubeGeo = null;
+    this.perimCubeGeo = null;
     this.trailPlateGeo = null;
     this.liveTrailGeo = null;
     this.mobileBurstUntil = 0;
@@ -55,23 +55,23 @@ export class Renderer {
 
     this.scene.add(new THREE.AmbientLight(0x223355, 0.18));
 
-    this.wallPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, WALL_H, TRAIL_PLATE_LEN);
-    this.perimPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, PERIM_H, TRAIL_PLATE_LEN);
+    this.wallCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, WALL_H, WALL_CUBE_SIZE);
+    this.perimCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, PERIM_H, WALL_CUBE_SIZE);
     this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN);
     this.trailCornerArmGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, CELL_SIZE * 0.5);
     this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = createElectricMaterial({
       color: 0x7c3aed, sparkColor: 0xc4b5fd, intensity: 1.0, body: 0.5,
-      acrossDir: AXIS_X,
+      acrossDir: AXIS_Y,
     });
     this.matMobile = createElectricMaterial({
       color: 0xff6600, sparkColor: 0xffcc88, intensity: 1.05, body: 0.55,
-      acrossDir: AXIS_X,
+      acrossDir: AXIS_Y,
     });
     this.matPerimeter = createElectricMaterial({
       color: 0x9333ea, sparkColor: 0xddd6fe, intensity: 1.0, body: 0.52,
-      acrossDir: AXIS_X,
+      acrossDir: AXIS_Y,
     });
     this._rebuildTrailMats();
 
@@ -99,7 +99,7 @@ export class Renderer {
     this.trailMats = list.map(d => {
       const mat = createElectricMaterial({
         color: d.trailGlow, sparkColor: d.trail,
-        intensity: 1.2, body: 0.55,
+        intensity: 1.2, body: 0.55, opacity: TRAIL_OPACITY,
         acrossDir: AXIS_X,
       });
       this._trackElectric(mat);
@@ -158,9 +158,34 @@ export class Renderer {
         const val = grid.get(x, y);
         const key = this._cellKey(x, y);
         if (val === 0) continue;
-        if (this.cellMeshes.has(key) && !isTrail(val)) continue;
-        this._setCellMesh(x, y, val, grid, wallSystem);
+        if (this.cellMeshes.has(key)) continue;
+        this._setCellMesh(x, y, val, grid, wallSystem, performance.now());
       }
+    }
+  }
+
+  _addWallCube(x, y, geo, mat) {
+    const mesh = new THREE.Mesh(geo, mat);
+    const p = this.gridToWorld(x, y);
+    const h = geo.parameters.height;
+    mesh.position.set(p.x, h / 2, p.z);
+    this.scene.add(mesh);
+    return mesh;
+  }
+
+  _markTrailSpawn(mesh, now) {
+    mesh.userData.spawnAt = now;
+    mesh.scale.setScalar(0.15);
+  }
+
+  _updateTrailSpawns(now) {
+    for (const mesh of this.cellMeshes.values()) {
+      const spawnAt = mesh.userData?.spawnAt;
+      if (!spawnAt) continue;
+      const t = Math.min(1, (now - spawnAt) / TRAIL_SPAWN_MS);
+      const ease = t * t * (3 - 2 * t);
+      mesh.scale.setScalar(0.15 + ease * 0.85);
+      if (t >= 1) delete mesh.userData.spawnAt;
     }
   }
 
@@ -172,27 +197,6 @@ export class Renderer {
       }
     }
     return false;
-  }
-
-  _isWallAt(grid, x, y) {
-    if (!grid.inBounds(x, y)) return true;
-    return grid.get(x, y) === CELL_WALL;
-  }
-
-  _inferWallDir(grid, x, y) {
-    const left = this._isWallAt(grid, x - 1, y);
-    const right = this._isWallAt(grid, x + 1, y);
-    const up = this._isWallAt(grid, x, y - 1);
-    const down = this._isWallAt(grid, x, y + 1);
-    const horiz = (left ? 1 : 0) + (right ? 1 : 0);
-    const vert = (up ? 1 : 0) + (down ? 1 : 0);
-    if (horiz > vert) return 1;
-    if (vert > horiz) return 2;
-    if (grid.isPerimeter(x, y)) {
-      if (y < ARENA_BORDER + 1 || y >= grid.h - ARENA_BORDER - 1) return 1;
-      return 2;
-    }
-    return horiz > 0 ? 1 : 2;
   }
 
   _plateRotation(dir) {
@@ -287,7 +291,7 @@ export class Renderer {
     return this._plateRotation(dir);
   }
 
-  _setCellMesh(x, y, type, grid, wallSystem) {
+  _setCellMesh(x, y, type, grid, wallSystem, now = performance.now()) {
     const key = this._cellKey(x, y);
     const existing = this.cellMeshes.get(key);
     if (existing) {
@@ -308,27 +312,24 @@ export class Renderer {
         mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
       }
       mesh.userData.isTrail = true;
+      this._markTrailSpawn(mesh, now);
       this.cellMeshes.set(key, mesh);
       return;
     }
 
-    let mat, geo, h;
+    let mat, geo;
     if (type === CELL_WALL && grid.isPerimeter(x, y)) {
       mat = this.matPerimeter;
-      geo = this.perimPlateGeo;
-      h = PERIM_H;
+      geo = this.perimCubeGeo;
     } else if (type === CELL_WALL && this._isMobileCell(x, y, wallSystem)) {
       mat = this.matMobile;
-      geo = this.wallPlateGeo;
-      h = WALL_H;
+      geo = this.wallCubeGeo;
     } else {
       mat = this.matWall;
-      geo = this.wallPlateGeo;
-      h = WALL_H;
+      geo = this.wallCubeGeo;
     }
 
-    const dir = this._inferWallDir(grid, x, y);
-    const mesh = this._addOrientedPlate(x, y, geo, mat, h, dir);
+    const mesh = this._addWallCube(x, y, geo, mat);
     this.cellMeshes.set(key, mesh);
   }
 
@@ -356,61 +357,71 @@ export class Renderer {
   _buildBike(def) {
     const g = new THREE.Group();
     const roofStripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, intensity: 0.9, body: 0.45,
+      color: def.glow, sparkColor: def.wheel, intensity: 0.95, body: 0.48,
       acrossDir: AXIS_Y,
     });
     const sideStripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, intensity: 0.9, body: 0.45,
+      color: def.glow, sparkColor: def.wheel, intensity: 0.95, body: 0.48,
       acrossDir: AXIS_X,
+    });
+    const underglowMat = createElectricMaterial({
+      color: def.trailGlow, sparkColor: def.wheel, intensity: 0.75, body: 0.35, opacity: 0.85,
+      acrossDir: AXIS_Z,
     });
     this._trackElectric(roofStripMat);
     this._trackElectric(sideStripMat);
+    this._trackElectric(underglowMat);
 
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: def.body, emissive: def.glow, emissiveIntensity: 0.75,
-      metalness: 0.3, roughness: 0.35,
+      color: def.body, emissive: def.glow, emissiveIntensity: 0.85,
+      metalness: 0.55, roughness: 0.28,
     });
     const darkMat = new THREE.MeshStandardMaterial({
-      color: 0x0a0a18, emissive: def.glow, emissiveIntensity: 0.25,
+      color: 0x080818, emissive: def.glow, emissiveIntensity: 0.35,
+      metalness: 0.4, roughness: 0.45,
+    });
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: def.wheel, emissive: def.wheel, emissiveIntensity: 1.2,
+      metalness: 0.6, roughness: 0.2,
     });
 
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.16, 0.78), darkMat);
-    chassis.position.y = 0.2;
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.14, 0.82), darkMat);
+    chassis.position.y = 0.19;
     g.add(chassis);
 
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.32), bodyMat);
-    nose.position.set(0, 0.26, -0.28);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.1, 0.36), bodyMat);
+    nose.position.set(0, 0.24, -0.34);
     g.add(nose);
 
-    const stripGeo = new THREE.BoxGeometry(0.5, 0.06, 0.12);
-    const roofStrip = new THREE.Mesh(stripGeo, roofStripMat);
-    roofStrip.position.set(0, 0.32, 0);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.28), accentMat);
+    canopy.position.set(0, 0.3, -0.08);
+    g.add(canopy);
+
+    const roofStrip = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.05, 0.14), roofStripMat);
+    roofStrip.position.set(0, 0.34, 0.02);
     g.add(roofStrip);
 
-    [-0.2, 0.2].forEach(s => {
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.12, 0.62), sideStripMat);
-      side.position.set(s, 0.22, 0.02);
+    [-0.22, 0.22].forEach(s => {
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.66), sideStripMat);
+      side.position.set(s, 0.22, 0.04);
       g.add(side);
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 20), accentMat);
+      disc.rotation.z = Math.PI / 2;
+      disc.position.set(s, 0.14, 0.2);
+      g.add(disc);
     });
 
-    const ringGeo = new THREE.TorusGeometry(0.13, 0.028, 8, 16);
-    const wheelMat = new THREE.MeshStandardMaterial({
-      color: def.wheel, emissive: def.wheel, emissiveIntensity: 1.1,
-    });
-    [-0.24, 0.24].forEach(s => {
-      const ring = new THREE.Mesh(ringGeo, wheelMat);
-      ring.rotation.y = Math.PI / 2;
-      ring.position.set(s, 0.13, 0.22);
-      g.add(ring);
-    });
+    const underglow = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.02, 0.7), underglowMat);
+    underglow.position.set(0, 0.1, 0.04);
+    g.add(underglow);
 
     const emitterMat = createElectricMaterial({
-      color: def.trailGlow, sparkColor: def.wheel, intensity: 1.0, body: 0.5,
+      color: def.trailGlow, sparkColor: def.wheel, intensity: 1.05, body: 0.52,
       acrossDir: AXIS_X,
     });
     this._trackElectric(emitterMat);
-    const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.14), emitterMat);
-    emitter.position.set(0, 0.28, 0.36);
+    const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.16), emitterMat);
+    emitter.position.set(0, 0.28, 0.38);
     g.add(emitter);
 
     g.userData.emitterMat = emitterMat;
@@ -438,9 +449,23 @@ export class Renderer {
     };
   }
 
-  _updateLiveTrail(lt, rider, bikeMesh, grid) {
+  _updateLiveTrail(lt, rider, bikeMesh, grid, renderT = 1) {
     const dir = grid?.getTrailDir(rider.prevX, rider.prevY) ?? rider.dir;
-    const join = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2, grid);
+    const endJoin = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2, grid);
+    let join = endJoin;
+    if (grid && renderT < 1 && (rider.prevX !== rider.x || rider.prevY !== rider.y)) {
+      const bx = rider.prevX - DX[dir];
+      const by = rider.prevY - DY[dir];
+      if (grid.inBounds(bx, by) && isTrail(grid.get(bx, by))) {
+        const backDir = grid.getTrailDir(bx, by);
+        const startJoin = this._plateFrontEdge(bx, by, backDir, this._worldPos, grid);
+        const st = renderT;
+        join = {
+          x: startJoin.x + (endJoin.x - startJoin.x) * st,
+          z: startJoin.z + (endJoin.z - startJoin.z) * st,
+        };
+      }
+    }
     const rear = this._bikeRearWorld(rider, bikeMesh, this._worldPos);
     const seg = lt.userData.segment;
     const dx = join.x - rear.x;
@@ -465,7 +490,9 @@ export class Renderer {
     return this.riderMeshes.get(rider.id);
   }
 
-  syncRiders(riders, playing, now = performance.now(), grid = null) {
+  syncRiders(riders, playing, now = performance.now(), grid = null, renderT = 1) {
+    this._updateTrailSpawns(now);
+
     for (const m of this.cellMeshes.values()) {
       if (m.userData?.isTrail) m.visible = true;
     }
@@ -500,7 +527,12 @@ export class Renderer {
           this.scene.add(lt);
           this.liveTrails.set(r.id, lt);
         }
-        this._updateLiveTrail(lt, r, mesh, grid);
+        this._updateLiveTrail(lt, r, mesh, grid, renderT);
+      }
+
+      if (r.isPlayer && mesh.userData.emitterMat) {
+        const pulse = 0.92 + Math.sin(now / 120) * 0.08;
+        updateElectricMaterial(mesh.userData.emitterMat, { intensity: pulse });
       }
     }
   }
