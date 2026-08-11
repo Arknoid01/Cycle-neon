@@ -58,6 +58,7 @@ export class Renderer {
     this.wallPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, WALL_H, TRAIL_PLATE_LEN);
     this.perimPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, PERIM_H, TRAIL_PLATE_LEN);
     this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN);
+    this.trailHalfPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN * 0.5);
     this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = createElectricMaterial({
@@ -225,6 +226,27 @@ export class Renderer {
     return mesh;
   }
 
+  _addCornerPlate(x, y, geoHalf, mat, height, inDir, outDir) {
+    const g = new THREE.Group();
+    const center = this.gridToWorld(x, y);
+    const quarter = TRAIL_PLATE_LEN * 0.25;
+
+    for (const dir of [inDir, outDir]) {
+      const arm = new THREE.Mesh(geoHalf, mat);
+      const shift = this._plateShiftBack(dir);
+      arm.position.set(
+        center.x + shift.x + DX[dir] * quarter,
+        height / 2,
+        center.z + shift.z + DY[dir] * quarter,
+      );
+      arm.rotation.y = this._plateRotation(dir);
+      g.add(arm);
+    }
+
+    this.scene.add(g);
+    return g;
+  }
+
   _trailRotation(dir) {
     return this._plateRotation(dir);
   }
@@ -239,8 +261,14 @@ export class Renderer {
 
     if (isTrail(type)) {
       const mat = this.trailMats[type - TRAIL_BASE];
-      const dir = grid.getTrailDir(x, y);
-      const mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, dir);
+      const outDir = grid.getTrailDir(x, y);
+      const inDir = grid.getTrailInDir(x, y);
+      let mesh;
+      if (inDir !== outDir) {
+        mesh = this._addCornerPlate(x, y, this.trailHalfPlateGeo, mat, TRAIL_H, inDir, outDir);
+      } else {
+        mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
+      }
       mesh.userData.isTrail = true;
       this.cellMeshes.set(key, mesh);
       return;
