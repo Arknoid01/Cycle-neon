@@ -8,7 +8,9 @@ export class Grid {
     this.h = h;
     this.cells = new Uint8Array(w * h);
     this.trailDirs = new Uint8Array(w * h);
+    this.trailInDirs = new Uint8Array(w * h);
     this.trailDirs.fill(NO_TRAIL_DIR);
+    this.trailInDirs.fill(NO_TRAIL_DIR);
   }
 
   idx(x, y) { return y * this.w + x; }
@@ -28,20 +30,33 @@ export class Grid {
     return d === NO_TRAIL_DIR ? 0 : d;
   }
 
+  getTrailInDir(x, y) {
+    if (!this.inBounds(x, y)) return 0;
+    const i = this.idx(x, y);
+    const d = this.trailInDirs[i];
+    if (d !== NO_TRAIL_DIR) return d;
+    const out = this.trailDirs[i];
+    return out === NO_TRAIL_DIR ? 0 : out;
+  }
+
   set(x, y, val) {
     if (!this.inBounds(x, y)) return false;
     const i = this.idx(x, y);
     if (this.cells[i] === val) return false;
     this.cells[i] = val;
-    if (!isTrail(val)) this.trailDirs[i] = NO_TRAIL_DIR;
+    if (!isTrail(val)) {
+      this.trailDirs[i] = NO_TRAIL_DIR;
+      this.trailInDirs[i] = NO_TRAIL_DIR;
+    }
     return true;
   }
 
-  setTrail(x, y, val, dir) {
+  setTrail(x, y, val, outDir, inDir = outDir) {
     if (!this.inBounds(x, y)) return false;
     const i = this.idx(x, y);
     this.cells[i] = val;
-    this.trailDirs[i] = dir;
+    this.trailDirs[i] = outDir;
+    this.trailInDirs[i] = inDir;
     return true;
   }
 
@@ -60,6 +75,7 @@ export class Grid {
       const i = this.idx(x, y);
       this.cells[i] = CELL_EMPTY;
       this.trailDirs[i] = NO_TRAIL_DIR;
+      this.trailInDirs[i] = NO_TRAIL_DIR;
       return true;
     }
     return false;

@@ -193,7 +193,7 @@ export class Simulation {
       } else if (!r.isPlayer) {
         newDir = chooseBotTurn(this, r, moves);
       }
-      moves.push({ rider: r, newDir, nx: r.x + DX[newDir], ny: r.y + DY[newDir] });
+      moves.push({ rider: r, newDir, oldDir: r.dir, nx: r.x + DX[newDir], ny: r.y + DY[newDir] });
     }
 
     const targets = new Map();
@@ -235,7 +235,7 @@ export class Simulation {
       if (dead.has(m.rider)) continue;
       this.grid.setTrail(
         m.nx - DX[m.newDir], m.ny - DY[m.newDir],
-        trailVal(m.rider.id), m.newDir,
+        trailVal(m.rider.id), m.newDir, m.oldDir,
       );
       m.rider.x = m.nx;
       m.rider.y = m.ny;
