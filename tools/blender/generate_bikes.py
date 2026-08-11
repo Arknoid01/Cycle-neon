@@ -136,10 +136,12 @@ def make_bike_materials(prefix):
 
 
 def add_box(name, size, location, mat, parent, rotation=(0, 0, 0)):
+    # primitive_cube_add(size=1) crée déjà une arête de longueur 1 (sommets à ±0.5) :
+    # le facteur d'échelle doit être size[i] tel quel, pas size[i] / 2.
     bpy.ops.mesh.primitive_cube_add(size=1, location=location)
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (size[0] / 2, size[1] / 2, size[2] / 2)
+    obj.scale = (size[0], size[1], size[2])
     obj.rotation_euler = rotation
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     obj.data.materials.append(mat)
@@ -272,9 +274,9 @@ def build_bike(dims, flavor, root_name='Bike'):
                          (sign * (W * 0.5), wheel_y, wheel_r),
                          mats['wheel'], root, rotation=(0, math.radians(90), 0))
 
-    # Soubassement / traînée (trail)
+    # Soubassement / traînée (trail) — plaqué contre le dessous du châssis
     add_box('trail_underglow', (W * 0.8, L * 0.7, 0.015),
-            (0, -L * 0.02, ground * 0.4), mats['trail'], root)
+            (0, -L * 0.02, ground + H * 0.02), mats['trail'], root)
 
     # Plaque émissive arrière + ancrage de traînée (-Y = arrière)
     rear_y = -L * 0.5 - 0.02

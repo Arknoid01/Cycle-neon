@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import {
   CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, TRAIL_PLATE_LEN, PERIM_H,
   CAM_DIR_ANGLES, BIKE_DIR_ANGLES, DX, DY, TRAIL_OPACITY, WALL_CUBE_SIZE,
-  TRAIL_ARM_LEN, TRAIL_ARM_OFFSET,
+  TRAIL_ARM_LEN, TRAIL_ARM_OFFSET, BIKE_SCALE,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
@@ -438,7 +438,9 @@ export class Renderer {
   }
 
   _buildBike(def) {
-    return buildFallbackBike(def, def.skin, m => this._trackElectric(m));
+    const mesh = buildFallbackBike(def, def.skin, m => this._trackElectric(m));
+    mesh.scale.setScalar(BIKE_SCALE);
+    return mesh;
   }
 
   _replaceRiderMesh(riderId, newMesh) {
@@ -466,6 +468,7 @@ export class Renderer {
         disposeBikeMesh(mesh);
         return;
       }
+      mesh.scale.setScalar(BIKE_SCALE);
       this._replaceRiderMesh(rider.id, mesh);
     });
   }
