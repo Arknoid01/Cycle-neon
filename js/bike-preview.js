@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { buildBikeSkin } from './bike-builder.js';
 import { getCosmeticPreset, getActiveSkin, getRiderColorDef } from './cosmetics.js';
-import { updateElectricMaterial } from './electric-shader.js';
+import { createBikeMesh, pulseBikeMaterials, disposeBikeMesh } from './bike-model-loader.js';
 
 export class BikePreview {
   constructor(canvas) {
@@ -18,29 +17,30 @@ export class BikePreview {
     this.angle = 0;
     this.active = false;
     this.raf = 0;
+    this._buildGen = 0;
   }
 
   _disposeBike() {
     if (!this.bike) return;
     this.scene.remove(this.bike);
-    this.bike.traverse(obj => {
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) {
-        if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-        else obj.material.dispose();
-      }
-    });
+    disposeBikeMesh(this.bike);
     this.bike = null;
     this.electricMats = [];
   }
 
-  _rebuildBike() {
+  async _rebuildBike() {
     if (!this.scene) return;
+    const gen = ++this._buildGen;
     this._disposeBike();
     const colors = getCosmeticPreset();
     const skin = getActiveSkin();
     const def = { ...getRiderColorDef(colors), skinId: skin.id, skin };
-    this.bike = buildBikeSkin(def, skin, m => this.electricMats.push(m));
+    const bike = await createBikeMesh(def, skin, m => this.electricMats.push(m));
+    if (gen !== this._buildGen) {
+      disposeBikeMesh(bike);
+      return;
+    }
+    this.bike = bike;
     this.bike.position.y = 0.05;
     this.scene.add(this.bike);
   }
@@ -78,7 +78,7 @@ export class BikePreview {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.3, 0.75));
 
-    this._rebuildBike();
+    await this._rebuildBike();
   }
 
   refresh() {
@@ -92,9 +92,10 @@ export class BikePreview {
       if (!this.active) return;
       this.raf = requestAnimationFrame(tick);
       this.angle += 0.012;
-      if (this.bike) this.bike.rotation.y = this.angle;
-      const pulse = 0.92 + Math.sin(now / 120) * 0.08;
-      for (const m of this.electricMats) updateElectricMaterial(m, { intensity: pulse });
+      if (this.bike) {
+        this.bike.rotation.y = this.angle;
+        pulseBikeMaterials(this.bike, now);
+      }
       this.composer?.render();
     };
     tick(performance.now());

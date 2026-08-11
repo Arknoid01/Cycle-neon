@@ -5,7 +5,7 @@ import { isSkinUnlocked, syncEarnedSkins } from './skin-unlocks.js';
 export { CHASSIS_PRESETS, getChassisPreset } from './bike-builder.js';
 export { BIKE_SKINS, getBikeSkin, SKIN_TIER_LABELS } from './bike-skins.js';
 export {
-  isSkinUnlocked, grantSkin, purchaseSkin, syncEarnedSkins, skinLockHint,
+  isSkinUnlocked, grantSkin, purchaseSkin, syncEarnedSkins, skinLockHint, getUnlockedSkinIds,
 } from './skin-unlocks.js';
 
 export const COLOR_PRESETS = [

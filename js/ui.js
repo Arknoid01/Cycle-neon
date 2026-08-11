@@ -9,6 +9,8 @@ import { getSettings, saveSettings } from './settings.js';
 import { setMasterVolume } from './audio.js';
 import { WIN_BONUS } from './constants.js';
 import { BikePreview } from './bike-preview.js';
+import { preloadBikeModels } from './bike-model-loader.js';
+import { getBikeSkin } from './bike-skins.js';
 
 const SCREENS = ['home', 'play', 'custom', 'trophies', 'options'];
 
@@ -155,6 +157,7 @@ export class UI {
           return;
         }
         saveSkin(skin.id);
+        if (skin.model) preloadBikeModels([getBikeSkin(skin.id)]);
         if (this.skinPickerHint) this.skinPickerHint.textContent = '';
         this.buildSkinPicker();
         this.bikePreview?.refresh();

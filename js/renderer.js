@@ -11,6 +11,14 @@ import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
 import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 import { buildBikeSkin } from './bike-builder.js';
+import {
+  skinUsesModel,
+  buildFallbackBike,
+  createBikeMesh,
+  bikeTrailRearWorld,
+  pulseBikeMaterials,
+  disposeBikeMesh,
+} from './bike-model-loader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -137,6 +145,7 @@ export class Renderer {
           m.dispose();
         }
       }
+      disposeBikeMesh(g);
       this.scene.remove(g);
     });
     this.riderMeshes.clear();
@@ -429,7 +438,36 @@ export class Renderer {
   }
 
   _buildBike(def) {
-    return buildBikeSkin(def, def.skin, m => this._trackElectric(m));
+    return buildFallbackBike(def, def.skin, m => this._trackElectric(m));
+  }
+
+  _replaceRiderMesh(riderId, newMesh) {
+    const old = this.riderMeshes.get(riderId);
+    if (!old || old === newMesh) return;
+    newMesh.position.copy(old.position);
+    newMesh.rotation.copy(old.rotation);
+    newMesh.visible = old.visible;
+    this.scene.remove(old);
+    disposeBikeMesh(old);
+    this.scene.add(newMesh);
+    this.riderMeshes.set(riderId, newMesh);
+  }
+
+  _loadGltfBike(rider) {
+    const skin = rider.def.skin;
+    if (!skinUsesModel(skin)) return;
+    const loadId = `${rider.id}:${skin.id}:${rider.def.trailGlow}`;
+    if (rider._gltfLoadId === loadId) return;
+    rider._gltfLoadId = loadId;
+
+    createBikeMesh(rider.def, skin, m => this._trackElectric(m)).then(mesh => {
+      if (!this.riderMeshes.has(rider.id)) return;
+      if (rider._gltfLoadId !== loadId) {
+        disposeBikeMesh(mesh);
+        return;
+      }
+      this._replaceRiderMesh(rider.id, mesh);
+    });
   }
 
   _buildLiveTrail(mat) {
@@ -444,13 +482,7 @@ export class Renderer {
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
     const angle = bikeMesh?.rotation.y ?? rider.smoothAngle;
-    const backOff = 0.38;
-    const fx = Math.sin(angle);
-    const fz = -Math.cos(angle);
-    return {
-      x: p.x - fx * backOff,
-      z: p.z - fz * backOff,
-    };
+    return bikeTrailRearWorld(bikeMesh, p.x, p.z, angle);
   }
 
   _updateLiveTrail(lt, rider, bikeMesh, grid, renderT = 1) {
@@ -490,6 +522,7 @@ export class Renderer {
       const mesh = this._buildBike(rider.def);
       this.scene.add(mesh);
       this.riderMeshes.set(rider.id, mesh);
+      this._loadGltfBike(rider);
     }
     return this.riderMeshes.get(rider.id);
   }
@@ -533,10 +566,7 @@ export class Renderer {
         this._updateLiveTrail(lt, r, mesh, grid, renderT);
       }
 
-      if (r.isPlayer && mesh.userData.emitterMat) {
-        const pulse = 0.92 + Math.sin(now / 120) * 0.08;
-        updateElectricMaterial(mesh.userData.emitterMat, { intensity: pulse });
-      }
+      if (r.isPlayer) pulseBikeMaterials(mesh, now);
     }
   }
 
