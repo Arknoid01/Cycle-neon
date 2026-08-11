@@ -9,7 +9,7 @@ import {
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
-import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
+import { createElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 import { buildBikeSkin } from './bike-builder.js';
 import {
   skinUsesModel,
