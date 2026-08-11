@@ -325,6 +325,12 @@ export class Simulation {
     return (now - this.gameStartTime) / 1000;
   }
 
+  getRenderT(now) {
+    if (!this.playing || !this.lastSimTime) return 1;
+    let t = Math.min(1, (now - this.lastSimTime) / this.tickIntervalMs);
+    return t * t * (3 - 2 * t);
+  }
+
   updateRenderPositions(now) {
     for (const r of this.riders) {
       if (!r.alive) continue;

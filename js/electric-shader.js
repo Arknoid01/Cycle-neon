@@ -14,6 +14,7 @@ const FRAG = /* glsl */`
   uniform vec3 uSparkColor;
   uniform float uIntensity;
   uniform float uBody;
+  uniform float uOpacity;
   uniform vec3 uAcrossDir;
 
   varying vec3 vLocalPos;
@@ -23,7 +24,7 @@ const FRAG = /* glsl */`
     float band = exp(-across * across * 32.0);
     vec3 core = mix(uColor, uSparkColor, 0.22);
     vec3 col = core * uIntensity * band;
-    float alpha = band * clamp(uBody + 0.4, 0.0, 1.0);
+    float alpha = band * clamp(uBody + 0.4, 0.0, 1.0) * uOpacity;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -32,7 +33,7 @@ const AXIS_Y = new THREE.Vector3(0, 1, 0);
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 const AXIS_X = new THREE.Vector3(1, 0, 0);
 
-/** @param {{ color: number, sparkColor?: number, intensity?: number, body?: number, alongDir?: THREE.Vector3, acrossDir?: THREE.Vector3 }} opts */
+/** @param {{ color: number, sparkColor?: number, intensity?: number, body?: number, opacity?: number, alongDir?: THREE.Vector3, acrossDir?: THREE.Vector3 }} opts */
 export function createElectricMaterial(opts) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
@@ -40,6 +41,7 @@ export function createElectricMaterial(opts) {
       uSparkColor: { value: new THREE.Color(opts.sparkColor ?? 0xcccccc) },
       uIntensity: { value: opts.intensity ?? 0.95 },
       uBody: { value: opts.body ?? 0.55 },
+      uOpacity: { value: opts.opacity ?? 1 },
       uAcrossDir: { value: (opts.acrossDir ?? AXIS_X).clone() },
     },
     vertexShader: VERT,
@@ -56,6 +58,9 @@ export function updateElectricMaterial(mat, overrides = {}) {
   if (!mat?.uniforms) return;
   if (overrides.intensity !== undefined) {
     mat.uniforms.uIntensity.value = overrides.intensity;
+  }
+  if (overrides.opacity !== undefined) {
+    mat.uniforms.uOpacity.value = overrides.opacity;
   }
 }
 
