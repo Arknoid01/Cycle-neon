@@ -20,14 +20,14 @@ let introUntil = 0;
 let menuVisible = true;
 let gameMode = 'arcade';
 
-function beginRun(arena, options = {}) {
+async function beginRun(arena, options = {}) {
   initAudio();
   unlockAudio(true);
   currentArena = arena;
   ui.hideMenu();
   menuVisible = false;
+  if (!renderer.scene) await renderer.init();
   renderer.clearAll(options.riderDefs);
-  if (!renderer.scene) renderer.init();
   renderer.setBloomEnabled(getSettings().bloom);
   sim.reset(arena.id, options);
   renderer.syncGrid(sim.grid, sim.walls);

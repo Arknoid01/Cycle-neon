@@ -9,6 +9,10 @@ import {
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
 import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
+import {
+  loadBikeSpriteSheet, createBikeFrameMaterials, bikeSpriteTint,
+  BIKE_SPRITE_W, BIKE_SPRITE_H, BIKE_SPRITE_Y, BIKE_REAR_OFFSET,
+} from './bike-sprites.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -31,6 +35,7 @@ export class Renderer {
     this.perimCubeGeo = null;
     this.trailPlateGeo = null;
     this.liveTrailGeo = null;
+    this.bikeSheet = null;
     this.mobileBurstUntil = 0;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
@@ -40,7 +45,7 @@ export class Renderer {
     this._worldPos2 = new THREE.Vector3();
   }
 
-  init() {
+  async init() {
     const { w, h } = gridDimensions();
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x010108);
@@ -88,6 +93,8 @@ export class Renderer {
       new THREE.Vector2(window.innerWidth, window.innerHeight), 0.34, 0.24, 0.78
     );
     this.composer.addPass(this.bloomPass);
+
+    this.bikeSheet = await loadBikeSpriteSheet();
   }
 
   _trackElectric(mat) {
@@ -126,7 +133,15 @@ export class Renderer {
   clearAll(riderDefs) {
     this.cellMeshes.forEach(m => this.scene.remove(m));
     this.cellMeshes.clear();
-    this.riderMeshes.forEach(g => this.scene.remove(g));
+    this.riderMeshes.forEach(g => {
+      if (g.userData.frameMats) {
+        for (const m of g.userData.frameMats) {
+          m.map?.dispose();
+          m.dispose();
+        }
+      }
+      this.scene.remove(g);
+    });
     this.riderMeshes.clear();
     this.liveTrails.forEach(g => this.scene.remove(g));
     this.liveTrails.clear();
@@ -354,6 +369,20 @@ export class Renderer {
     updateElectricMaterial(this.matMobile, { intensity });
   }
 
+  _buildBikeSprite(def) {
+    const g = new THREE.Group();
+    const tint = bikeSpriteTint(def);
+    const mats = createBikeFrameMaterials(this.bikeSheet, tint);
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(BIKE_SPRITE_W, BIKE_SPRITE_H), mats[0]);
+    plane.position.y = BIKE_SPRITE_Y;
+    g.add(plane);
+    g.userData.sprite = plane;
+    g.userData.frameMats = mats;
+    g.userData.frameDir = 0;
+    g.userData.isSprite = true;
+    return g;
+  }
+
   _buildBike(def) {
     const g = new THREE.Group();
     const roofStripMat = createElectricMaterial({
@@ -439,8 +468,10 @@ export class Renderer {
 
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
-    const angle = bikeMesh?.rotation.y ?? rider.smoothAngle;
-    const backOff = 0.38;
+    const angle = bikeMesh?.userData?.isSprite
+      ? BIKE_DIR_ANGLES[rider.dir]
+      : (bikeMesh?.rotation.y ?? rider.smoothAngle);
+    const backOff = bikeMesh?.userData?.isSprite ? BIKE_REAR_OFFSET : 0.38;
     const fx = Math.sin(angle);
     const fz = -Math.cos(angle);
     return {
@@ -474,7 +505,9 @@ export class Renderer {
     if (dist > 0.02) {
       seg.visible = true;
       seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
-      seg.rotation.y = bikeMesh?.rotation.y ?? this._trailRotation(dir);
+      seg.rotation.y = bikeMesh?.userData?.isSprite
+        ? BIKE_DIR_ANGLES[rider.dir]
+        : (bikeMesh?.rotation.y ?? this._trailRotation(dir));
       seg.scale.set(1, 1, dist);
     } else {
       seg.visible = false;
@@ -483,7 +516,9 @@ export class Renderer {
 
   ensureRiderMesh(rider) {
     if (!this.riderMeshes.has(rider.id)) {
-      const mesh = this._buildBike(rider.def);
+      const mesh = this.bikeSheet
+        ? this._buildBikeSprite(rider.def)
+        : this._buildBike(rider.def);
       this.scene.add(mesh);
       this.riderMeshes.set(rider.id, mesh);
     }
@@ -509,12 +544,23 @@ export class Renderer {
       mesh.visible = true;
       const p = this.gridToWorld(r.renderX, r.renderY, this._worldPos);
       mesh.position.set(p.x, 0, p.z);
-      const targetAngle = BIKE_DIR_ANGLES[r.dir];
-      let diff = targetAngle - r.smoothAngle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      r.smoothAngle += diff * 0.28;
-      mesh.rotation.y = r.smoothAngle;
+
+      if (mesh.userData.isSprite) {
+        const sprite = mesh.userData.sprite;
+        if (mesh.userData.frameDir !== r.dir) {
+          mesh.userData.frameDir = r.dir;
+          sprite.material = mesh.userData.frameMats[r.dir];
+        }
+        sprite.lookAt(this.camera.position.x, mesh.position.y + BIKE_SPRITE_Y, this.camera.position.z);
+        mesh.rotation.y = 0;
+      } else {
+        const targetAngle = BIKE_DIR_ANGLES[r.dir];
+        let diff = targetAngle - r.smoothAngle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        r.smoothAngle += diff * 0.28;
+        mesh.rotation.y = r.smoothAngle;
+      }
 
       const underKey = this._cellKey(r.x, r.y);
       const underMesh = this.cellMeshes.get(underKey);
