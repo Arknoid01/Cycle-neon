@@ -7,6 +7,10 @@ export const COLOR_PRESETS = [
   { id: 'crimson', body: 0xcc6666, glow: 0xcc3333, wheel: 0xcc0022, trail: 0x994444, trailGlow: 0xcc0033 },
 ];
 
+import { CHASSIS_PRESETS, getChassisPreset } from './bike-builder.js';
+
+export { CHASSIS_PRESETS, getChassisPreset };
+
 export const BOT_DEFS = [
   { name: 'Spectre', isPlayer: false, personality: 'chasseur', difficulty: 2, body: 0xcc4499, glow: 0xcc0066, wheel: 0xcc6699, trail: 0x994466, trailGlow: 0xcc3388 },
   { name: 'Phantom', isPlayer: false, personality: 'prudent', difficulty: 2, body: 0x44aa66, glow: 0x00cc55, wheel: 0x55aa77, trail: 0x336644, trailGlow: 0x33aa66 },
@@ -20,15 +24,32 @@ export function saveCosmetic(id) {
   try { localStorage.setItem('lc_cosmetic', id); } catch {}
 }
 
+export function loadChassis() {
+  try { return localStorage.getItem('lc_chassis') || 'classic'; } catch { return 'classic'; }
+}
+
+export function saveChassis(id) {
+  try { localStorage.setItem('lc_chassis', id); } catch {}
+}
+
 export function getCosmeticPreset() {
   return COLOR_PRESETS.find(p => p.id === loadCosmetic()) || COLOR_PRESETS[0];
 }
 
 export function getRiderDefs() {
   const c = getCosmeticPreset();
+  const chassis = getChassisPreset(loadChassis());
   return [
-    { key: 'player', name: 'Toi', isPlayer: true, body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow },
-    ...BOT_DEFS.map((b, i) => ({ key: 'bot' + i, ...b })),
+    {
+      key: 'player', name: 'Toi', isPlayer: true,
+      body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow,
+      chassisId: chassis.id, chassis,
+    },
+    ...BOT_DEFS.map((b, i) => ({
+      key: 'bot' + i, ...b,
+      chassisId: i === 0 ? 'blade' : 'tank',
+      chassis: getChassisPreset(i === 0 ? 'blade' : 'tank'),
+    })),
   ];
 }
 

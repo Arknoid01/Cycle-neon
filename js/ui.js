@@ -1,14 +1,19 @@
 import { ARENAS, ARENA_DESC, ARENA_FAMILIES, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
 import { CHALLENGES, checkChallenges, loadChallenges } from './challenges.js';
-import { COLOR_PRESETS, loadCosmetic, saveCosmetic, getCosmeticPreset, hexCss } from './cosmetics.js';
+import {
+  COLOR_PRESETS, CHASSIS_PRESETS, loadCosmetic, saveCosmetic, loadChassis, saveChassis,
+  getCosmeticPreset, hexCss,
+} from './cosmetics.js';
 import { getSettings, saveSettings } from './settings.js';
 import { setMasterVolume } from './audio.js';
 import { WIN_BONUS } from './constants.js';
+import { BikePreview } from './bike-preview.js';
 
 const SCREENS = ['home', 'play', 'custom', 'trophies', 'options'];
 
 export class UI {
-  constructor() {
+  constructor(renderer) {
+    this.renderer = renderer;
     this.scoreEl = document.getElementById('score');
     this.arenaNameEl = document.getElementById('arena-name');
     this.timerEl = document.getElementById('timer');
@@ -32,7 +37,6 @@ export class UI {
     this.arenaList = document.getElementById('arena-list');
     this.arenaRandomBtn = document.getElementById('arena-random');
     this.cosmeticPicker = document.getElementById('cosmetic-picker');
-    this.cosmeticPreview = document.getElementById('cosmetic-preview');
     this.challengesList = document.getElementById('challenges-list');
     this.arenaIntro = document.getElementById('arena-intro');
     this.arenaIntroName = document.getElementById('arena-intro-name');
@@ -43,8 +47,10 @@ export class UI {
     this.optVolume = document.getElementById('opt-volume');
     this.optHaptic = document.getElementById('opt-haptic');
     this.optBloom = document.getElementById('opt-bloom');
-    this.optSpriteSandbox = document.getElementById('opt-sprite-sandbox');
+    this.bikePreviewCanvas = document.getElementById('bike-preview-canvas');
+    this.chassisPicker = document.getElementById('chassis-picker');
     this.gameHud = document.getElementById('game-hud');
+    this.bikePreview = this.bikePreviewCanvas ? new BikePreview(this.bikePreviewCanvas) : null;
 
     this.screenEls = {};
     for (const id of SCREENS) {
@@ -60,18 +66,12 @@ export class UI {
     this.onContinueChampionship = null;
     this.overlayMode = 'menu';
     this.onSettingsChange = null;
-    this.onOpenSpriteSandbox = null;
   }
 
   applyScoreColor() {
     const c = getCosmeticPreset();
     this.scoreEl.style.color = hexCss(c.trailGlow);
     this.scoreEl.style.textShadow = `0 0 8px ${hexCss(c.trailGlow)}88`;
-    if (this.cosmeticPreview) {
-      this.cosmeticPreview.style.background =
-        `linear-gradient(135deg, ${hexCss(c.body)} 0%, ${hexCss(c.trailGlow)} 100%)`;
-      this.cosmeticPreview.style.boxShadow = `0 0 14px ${hexCss(c.trailGlow)}66`;
-    }
   }
 
   trophyStats() {
@@ -96,7 +96,13 @@ export class UI {
       el?.classList.toggle('hidden', key !== id);
     }
     if (id === 'home') this.updateHomeStats();
-    if (id === 'custom') this.buildCosmeticPicker();
+    if (id === 'custom') {
+      this.buildCosmeticPicker();
+      this.buildChassisPicker();
+      this.startBikePreview();
+    } else {
+      this.stopBikePreview();
+    }
     if (id === 'trophies') this.buildChallengesList();
     if (id === 'play') this.buildArenaList();
     if (id === 'options') this.syncOptionsUI();
@@ -116,10 +122,44 @@ export class UI {
         saveCosmetic(p.id);
         this.buildCosmeticPicker();
         this.applyScoreColor();
+        this.bikePreview?.refresh();
       });
       this.cosmeticPicker.appendChild(btn);
     });
     this.applyScoreColor();
+  }
+
+  buildChassisPicker() {
+    if (!this.chassisPicker) return;
+    const current = loadChassis();
+    this.chassisPicker.innerHTML = '';
+    CHASSIS_PRESETS.forEach(c => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chassis-btn' + (c.id === current ? ' selected' : '');
+      btn.innerHTML = `<span class="chassis-name">${c.name}</span><span class="chassis-desc">${c.desc}</span>`;
+      btn.addEventListener('click', () => {
+        saveChassis(c.id);
+        this.buildChassisPicker();
+        this.bikePreview?.refresh();
+      });
+      this.chassisPicker.appendChild(btn);
+    });
+  }
+
+  async startBikePreview() {
+    if (!this.bikePreview) return;
+    await this.bikePreview.init();
+    this.bikePreview.resize();
+    this.bikePreview.start();
+  }
+
+  stopBikePreview() {
+    this.bikePreview?.stop();
+  }
+
+  resizeBikePreview() {
+    this.bikePreview?.resize();
   }
 
   buildChallengesList() {
@@ -202,7 +242,6 @@ export class UI {
       const s = saveSettings({ bloom: this.optBloom.checked });
       this.onSettingsChange?.(s);
     });
-    this.optSpriteSandbox?.addEventListener('click', () => this.onOpenSpriteSandbox?.());
     this.applySettings();
   }
 
@@ -341,13 +380,12 @@ export class UI {
     this.multiplierEl?.classList.add('hidden');
   }
 
-  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship, onOpenSpriteSandbox) {
+  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship) {
     this.onStartArena = onStartArena;
     this.onShowMenu = onShowMenu;
     this.onSettingsChange = onSettingsChange;
     this.onStartChampionship = onStartChampionship;
     this.onContinueChampionship = onContinueChampionship;
-    this.onOpenSpriteSandbox = onOpenSpriteSandbox;
 
     document.querySelectorAll('.menu-tile[data-screen]').forEach(btn => {
       btn.addEventListener('click', () => this.showScreen(btn.dataset.screen));
