@@ -93,9 +93,14 @@
       <div id="custom-screen" class="menu-screen hidden">
         <button type="button" class="menu-back" data-back>← Accueil</button>
         <h2 class="screen-title">Personnalisation</h2>
-        <p class="screen-sub">Couleur de ton light cycle</p>
-        <div id="cosmetic-preview" class="cosmetic-preview"></div>
+        <p class="screen-sub">Couleur et silhouette de ton light cycle</p>
+        <div class="bike-preview-wrap">
+          <canvas id="bike-preview-canvas" class="bike-preview-canvas"></canvas>
+        </div>
+        <p class="picker-label">Couleur</p>
         <div id="cosmetic-picker"></div>
+        <p class="picker-label">Silhouette</p>
+        <div id="chassis-picker" class="chassis-picker"></div>
       </div>
 
       <div id="trophies-screen" class="menu-screen hidden">
@@ -109,10 +114,6 @@
         <button type="button" class="menu-back" data-back>← Accueil</button>
         <h2 class="screen-title">Options</h2>
         <div class="options-list">
-          <button type="button" id="opt-sprite-sandbox" class="option-sandbox-btn">
-            Atelier sprite moto
-          </button>
-          <p class="option-sandbox-hint">Scène figée · deux motos face à face · réglage des orientations</p>
           <label class="option-row">
             <span class="option-label">Volume</span>
             <input type="range" id="opt-volume" min="0" max="100" value="100">
@@ -129,68 +130,6 @@
           </label>
         </div>
       </div>
-    </div>
-  </div>
-
-  <button type="button" id="sandbox-exit" class="sandbox-exit hidden" aria-label="Quitter l'atelier">← Menu</button>
-
-  <div id="bike-sprite-debug" class="bike-sprite-debug hidden">
-    <div class="bsd-title">Atelier sprite moto</div>
-    <p class="bsd-hint">Scène figée — choisis une moto, tourne-la, puis exporte le code.</p>
-
-    <div class="bsd-section">
-      <span class="bsd-label">Moto sélectionnée</span>
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn active" data-bsd-bike="0">Ma moto</button>
-        <button type="button" class="bsd-btn" data-bsd-bike="1">Adversaire</button>
-      </div>
-      <div class="bsd-values" id="bsd-bike-label">Ma moto</div>
-    </div>
-
-    <div class="bsd-section">
-      <span class="bsd-label">Direction</span>
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn active" data-bsd-dir="0">↑</button>
-        <button type="button" class="bsd-btn" data-bsd-dir="1">→</button>
-        <button type="button" class="bsd-btn" data-bsd-dir="2">↓</button>
-        <button type="button" class="bsd-btn" data-bsd-dir="3">←</button>
-      </div>
-      <div class="bsd-values" id="bsd-dir-label">↑ Haut</div>
-    </div>
-
-    <div class="bsd-section">
-      <span class="bsd-label">Frame atlas</span>
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn" id="bsd-frame-prev">◀ Frame</button>
-        <button type="button" class="bsd-btn" id="bsd-frame-next">Frame ▶</button>
-      </div>
-      <div class="bsd-values" id="bsd-frame-label">0 Arrière</div>
-    </div>
-
-    <div class="bsd-section">
-      <span class="bsd-label">Rotation</span>
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn" id="bsd-rot-minus">−15°</button>
-        <button type="button" class="bsd-btn" id="bsd-rot-minus-fine">−5°</button>
-        <button type="button" class="bsd-btn" id="bsd-rot-plus-fine">+5°</button>
-        <button type="button" class="bsd-btn" id="bsd-rot-plus">+15°</button>
-      </div>
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn" id="bsd-flip-pi">Flip π</button>
-        <button type="button" class="bsd-btn" id="bsd-flip-x">Flip X</button>
-        <button type="button" class="bsd-btn" id="bsd-apply-all-rot">Rot → toutes</button>
-      </div>
-      <div class="bsd-values" id="bsd-rot-label">0°</div>
-    </div>
-
-    <div class="bsd-section">
-      <div class="bsd-btn-row">
-        <button type="button" class="bsd-btn" id="bsd-export-btn">Générer code</button>
-        <button type="button" class="bsd-btn bsd-primary" id="bsd-copy">Copier</button>
-        <button type="button" class="bsd-btn" id="bsd-reset">Reset</button>
-      </div>
-      <span class="bsd-copy-status" id="bsd-copy-status"></span>
-      <textarea id="bsd-export" class="bsd-export" rows="6" readonly placeholder="Clique « Générer code » puis « Copier »…"></textarea>
     </div>
   </div>
   <script type="importmap">

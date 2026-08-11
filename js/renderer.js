@@ -10,13 +10,7 @@ import {
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
 import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
-import {
-  loadBikeSpriteSheet, createBikeFrameMaterials, bikeSpriteTint,
-  BIKE_SPRITE_W, BIKE_SPRITE_H, BIKE_SPRITE_Y, BIKE_REAR_OFFSET,
-  getFrameIndexForDir, getBikeSpriteRotation, getBikeSpriteScaleX,
-  loadBikeSpriteTuningFromStorage,
-} from './bike-sprites.js';
-import { makeSandboxRider, createSandboxPair } from './bike-sprite-sandbox.js';
+import { buildProceduralBike } from './bike-builder.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -39,10 +33,6 @@ export class Renderer {
     this.perimCubeGeo = null;
     this.trailPlateGeo = null;
     this.liveTrailGeo = null;
-    this.bikeSheet = null;
-    this.sandboxMode = false;
-    this.sandboxRiders = null;
-    this.sandboxDisplayDirs = null;
     this.mobileBurstUntil = 0;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
@@ -92,50 +82,6 @@ export class Renderer {
       new THREE.Vector2(window.innerWidth, window.innerHeight), 0.34, 0.24, 0.78
     );
     this.composer.addPass(this.bloomPass);
-
-    this.bikeSheet = await loadBikeSpriteSheet();
-    loadBikeSpriteTuningFromStorage();
-  }
-
-  setSandboxBikeDir(bikeId, dir) {
-    if (!this.sandboxMode || !this.sandboxDisplayDirs) return;
-    this.sandboxDisplayDirs.set(bikeId, dir);
-    const r = this.sandboxRiders?.find(x => x.id === bikeId);
-    if (r) r.dir = dir;
-    this.invalidateBikeSpriteFrames();
-  }
-
-  enterSpriteSandbox(riderDefs) {
-    this.sandboxMode = true;
-    this.clearAll(riderDefs);
-    const { cx, cy, gap } = createSandboxPair();
-    this.sandboxDisplayDirs = new Map([[0, 0], [1, 2]]);
-    this.sandboxRiders = [
-      makeSandboxRider(0, riderDefs[0], cx, cy + gap, 0, true),
-      makeSandboxRider(1, riderDefs[1], cx, cy - gap, 2, false),
-    ];
-    this.camReady = false;
-  }
-
-  exitSpriteSandbox() {
-    this.sandboxMode = false;
-    this.sandboxRiders = null;
-    this.sandboxDisplayDirs = null;
-    this.clearAll(getRiderDefs());
-    this.camReady = false;
-  }
-
-  _spriteDirFor(r) {
-    if (this.sandboxMode) {
-      return this.sandboxDisplayDirs?.get(r.id) ?? r.dir;
-    }
-    return r.dir;
-  }
-
-  invalidateBikeSpriteFrames() {
-    for (const mesh of this.riderMeshes.values()) {
-      if (mesh.userData.isSprite) mesh.userData.frameKey = null;
-    }
   }
 
   _trackElectric(mat) {
@@ -447,92 +393,8 @@ export class Renderer {
     this.matMobile.emissiveIntensity = intensity;
   }
 
-  _buildBikeSprite(def) {
-    const g = new THREE.Group();
-    const tint = bikeSpriteTint(def);
-    const mats = createBikeFrameMaterials(this.bikeSheet, tint);
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(BIKE_SPRITE_W, BIKE_SPRITE_H), mats[0]);
-    plane.position.y = BIKE_SPRITE_Y;
-    g.add(plane);
-    g.userData.sprite = plane;
-    g.userData.frameMats = mats;
-    g.userData.frameKey = null;
-    g.userData.isSprite = true;
-    return g;
-  }
-
   _buildBike(def) {
-    const g = new THREE.Group();
-    const roofStripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, intensity: 0.95, body: 0.48,
-      acrossDir: AXIS_Y,
-    });
-    const sideStripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, intensity: 0.95, body: 0.48,
-      acrossDir: AXIS_X,
-    });
-    const underglowMat = createElectricMaterial({
-      color: def.trailGlow, sparkColor: def.wheel, intensity: 0.75, body: 0.35, opacity: 0.85,
-      acrossDir: AXIS_Z,
-    });
-    this._trackElectric(roofStripMat);
-    this._trackElectric(sideStripMat);
-    this._trackElectric(underglowMat);
-
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: def.body, emissive: def.glow, emissiveIntensity: 0.85,
-      metalness: 0.55, roughness: 0.28,
-    });
-    const darkMat = new THREE.MeshStandardMaterial({
-      color: 0x080818, emissive: def.glow, emissiveIntensity: 0.35,
-      metalness: 0.4, roughness: 0.45,
-    });
-    const accentMat = new THREE.MeshStandardMaterial({
-      color: def.wheel, emissive: def.wheel, emissiveIntensity: 1.2,
-      metalness: 0.6, roughness: 0.2,
-    });
-
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.14, 0.82), darkMat);
-    chassis.position.y = 0.19;
-    g.add(chassis);
-
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.1, 0.36), bodyMat);
-    nose.position.set(0, 0.24, -0.34);
-    g.add(nose);
-
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.28), accentMat);
-    canopy.position.set(0, 0.3, -0.08);
-    g.add(canopy);
-
-    const roofStrip = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.05, 0.14), roofStripMat);
-    roofStrip.position.set(0, 0.34, 0.02);
-    g.add(roofStrip);
-
-    [-0.22, 0.22].forEach(s => {
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.66), sideStripMat);
-      side.position.set(s, 0.22, 0.04);
-      g.add(side);
-      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 20), accentMat);
-      disc.rotation.z = Math.PI / 2;
-      disc.position.set(s, 0.14, 0.2);
-      g.add(disc);
-    });
-
-    const underglow = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.02, 0.7), underglowMat);
-    underglow.position.set(0, 0.1, 0.04);
-    g.add(underglow);
-
-    const emitterMat = createElectricMaterial({
-      color: def.trailGlow, sparkColor: def.wheel, intensity: 1.05, body: 0.52,
-      acrossDir: AXIS_X,
-    });
-    this._trackElectric(emitterMat);
-    const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.16), emitterMat);
-    emitter.position.set(0, 0.28, 0.38);
-    g.add(emitter);
-
-    g.userData.emitterMat = emitterMat;
-    return g;
+    return buildProceduralBike(def, def.chassis, m => this._trackElectric(m));
   }
 
   _buildLiveTrail(mat) {
@@ -546,11 +408,8 @@ export class Renderer {
 
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
-    const spriteDir = this._spriteDirFor(rider);
-    const angle = bikeMesh?.userData?.isSprite
-      ? getBikeSpriteRotation(spriteDir)
-      : (bikeMesh?.rotation.y ?? rider.smoothAngle);
-    const backOff = bikeMesh?.userData?.isSprite ? BIKE_REAR_OFFSET : 0.38;
+    const angle = bikeMesh?.rotation.y ?? rider.smoothAngle;
+    const backOff = 0.38;
     const fx = Math.sin(angle);
     const fz = -Math.cos(angle);
     return {
@@ -584,9 +443,7 @@ export class Renderer {
     if (dist > 0.02) {
       seg.visible = true;
       seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
-      seg.rotation.y = bikeMesh?.userData?.isSprite
-        ? getBikeSpriteRotation(this._spriteDirFor(rider))
-        : (bikeMesh?.rotation.y ?? this._trailRotation(dir));
+      seg.rotation.y = bikeMesh?.rotation.y ?? this._trailRotation(dir);
       seg.scale.set(1, 1, dist);
     } else {
       seg.visible = false;
@@ -595,9 +452,7 @@ export class Renderer {
 
   ensureRiderMesh(rider) {
     if (!this.riderMeshes.has(rider.id)) {
-      const mesh = this.bikeSheet
-        ? this._buildBikeSprite(rider.def)
-        : this._buildBike(rider.def);
+      const mesh = this._buildBike(rider.def);
       this.scene.add(mesh);
       this.riderMeshes.set(rider.id, mesh);
     }
@@ -622,33 +477,18 @@ export class Renderer {
       const p = this.gridToWorld(r.renderX, r.renderY, this._worldPos);
       mesh.position.set(p.x, 0, p.z);
 
-      if (mesh.userData.isSprite) {
-        const sprite = mesh.userData.sprite;
-        const spriteDir = this._spriteDirFor(r);
-        const frameIdx = getFrameIndexForDir(spriteDir);
-        const frameKey = `${spriteDir}:${frameIdx}`;
-        if (mesh.userData.frameKey !== frameKey) {
-          mesh.userData.frameKey = frameKey;
-          sprite.material = mesh.userData.frameMats[frameIdx];
-        }
-        sprite.rotation.y = getBikeSpriteRotation(spriteDir);
-        sprite.scale.x = getBikeSpriteScaleX(spriteDir);
-        sprite.scale.y = 1;
-        mesh.rotation.y = 0;
-      } else {
-        const targetAngle = BIKE_DIR_ANGLES[r.dir];
-        let diff = targetAngle - r.smoothAngle;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        r.smoothAngle += diff * 0.28;
-        mesh.rotation.y = r.smoothAngle;
-      }
+      const targetAngle = BIKE_DIR_ANGLES[r.dir];
+      let diff = targetAngle - r.smoothAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      r.smoothAngle += diff * 0.28;
+      mesh.rotation.y = r.smoothAngle;
 
       const underKey = this._cellKey(r.x, r.y);
       const underMesh = this.cellMeshes.get(underKey);
       if (underMesh?.userData?.isTrail) underMesh.visible = false;
 
-      if (playing && !this.sandboxMode) {
+      if (playing) {
         let lt = this.liveTrails.get(r.id);
         if (!lt) {
           lt = this._buildLiveTrail(this.trailMats[r.id]);
@@ -710,18 +550,6 @@ export class Renderer {
       }
       return true;
     });
-  }
-
-  updateSandboxCamera() {
-    if (!this.sandboxRiders?.length) return;
-    const a = this.sandboxRiders[0];
-    const b = this.sandboxRiders[1];
-    const p0 = this.gridToWorld(a.renderX, a.renderY, this._worldPos);
-    const p1 = this.gridToWorld(b.renderX, b.renderY, this._worldPos2);
-    const cx = (p0.x + p1.x) * 0.5;
-    const cz = (p0.z + p1.z) * 0.5;
-    this.camera.position.set(cx, 13, cz + 9);
-    this.camera.lookAt(cx, 0.35, cz);
   }
 
   updateCamera(player) {

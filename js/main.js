@@ -4,8 +4,6 @@ import { UI } from './ui.js';
 import { pickArena, saveArenaPref } from './arenas.js';
 import { Championship, loadChampBest, saveChampBest } from './championship.js';
 import { getSettings } from './settings.js';
-import { BikeSpriteDebug } from './bike-sprite-debug.js';
-import { BikeSpriteSandbox } from './bike-sprite-sandbox.js';
 import {
   initAudio, unlockAudio, updateEngineSound, updateGameplayIntensity, stopEngine, setMasterVolume,
   playTurn, playWallShift, playWallWarn, playNearMissBonus, playCrash,
@@ -14,10 +12,7 @@ import {
 
 const sim = new Simulation();
 const renderer = new Renderer(document.getElementById('game'));
-const ui = new UI();
-const championship = new Championship();
-const bikeSpriteDebug = new BikeSpriteDebug(renderer);
-const bikeSpriteSandbox = new BikeSpriteSandbox(renderer, bikeSpriteDebug, ui);
+const ui = new UI(renderer);
 
 let currentArena = null;
 let introUntil = 0;
@@ -25,11 +20,11 @@ let menuVisible = true;
 let gameMode = 'arcade';
 
 async function beginRun(arena, options = {}) {
-  if (bikeSpriteSandbox.isActive()) bikeSpriteSandbox.exit();
   initAudio();
   unlockAudio(true);
   currentArena = arena;
   ui.hideMenu();
+  ui.stopBikePreview();
   menuVisible = false;
   if (!renderer.scene) await renderer.init();
   renderer.clearAll(options.riderDefs);
@@ -49,6 +44,8 @@ function startArena(id) {
   beginRun(pickArena(id));
 }
 
+const championship = new Championship();
+
 function startChampionship() {
   gameMode = 'championship';
   championship.start();
@@ -61,7 +58,6 @@ function beginChampionshipRound() {
 }
 
 function showMenu() {
-  if (bikeSpriteSandbox.isActive()) bikeSpriteSandbox.exit();
   stopEngine();
   menuVisible = true;
   gameMode = 'arcade';
@@ -70,16 +66,8 @@ function showMenu() {
   ui.showMenu();
 }
 
-async function openSpriteSandbox() {
-  if (!renderer.scene) await renderer.init();
-  renderer.setBloomEnabled(getSettings().bloom);
-  menuVisible = false;
-  sim.playing = false;
-  await bikeSpriteSandbox.enter();
-}
-
 function onTurn(side) {
-  if (menuVisible || !sim.playing || bikeSpriteSandbox.isActive()) return;
+  if (menuVisible || !sim.playing) return;
   unlockAudio(true);
   const p = sim.getPlayer();
   if (side === 'left') { sim.setTurn((p.dir + 3) % 4); playTurn(); }
@@ -148,24 +136,18 @@ function handleEvents(events, now) {
 }
 
 function gameLoop(now) {
-  if (renderer.scene) {
-    if (bikeSpriteSandbox.isActive()) {
-      const riders = bikeSpriteSandbox.getRiders();
-      renderer.syncRiders(riders, false, now, null, 1);
-      renderer.updateSandboxCamera();
-    } else {
-      sim.updateRenderPositions(now);
-      renderer.syncRiders(sim.riders, sim.playing, now, sim.grid, sim.getRenderT(now));
-      renderer.updateCamera(sim.getPlayer());
-      renderer.syncMobileWarnings(sim.walls, now);
-      if (sim.playing) {
-        renderer.setBloomIntensity(sim.getIntensity());
-        updateGameplayIntensity(sim.multiplier);
-      }
+  if (renderer.scene && !menuVisible) {
+    sim.updateRenderPositions(now);
+    renderer.syncRiders(sim.riders, sim.playing, now, sim.grid, sim.getRenderT(now));
+    renderer.updateCamera(sim.getPlayer());
+    renderer.syncMobileWarnings(sim.walls, now);
+    if (sim.playing) {
+      renderer.setBloomIntensity(sim.getIntensity());
+      updateGameplayIntensity(sim.multiplier);
     }
   }
 
-  if (!bikeSpriteSandbox.isActive() && sim.shouldSimTick(now, introUntil)) {
+  if (!menuVisible && sim.shouldSimTick(now, introUntil)) {
     const { events } = sim.simulationTick(now);
     renderer.syncGrid(sim.grid, sim.walls);
     handleEvents(events, now);
@@ -182,7 +164,10 @@ function gameLoop(now) {
 ui.applyScoreColor();
 ui.buildHomeMenu();
 ui.showMenu();
-ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship, openSpriteSandbox);
+ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship);
 setMasterVolume(getSettings().volume);
-window.addEventListener('resize', () => renderer.resize());
+window.addEventListener('resize', () => {
+  renderer.resize();
+  ui.resizeBikePreview();
+});
 requestAnimationFrame(gameLoop);
