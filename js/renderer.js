@@ -206,6 +206,29 @@ export class Renderer {
     };
   }
 
+  _isPreCornerCell(grid, x, y, outDir) {
+    const nx = x + DX[outDir];
+    const ny = y + DY[outDir];
+    if (!grid.inBounds(nx, ny) || !isTrail(grid.get(nx, ny))) return false;
+    const nextOut = grid.getTrailDir(nx, ny);
+    const nextIn = grid.getTrailInDir(nx, ny);
+    return nextIn !== nextOut && nextIn === outDir;
+  }
+
+  _addTrailArm(group, center, geoHalf, mat, height, dir, towardEdge) {
+    const quarter = CELL_SIZE * 0.25;
+    const sign = towardEdge ? 1 : -1;
+    const arm = new THREE.Mesh(geoHalf, mat);
+    arm.position.set(
+      center.x + DX[dir] * quarter * sign,
+      height / 2,
+      center.z + DY[dir] * quarter * sign,
+    );
+    arm.rotation.y = this._plateRotation(dir);
+    group.add(arm);
+    return arm;
+  }
+
   /** Front edge of a trail plate on (gx, gy), for linking live segments. */
   _plateFrontEdge(gx, gy, dir, out, grid = null) {
     const p = this.gridToWorld(gx, gy, out);
@@ -213,6 +236,11 @@ export class Renderer {
       const outDir = grid.getTrailDir(gx, gy);
       const inDir = grid.getTrailInDir(gx, gy);
       if (inDir !== outDir) {
+        p.x += DX[outDir] * CELL_SIZE * 0.5;
+        p.z += DY[outDir] * CELL_SIZE * 0.5;
+        return p;
+      }
+      if (this._isPreCornerCell(grid, gx, gy, outDir)) {
         p.x += DX[outDir] * CELL_SIZE * 0.5;
         p.z += DY[outDir] * CELL_SIZE * 0.5;
         return p;
@@ -225,13 +253,13 @@ export class Renderer {
     return p;
   }
 
-  _addOrientedPlate(x, y, geo, mat, height, dir, shiftBack = true) {
+  _addOrientedPlate(x, y, geo, mat, height, dir, shiftBack = true, parent = null) {
     const mesh = new THREE.Mesh(geo, mat);
     const p = this.gridToWorld(x, y);
     const shift = shiftBack ? this._plateShiftBack(dir) : { x: 0, z: 0 };
     mesh.position.set(p.x + shift.x, height / 2, p.z + shift.z);
     mesh.rotation.y = this._plateRotation(dir);
-    this.scene.add(mesh);
+    (parent || this.scene).add(mesh);
     return mesh;
   }
 
@@ -239,26 +267,18 @@ export class Renderer {
   _addCornerPlate(x, y, geoHalf, mat, height, inDir, outDir) {
     const g = new THREE.Group();
     const center = this.gridToWorld(x, y);
-    const quarter = CELL_SIZE * 0.25;
+    this._addTrailArm(g, center, geoHalf, mat, height, inDir, false);
+    this._addTrailArm(g, center, geoHalf, mat, height, outDir, true);
+    this.scene.add(g);
+    return g;
+  }
 
-    const inArm = new THREE.Mesh(geoHalf, mat);
-    inArm.position.set(
-      center.x - DX[inDir] * quarter,
-      height / 2,
-      center.z - DY[inDir] * quarter,
-    );
-    inArm.rotation.y = this._plateRotation(inDir);
-    g.add(inArm);
-
-    const outArm = new THREE.Mesh(geoHalf, mat);
-    outArm.position.set(
-      center.x + DX[outDir] * quarter,
-      height / 2,
-      center.z + DY[outDir] * quarter,
-    );
-    outArm.rotation.y = this._plateRotation(outDir);
-    g.add(outArm);
-
+  /** Straight cell before a turn: extend from center to the corner cell. */
+  _addPreCornerPlate(x, y, geo, geoHalf, mat, height, outDir) {
+    const g = new THREE.Group();
+    const center = this.gridToWorld(x, y);
+    this._addOrientedPlate(x, y, geo, mat, height, outDir, true, g);
+    this._addTrailArm(g, center, geoHalf, mat, height, outDir, true);
     this.scene.add(g);
     return g;
   }
@@ -282,6 +302,8 @@ export class Renderer {
       let mesh;
       if (inDir !== outDir) {
         mesh = this._addCornerPlate(x, y, this.trailCornerArmGeo, mat, TRAIL_H, inDir, outDir);
+      } else if (this._isPreCornerCell(grid, x, y, outDir)) {
+        mesh = this._addPreCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
       } else {
         mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
       }
