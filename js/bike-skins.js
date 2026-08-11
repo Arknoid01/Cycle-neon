@@ -21,7 +21,9 @@ export const BIKE_SKINS = [
     name: 'Phantom',
     desc: 'Anneaux lumineux · profil fantôme',
     tier: 'premium',
-    kit: 'phantom',
+    kit: 'gltf',
+    model: 'assets/bikes/phantom.glb',
+    fallbackKit: 'phantom',
     chassisId: 'blade',
   },
   {
@@ -29,7 +31,9 @@ export const BIKE_SKINS = [
     name: 'Vanguard',
     desc: 'Pylônes latéraux · présence lourde',
     tier: 'premium',
-    kit: 'vanguard',
+    kit: 'gltf',
+    model: 'assets/bikes/vanguard.glb',
+    fallbackKit: 'vanguard',
     chassisId: 'tank',
   },
   {
@@ -37,7 +41,9 @@ export const BIKE_SKINS = [
     name: 'Specter',
     desc: 'Aileron dorsal · nez bifide',
     tier: 'premium',
-    kit: 'specter',
+    kit: 'gltf',
+    model: 'assets/bikes/specter.glb',
+    fallbackKit: 'specter',
     chassisId: 'blade',
   },
   {
@@ -45,7 +51,9 @@ export const BIKE_SKINS = [
     name: 'Pulse',
     desc: 'Cœur sphérique · lignes douces',
     tier: 'earn',
-    kit: 'pulse',
+    kit: 'gltf',
+    model: 'assets/bikes/pulse.glb',
+    fallbackKit: 'pulse',
     chassisId: 'racer',
     unlockChallenge: 'win_classique',
   },
@@ -54,7 +62,9 @@ export const BIKE_SKINS = [
     name: 'Inferno',
     desc: 'Avant agressif · éclats de feu',
     tier: 'premium',
-    kit: 'inferno',
+    kit: 'gltf',
+    model: 'assets/bikes/inferno.glb',
+    fallbackKit: 'inferno',
     chassisId: 'tank',
   },
   {
@@ -62,7 +72,9 @@ export const BIKE_SKINS = [
     name: 'Chrome',
     desc: 'Carrosserie miroir · strips minimaux',
     tier: 'premium',
-    kit: 'chrome',
+    kit: 'gltf',
+    model: 'assets/bikes/chrome.glb',
+    fallbackKit: 'chrome',
     chassisId: 'classic',
   },
 ];
@@ -79,4 +91,8 @@ export function getBikeSkin(id) {
 
 export function getDefaultSkinId() {
   return BIKE_SKINS[0].id;
+}
+
+export function getGltfSkins() {
+  return BIKE_SKINS.filter(s => s.model);
 }

@@ -4,6 +4,9 @@ import { UI } from './ui.js';
 import { pickArena, saveArenaPref } from './arenas.js';
 import { Championship, loadChampBest, saveChampBest } from './championship.js';
 import { getSettings } from './settings.js';
+import { preloadBikeModels } from './bike-model-loader.js';
+import { BIKE_SKINS } from './bike-skins.js';
+import { getUnlockedSkinIds } from './skin-unlocks.js';
 import {
   initAudio, unlockAudio, updateEngineSound, updateGameplayIntensity, stopEngine, setMasterVolume,
   playTurn, playWallShift, playWallWarn, playNearMissBonus, playCrash,
@@ -27,6 +30,7 @@ async function beginRun(arena, options = {}) {
   ui.stopBikePreview();
   menuVisible = false;
   if (!renderer.scene) await renderer.init();
+  preloadUnlockedModels();
   renderer.clearAll(options.riderDefs);
   renderer.setBloomEnabled(getSettings().bloom);
   sim.reset(arena.id, options);
@@ -45,6 +49,12 @@ function startArena(id) {
 }
 
 const championship = new Championship();
+
+function preloadUnlockedModels() {
+  const ids = new Set(getUnlockedSkinIds());
+  const skins = BIKE_SKINS.filter(s => s.model && ids.has(s.id));
+  preloadBikeModels(skins);
+}
 
 function startChampionship() {
   gameMode = 'championship';
@@ -164,6 +174,7 @@ function gameLoop(now) {
 ui.applyScoreColor();
 ui.buildHomeMenu();
 ui.showMenu();
+preloadUnlockedModels();
 ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship);
 setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => {
