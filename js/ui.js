@@ -43,6 +43,7 @@ export class UI {
     this.optVolume = document.getElementById('opt-volume');
     this.optHaptic = document.getElementById('opt-haptic');
     this.optBloom = document.getElementById('opt-bloom');
+    this.optBikeDebug = document.getElementById('opt-bike-debug');
 
     this.screenEls = {};
     for (const id of SCREENS) {
@@ -58,6 +59,7 @@ export class UI {
     this.onContinueChampionship = null;
     this.overlayMode = 'menu';
     this.onSettingsChange = null;
+    this.onBikeDebugChange = null;
   }
 
   applyScoreColor() {
@@ -178,6 +180,7 @@ export class UI {
     if (this.optVolume) this.optVolume.value = Math.round(s.volume * 100);
     if (this.optHaptic) this.optHaptic.checked = s.haptic;
     if (this.optBloom) this.optBloom.checked = s.bloom;
+    if (this.optBikeDebug) this.optBikeDebug.checked = s.bikeDebug;
   }
 
   applySettings() {
@@ -198,6 +201,10 @@ export class UI {
     this.optBloom?.addEventListener('change', () => {
       const s = saveSettings({ bloom: this.optBloom.checked });
       this.onSettingsChange?.(s);
+    });
+    this.optBikeDebug?.addEventListener('change', () => {
+      const s = saveSettings({ bikeDebug: this.optBikeDebug.checked });
+      this.onBikeDebugChange?.(s.bikeDebug);
     });
     this.applySettings();
   }

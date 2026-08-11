@@ -3,7 +3,8 @@ import { Renderer } from './renderer.js';
 import { UI } from './ui.js';
 import { pickArena, saveArenaPref } from './arenas.js';
 import { Championship, loadChampBest, saveChampBest } from './championship.js';
-import { getSettings } from './settings.js';
+import { getSettings, saveSettings } from './settings.js';
+import { BikeSpriteDebug } from './bike-sprite-debug.js';
 import {
   initAudio, unlockAudio, updateEngineSound, updateGameplayIntensity, stopEngine, setMasterVolume,
   playTurn, playWallShift, playWallWarn, playNearMissBonus, playCrash,
@@ -14,6 +15,7 @@ const sim = new Simulation();
 const renderer = new Renderer(document.getElementById('game'));
 const ui = new UI();
 const championship = new Championship();
+const bikeSpriteDebug = new BikeSpriteDebug(renderer);
 
 let currentArena = null;
 let introUntil = 0;
@@ -35,6 +37,7 @@ async function beginRun(arena, options = {}) {
   ui.showControls();
   ui.updateHud(sim, currentArena, performance.now(), true, gameMode === 'championship' ? championship : null);
   updateEngineSound(sim.score, sim.getIntensity());
+  if (getSettings().bikeDebug) bikeSpriteDebug.setVisible(true);
 }
 
 function startArena(id) {
@@ -60,6 +63,9 @@ function showMenu() {
   gameMode = 'arcade';
   sim.playing = false;
   championship.active = false;
+  bikeSpriteDebug.setVisible(false);
+  saveSettings({ bikeDebug: false });
+  ui.syncOptionsUI();
   ui.showMenu();
 }
 
@@ -162,6 +168,8 @@ ui.applyScoreColor();
 ui.buildHomeMenu();
 ui.showMenu();
 ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship);
+ui.onBikeDebugChange = (on) => bikeSpriteDebug.setVisible(on);
+if (getSettings().bikeDebug) bikeSpriteDebug.setVisible(true);
 setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => renderer.resize());
 requestAnimationFrame(gameLoop);
