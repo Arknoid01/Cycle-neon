@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import {
   CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, TRAIL_PLATE_LEN, PERIM_H,
   CAM_DIR_ANGLES, BIKE_DIR_ANGLES, DX, DY, TRAIL_OPACITY, WALL_CUBE_SIZE,
+  TRAIL_ARM_LEN, TRAIL_ARM_OFFSET,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
@@ -63,7 +64,8 @@ export class Renderer {
     this.wallCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, WALL_H, WALL_CUBE_SIZE);
     this.perimCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, PERIM_H, WALL_CUBE_SIZE);
     this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN);
-    this.trailCornerArmGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN * 0.5);
+    this.trailCornerArmGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_ARM_LEN);
+    this.trailCornerCapGeo = new THREE.BoxGeometry(TRAIL_THICK * 1.5, TRAIL_H, TRAIL_THICK * 1.5);
     this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = this._createWallMat(0x3b0764, 0x7c3aed, 0.95);
@@ -207,13 +209,12 @@ export class Renderer {
   }
 
   _addTrailArmLocal(group, geoHalf, mat, height, dir, towardEdge) {
-    const quarter = CELL_SIZE * 0.25;
     const sign = towardEdge ? 1 : -1;
     const arm = new THREE.Mesh(geoHalf, mat);
     arm.position.set(
-      DX[dir] * quarter * sign,
+      DX[dir] * TRAIL_ARM_OFFSET * sign,
       height / 2,
-      DY[dir] * quarter * sign,
+      DY[dir] * TRAIL_ARM_OFFSET * sign,
     );
     arm.rotation.y = this._plateRotation(dir);
     group.add(arm);
@@ -238,6 +239,15 @@ export class Renderer {
     const nextOut = grid.getTrailDir(nx, ny);
     const nextIn = grid.getTrailInDir(nx, ny);
     return nextIn !== nextOut && nextIn === outDir;
+  }
+
+  _isPostCornerCell(grid, x, y, outDir) {
+    const px = x - DX[outDir];
+    const py = y - DY[outDir];
+    if (!grid.inBounds(px, py) || !isTrail(grid.get(px, py))) return false;
+    const prevOut = grid.getTrailDir(px, py);
+    const prevIn = grid.getTrailInDir(px, py);
+    return prevIn !== prevOut && prevOut === outDir;
   }
 
   _isMobileCell(x, y, wallSystem) {
@@ -274,11 +284,14 @@ export class Renderer {
     return p;
   }
 
-  /** L-corner: each arm runs from a cell edge to the center. */
+  /** L-corner: each arm runs from a cell edge to the center (+ cap). */
   _addCornerPlate(x, y, geoHalf, mat, height, inDir, outDir) {
     const g = this._createTrailCellGroup(x, y);
     this._addTrailArmLocal(g, geoHalf, mat, height, inDir, false);
     this._addTrailArmLocal(g, geoHalf, mat, height, outDir, true);
+    const cap = new THREE.Mesh(this.trailCornerCapGeo, mat);
+    cap.position.y = height / 2;
+    g.add(cap);
     return g;
   }
 
@@ -287,6 +300,14 @@ export class Renderer {
     const g = this._createTrailCellGroup(x, y);
     this._addOrientedPlateLocal(geo, mat, height, outDir, g);
     this._addTrailArmLocal(g, geoHalf, mat, height, outDir, true);
+    return g;
+  }
+
+  /** Straight cell after a turn: extend back toward the corner cell. */
+  _addPostCornerPlate(x, y, geo, geoHalf, mat, height, outDir) {
+    const g = this._createTrailCellGroup(x, y);
+    this._addOrientedPlateLocal(geo, mat, height, outDir, g);
+    this._addTrailArmLocal(g, geoHalf, mat, height, outDir, false);
     return g;
   }
 
@@ -300,6 +321,22 @@ export class Renderer {
     return this._plateRotation(dir);
   }
 
+  _buildTrailMesh(x, y, grid, type) {
+    const mat = this.trailMats[type - TRAIL_BASE];
+    const outDir = grid.getTrailDir(x, y);
+    const inDir = grid.getTrailInDir(x, y);
+    if (inDir !== outDir) {
+      return this._addCornerPlate(x, y, this.trailCornerArmGeo, mat, TRAIL_H, inDir, outDir);
+    }
+    if (this._isPostCornerCell(grid, x, y, outDir)) {
+      return this._addPostCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
+    }
+    if (this._isPreCornerCell(grid, x, y, outDir)) {
+      return this._addPreCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
+    }
+    return this._addStraightTrailPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
+  }
+
   _setCellMesh(x, y, type, grid, wallSystem) {
     const key = this._cellKey(x, y);
     const existing = this.cellMeshes.get(key);
@@ -309,19 +346,19 @@ export class Renderer {
     }
 
     if (isTrail(type)) {
-      const mat = this.trailMats[type - TRAIL_BASE];
       const outDir = grid.getTrailDir(x, y);
       const inDir = grid.getTrailInDir(x, y);
-      let mesh;
-      if (inDir !== outDir) {
-        mesh = this._addCornerPlate(x, y, this.trailCornerArmGeo, mat, TRAIL_H, inDir, outDir);
-      } else if (this._isPreCornerCell(grid, x, y, outDir)) {
-        mesh = this._addPreCornerPlate(x, y, this.trailPlateGeo, this.trailCornerArmGeo, mat, TRAIL_H, outDir);
-      } else {
-        mesh = this._addStraightTrailPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
-      }
+      const mesh = this._buildTrailMesh(x, y, grid, type);
       mesh.userData.isTrail = true;
       this.cellMeshes.set(key, mesh);
+
+      if (inDir !== outDir) {
+        const px = x - DX[inDir];
+        const py = y - DY[inDir];
+        if (grid.inBounds(px, py) && isTrail(grid.get(px, py))) {
+          this._setCellMesh(px, py, grid.get(px, py), grid, wallSystem);
+        }
+      }
       return;
     }
 
