@@ -58,7 +58,7 @@ export class Renderer {
     this.wallPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, WALL_H, TRAIL_PLATE_LEN);
     this.perimPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, PERIM_H, TRAIL_PLATE_LEN);
     this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN);
-    this.trailHalfPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN * 0.5);
+    this.trailCornerArmGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, CELL_SIZE * 0.5);
     this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = createElectricMaterial({
@@ -206,9 +206,18 @@ export class Renderer {
     };
   }
 
-  /** Front edge of a plate on (gx, gy) facing `dir`, for linking segments. */
-  _plateFrontEdge(gx, gy, dir, out) {
+  /** Front edge of a trail plate on (gx, gy), for linking live segments. */
+  _plateFrontEdge(gx, gy, dir, out, grid = null) {
     const p = this.gridToWorld(gx, gy, out);
+    if (grid) {
+      const outDir = grid.getTrailDir(gx, gy);
+      const inDir = grid.getTrailInDir(gx, gy);
+      if (inDir !== outDir) {
+        p.x += DX[outDir] * CELL_SIZE * 0.5;
+        p.z += DY[outDir] * CELL_SIZE * 0.5;
+        return p;
+      }
+    }
     const shift = this._plateShiftBack(dir);
     const half = TRAIL_PLATE_LEN * 0.5;
     p.x += shift.x + DX[dir] * half;
@@ -226,22 +235,29 @@ export class Renderer {
     return mesh;
   }
 
+  /** L-corner: each arm runs from a cell edge to the center. */
   _addCornerPlate(x, y, geoHalf, mat, height, inDir, outDir) {
     const g = new THREE.Group();
     const center = this.gridToWorld(x, y);
-    const quarter = TRAIL_PLATE_LEN * 0.25;
+    const quarter = CELL_SIZE * 0.25;
 
-    for (const dir of [inDir, outDir]) {
-      const arm = new THREE.Mesh(geoHalf, mat);
-      const shift = this._plateShiftBack(dir);
-      arm.position.set(
-        center.x + shift.x + DX[dir] * quarter,
-        height / 2,
-        center.z + shift.z + DY[dir] * quarter,
-      );
-      arm.rotation.y = this._plateRotation(dir);
-      g.add(arm);
-    }
+    const inArm = new THREE.Mesh(geoHalf, mat);
+    inArm.position.set(
+      center.x - DX[inDir] * quarter,
+      height / 2,
+      center.z - DY[inDir] * quarter,
+    );
+    inArm.rotation.y = this._plateRotation(inDir);
+    g.add(inArm);
+
+    const outArm = new THREE.Mesh(geoHalf, mat);
+    outArm.position.set(
+      center.x + DX[outDir] * quarter,
+      height / 2,
+      center.z + DY[outDir] * quarter,
+    );
+    outArm.rotation.y = this._plateRotation(outDir);
+    g.add(outArm);
 
     this.scene.add(g);
     return g;
@@ -265,7 +281,7 @@ export class Renderer {
       const inDir = grid.getTrailInDir(x, y);
       let mesh;
       if (inDir !== outDir) {
-        mesh = this._addCornerPlate(x, y, this.trailHalfPlateGeo, mat, TRAIL_H, inDir, outDir);
+        mesh = this._addCornerPlate(x, y, this.trailCornerArmGeo, mat, TRAIL_H, inDir, outDir);
       } else {
         mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, outDir);
       }
@@ -402,7 +418,7 @@ export class Renderer {
 
   _updateLiveTrail(lt, rider, bikeMesh, grid) {
     const dir = grid?.getTrailDir(rider.prevX, rider.prevY) ?? rider.dir;
-    const join = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2);
+    const join = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2, grid);
     const rear = this._bikeRearWorld(rider, bikeMesh, this._worldPos);
     const seg = lt.userData.segment;
     const dx = join.x - rear.x;
