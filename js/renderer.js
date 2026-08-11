@@ -3,8 +3,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {
-  CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, PERIM_H,
-  CAM_DIR_ANGLES, BIKE_DIR_ANGLES, ARENA_BORDER,
+  CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, TRAIL_PLATE_LEN, PERIM_H,
+  CAM_DIR_ANGLES, BIKE_DIR_ANGLES, ARENA_BORDER, DX, DY,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
@@ -55,9 +55,9 @@ export class Renderer {
 
     this.scene.add(new THREE.AmbientLight(0x223355, 0.18));
 
-    this.wallPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, WALL_H, CELL_SIZE * 0.92);
-    this.perimPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, PERIM_H, CELL_SIZE * 0.92);
-    this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, CELL_SIZE * 0.92);
+    this.wallPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, WALL_H, TRAIL_PLATE_LEN);
+    this.perimPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, PERIM_H, TRAIL_PLATE_LEN);
+    this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, TRAIL_PLATE_LEN);
     this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = createElectricMaterial({
@@ -198,10 +198,28 @@ export class Renderer {
     return BIKE_DIR_ANGLES[dir];
   }
 
-  _addOrientedPlate(x, y, geo, mat, height, dir) {
+  _plateShiftBack(dir) {
+    return {
+      x: -DX[dir] * CELL_SIZE * 0.5,
+      z: -DY[dir] * CELL_SIZE * 0.5,
+    };
+  }
+
+  /** Front edge of a plate on (gx, gy) facing `dir`, for linking segments. */
+  _plateFrontEdge(gx, gy, dir, out) {
+    const p = this.gridToWorld(gx, gy, out);
+    const shift = this._plateShiftBack(dir);
+    const half = TRAIL_PLATE_LEN * 0.5;
+    p.x += shift.x + DX[dir] * half;
+    p.z += shift.z + DY[dir] * half;
+    return p;
+  }
+
+  _addOrientedPlate(x, y, geo, mat, height, dir, shiftBack = true) {
     const mesh = new THREE.Mesh(geo, mat);
     const p = this.gridToWorld(x, y);
-    mesh.position.set(p.x, height / 2, p.z);
+    const shift = shiftBack ? this._plateShiftBack(dir) : { x: 0, z: 0 };
+    mesh.position.set(p.x + shift.x, height / 2, p.z + shift.z);
     mesh.rotation.y = this._plateRotation(dir);
     this.scene.add(mesh);
     return mesh;
@@ -223,6 +241,7 @@ export class Renderer {
       const mat = this.trailMats[type - TRAIL_BASE];
       const dir = grid.getTrailDir(x, y);
       const mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, dir);
+      mesh.userData.isTrail = true;
       this.cellMeshes.set(key, mesh);
       return;
     }
@@ -353,17 +372,18 @@ export class Renderer {
     };
   }
 
-  _updateLiveTrail(lt, rider, bikeMesh) {
-    const prev = this.gridToWorld(rider.prevX, rider.prevY, this._worldPos2);
+  _updateLiveTrail(lt, rider, bikeMesh, grid) {
+    const dir = grid?.getTrailDir(rider.prevX, rider.prevY) ?? rider.dir;
+    const join = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2);
     const rear = this._bikeRearWorld(rider, bikeMesh, this._worldPos);
     const seg = lt.userData.segment;
-    const dx = rear.x - prev.x;
-    const dz = rear.z - prev.z;
+    const dx = join.x - rear.x;
+    const dz = join.z - rear.z;
     const dist = Math.hypot(dx, dz);
     if (dist > 0.02) {
       seg.visible = true;
-      seg.position.set((rear.x + prev.x) / 2, TRAIL_H / 2, (rear.z + prev.z) / 2);
-      seg.rotation.y = bikeMesh?.rotation.y ?? this._trailRotation(rider.dir);
+      seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
+      seg.rotation.y = bikeMesh?.rotation.y ?? this._trailRotation(dir);
       seg.scale.set(1, 1, dist);
     } else {
       seg.visible = false;
@@ -379,7 +399,11 @@ export class Renderer {
     return this.riderMeshes.get(rider.id);
   }
 
-  syncRiders(riders, playing, now = performance.now()) {
+  syncRiders(riders, playing, now = performance.now(), grid = null) {
+    for (const m of this.cellMeshes.values()) {
+      if (m.userData?.isTrail) m.visible = true;
+    }
+
     for (const r of riders) {
       if (!r.alive) {
         const mesh = this.riderMeshes.get(r.id);
@@ -399,6 +423,10 @@ export class Renderer {
       r.smoothAngle += diff * 0.28;
       mesh.rotation.y = r.smoothAngle;
 
+      const underKey = this._cellKey(r.x, r.y);
+      const underMesh = this.cellMeshes.get(underKey);
+      if (underMesh?.userData?.isTrail) underMesh.visible = false;
+
       if (playing) {
         let lt = this.liveTrails.get(r.id);
         if (!lt) {
@@ -406,7 +434,7 @@ export class Renderer {
           this.scene.add(lt);
           this.liveTrails.set(r.id, lt);
         }
-        this._updateLiveTrail(lt, r, mesh);
+        this._updateLiveTrail(lt, r, mesh, grid);
       }
     }
   }
