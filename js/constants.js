@@ -20,7 +20,9 @@ export const WALL_H = 1.45;
 export const TRAIL_H = 1.25;
 export const TRAIL_THICK = 0.06;
 /** Plate length along travel axis — slight overlap to hide gaps between cells. */
-export const TRAIL_PLATE_LEN = CELL_SIZE * 1.08;
+export const TRAIL_PLATE_LEN = CELL_SIZE * 1.1;
+export const TRAIL_ARM_LEN = CELL_SIZE * 0.54;
+export const TRAIL_ARM_OFFSET = CELL_SIZE * 0.27;
 export const TRAIL_OPACITY = 0.8;
 export const WALL_CUBE_SIZE = CELL_SIZE * 1.02;
 export const PERIM_H = 1.95;
