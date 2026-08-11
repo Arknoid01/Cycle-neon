@@ -12,60 +12,18 @@ const VERT = /* glsl */`
 const FRAG = /* glsl */`
   uniform vec3 uColor;
   uniform vec3 uSparkColor;
-  uniform float uTime;
-  uniform float uSpeed;
   uniform float uIntensity;
-  uniform float uScale;
   uniform float uBody;
-  uniform vec3 uAlongDir;
   uniform vec3 uAcrossDir;
 
   varying vec3 vLocalPos;
 
-  float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-  }
-
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-  }
-
   void main() {
-    float t = uTime * uSpeed;
-    float along = dot(vLocalPos, uAlongDir) * uScale + t * 0.35;
     float across = dot(vLocalPos, uAcrossDir);
-
-    float band = exp(-across * across * 38.0);
-
-    float n = noise(vec2(along * 1.8, uTime * 0.12)) * 0.1;
-    float zig = sin(along * 11.0 + t * 1.0) * 0.32;
-    float zig2 = sin(along * 17.5 - t * 1.6) * 0.16;
-    float center = zig + zig2 + n;
-
-    float dist = abs(across - center);
-    float bolt = smoothstep(0.11, 0.0, dist);
-    float boltCore = smoothstep(0.038, 0.0, dist);
-
-    float runner = smoothstep(0.86, 1.0, sin(along * 9.0 - t * 1.2));
-    float spark = boltCore * runner;
-
-    vec3 body = uColor * band * uBody * 0.35;
-    body *= (1.0 - boltCore * 0.65);
-
-    vec3 elecHalo = mix(uColor, uSparkColor, 0.32) * bolt * uIntensity * 0.38;
-    vec3 elecCore = uSparkColor * boltCore * uIntensity * 1.5;
-    vec3 flash = uSparkColor * spark * 2.0;
-
-    vec3 col = body + elecHalo + elecCore + flash;
-    float alpha = clamp(band * uBody * 0.35 + bolt * 0.55 + boltCore * 0.95, 0.0, 1.0);
-
+    float band = exp(-across * across * 32.0);
+    vec3 core = mix(uColor, uSparkColor, 0.22);
+    vec3 col = core * uIntensity * band;
+    float alpha = band * clamp(uBody + 0.4, 0.0, 1.0);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -74,19 +32,15 @@ const AXIS_Y = new THREE.Vector3(0, 1, 0);
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 const AXIS_X = new THREE.Vector3(1, 0, 0);
 
-/** @param {{ color: number, sparkColor?: number, speed?: number, intensity?: number, scale?: number, body?: number, alongDir?: THREE.Vector3, acrossDir?: THREE.Vector3 }} opts */
+/** @param {{ color: number, sparkColor?: number, intensity?: number, body?: number, alongDir?: THREE.Vector3, acrossDir?: THREE.Vector3 }} opts */
 export function createElectricMaterial(opts) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uColor: { value: new THREE.Color(opts.color) },
       uSparkColor: { value: new THREE.Color(opts.sparkColor ?? 0xcccccc) },
-      uTime: { value: 0 },
-      uSpeed: { value: opts.speed ?? 0.75 },
       uIntensity: { value: opts.intensity ?? 0.95 },
-      uScale: { value: opts.scale ?? 1.1 },
       uBody: { value: opts.body ?? 0.55 },
-      uAlongDir: { value: (opts.alongDir ?? AXIS_Y).clone() },
-      uAcrossDir: { value: (opts.acrossDir ?? AXIS_Z).clone() },
+      uAcrossDir: { value: (opts.acrossDir ?? AXIS_X).clone() },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -94,18 +48,15 @@ export function createElectricMaterial(opts) {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
-  mat.userData.baseSpeed = opts.speed ?? 0.75;
   mat.userData.baseIntensity = opts.intensity ?? 0.95;
   return mat;
 }
 
-export function updateElectricMaterial(mat, timeSec, overrides = {}) {
+export function updateElectricMaterial(mat, overrides = {}) {
   if (!mat?.uniforms) return;
-  mat.uniforms.uTime.value = timeSec;
-  const speed = overrides.speed ?? mat.uniforms.uSpeed.value;
-  const intensity = overrides.intensity ?? mat.uniforms.uIntensity.value;
-  mat.uniforms.uSpeed.value = speed;
-  mat.uniforms.uIntensity.value = intensity;
+  if (overrides.intensity !== undefined) {
+    mat.uniforms.uIntensity.value = overrides.intensity;
+  }
 }
 
 export function setElectricColor(mat, color, sparkColor) {

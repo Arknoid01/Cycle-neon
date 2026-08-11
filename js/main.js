@@ -135,7 +135,6 @@ function handleEvents(events, now) {
 function gameLoop(now) {
   if (renderer.scene) {
     sim.updateRenderPositions(now);
-    renderer.updateShaders(now);
     renderer.syncRiders(sim.riders, sim.playing, now);
     renderer.updateCamera(sim.getPlayer());
     renderer.syncMobileWarnings(sim.walls, now);
