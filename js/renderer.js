@@ -12,7 +12,9 @@ import { gridDimensions } from './grid.js';
 import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 import {
   loadBikeSpriteSheet, createBikeFrameMaterials, bikeSpriteTint,
-  BIKE_SPRITE_W, BIKE_SPRITE_H, BIKE_SPRITE_Y, BIKE_REAR_OFFSET, BIKE_SPRITE_FLIP,
+  BIKE_SPRITE_W, BIKE_SPRITE_H, BIKE_SPRITE_Y, BIKE_REAR_OFFSET,
+  getFrameIndexForDir, getBikeSpriteRotation, getBikeSpriteScaleX,
+  loadBikeSpriteTuningFromStorage,
 } from './bike-sprites.js';
 
 export class Renderer {
@@ -37,6 +39,7 @@ export class Renderer {
     this.trailPlateGeo = null;
     this.liveTrailGeo = null;
     this.bikeSheet = null;
+    this.debugForceSpriteDir = null;
     this.mobileBurstUntil = 0;
     this.smoothCamX = 0;
     this.smoothCamZ = 0;
@@ -88,6 +91,18 @@ export class Renderer {
     this.composer.addPass(this.bloomPass);
 
     this.bikeSheet = await loadBikeSpriteSheet();
+    loadBikeSpriteTuningFromStorage();
+  }
+
+  setDebugForceSpriteDir(dir) {
+    this.debugForceSpriteDir = dir === null || dir === undefined ? null : dir;
+    this.invalidateBikeSpriteFrames();
+  }
+
+  invalidateBikeSpriteFrames() {
+    for (const mesh of this.riderMeshes.values()) {
+      if (mesh.userData.isSprite) mesh.userData.frameKey = null;
+    }
   }
 
   _trackElectric(mat) {
@@ -408,7 +423,7 @@ export class Renderer {
     g.add(plane);
     g.userData.sprite = plane;
     g.userData.frameMats = mats;
-    g.userData.frameDir = 0;
+    g.userData.frameKey = null;
     g.userData.isSprite = true;
     return g;
   }
@@ -498,8 +513,11 @@ export class Renderer {
 
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
+    const spriteDir = bikeMesh?.userData?.isSprite && this.debugForceSpriteDir !== null
+      ? this.debugForceSpriteDir
+      : rider.dir;
     const angle = bikeMesh?.userData?.isSprite
-      ? BIKE_DIR_ANGLES[rider.dir]
+      ? getBikeSpriteRotation(spriteDir)
       : (bikeMesh?.rotation.y ?? rider.smoothAngle);
     const backOff = bikeMesh?.userData?.isSprite ? BIKE_REAR_OFFSET : 0.38;
     const fx = Math.sin(angle);
@@ -536,7 +554,7 @@ export class Renderer {
       seg.visible = true;
       seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
       seg.rotation.y = bikeMesh?.userData?.isSprite
-        ? BIKE_DIR_ANGLES[rider.dir]
+        ? getBikeSpriteRotation(this.debugForceSpriteDir ?? rider.dir)
         : (bikeMesh?.rotation.y ?? this._trailRotation(dir));
       seg.scale.set(1, 1, dist);
     } else {
@@ -575,11 +593,16 @@ export class Renderer {
 
       if (mesh.userData.isSprite) {
         const sprite = mesh.userData.sprite;
-        if (mesh.userData.frameDir !== r.dir) {
-          mesh.userData.frameDir = r.dir;
-          sprite.material = mesh.userData.frameMats[r.dir];
+        const spriteDir = this.debugForceSpriteDir ?? r.dir;
+        const frameIdx = getFrameIndexForDir(spriteDir);
+        const frameKey = `${spriteDir}:${frameIdx}`;
+        if (mesh.userData.frameKey !== frameKey) {
+          mesh.userData.frameKey = frameKey;
+          sprite.material = mesh.userData.frameMats[frameIdx];
         }
-        sprite.rotation.y = BIKE_DIR_ANGLES[r.dir] + (BIKE_SPRITE_FLIP[r.dir] ? Math.PI : 0);
+        sprite.rotation.y = getBikeSpriteRotation(spriteDir);
+        sprite.scale.x = getBikeSpriteScaleX(spriteDir);
+        sprite.scale.y = 1;
         mesh.rotation.y = 0;
       } else {
         const targetAngle = BIKE_DIR_ANGLES[r.dir];
