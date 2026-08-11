@@ -14,25 +14,57 @@ export class BikeSpriteDebug {
     this.dirLabel = document.getElementById('bsd-dir-label');
     this.frameLabel = document.getElementById('bsd-frame-label');
     this.rotLabel = document.getElementById('bsd-rot-label');
+    this.bikeLabel = document.getElementById('bsd-bike-label');
     this.exportOut = document.getElementById('bsd-export');
     this.copyStatus = document.getElementById('bsd-copy-status');
     this.selectedDir = 0;
-    this.forcePreview = false;
+    this.sandbox = null;
+    this.selectedBikeId = 0;
     this.visible = false;
 
     if (!this.panel) return;
     this._bindControls();
   }
 
+  enterSandbox(sandbox) {
+    this.sandbox = sandbox;
+    this.selectedBikeId = 0;
+    this.setVisible(true);
+    this._syncDirFromSandbox();
+  }
+
+  exitSandbox() {
+    this.sandbox = null;
+    this.setVisible(false);
+  }
+
+  onSandboxBikeSelected(bikeId) {
+    this.selectedBikeId = bikeId;
+    this._syncDirFromSandbox();
+    this._refreshLabels();
+    this._highlightBikeButtons();
+  }
+
+  onSandboxBikeDirChanged(bikeId, dir) {
+    if (bikeId === this.selectedBikeId) {
+      this.selectedDir = dir;
+      this._refreshLabels();
+    }
+  }
+
+  _syncDirFromSandbox() {
+    if (!this.sandbox) return;
+    const riders = this.sandbox.getRiders();
+    const r = riders.find(x => x.id === this.selectedBikeId);
+    if (r) {
+      this.selectedDir = this.renderer.sandboxDisplayDirs?.get(r.id) ?? r.dir;
+    }
+  }
+
   setVisible(on) {
     this.visible = !!on;
-    this.panel.classList.toggle('hidden', !this.visible);
-    if (!this.visible) {
-      this.renderer.setDebugForceSpriteDir(null);
-      this.forcePreview = false;
-      const cb = document.getElementById('bsd-force-preview');
-      if (cb) cb.checked = false;
-    } else {
+    this.panel?.classList.toggle('hidden', !this.visible);
+    if (this.visible) {
       this._refreshLabels();
       this._updateExport();
     }
@@ -45,9 +77,24 @@ export class BikeSpriteDebug {
   _bindControls() {
     this.panel.querySelectorAll('[data-bsd-dir]').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.selectedDir = Number(btn.dataset.bsdDir);
+        const dir = Number(btn.dataset.bsdDir);
+        this.selectedDir = dir;
+        if (this.sandbox) {
+          this.sandbox.setBikeDir(this.selectedBikeId, dir);
+        }
         this._refreshLabels();
         this._highlightDirButtons();
+      });
+    });
+
+    this.panel.querySelectorAll('[data-bsd-bike]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bikeId = Number(btn.dataset.bsdBike);
+        this.selectedBikeId = bikeId;
+        this.sandbox?.setSelectedBikeId(bikeId);
+        this._syncDirFromSandbox();
+        this._refreshLabels();
+        this._highlightBikeButtons();
       });
     });
 
@@ -99,25 +146,6 @@ export class BikeSpriteDebug {
       }
       setTimeout(() => { this.copyStatus.textContent = ''; }, 2000);
     });
-
-    document.getElementById('bsd-force-preview')?.addEventListener('change', e => {
-      this.forcePreview = e.target.checked;
-      this.renderer.setDebugForceSpriteDir(
-        this.forcePreview ? this.selectedDir : null,
-      );
-    });
-
-    this.panel.querySelectorAll('[data-bsd-preview-dir]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const dir = Number(btn.dataset.bsdPreviewDir);
-        this.selectedDir = dir;
-        this._highlightDirButtons();
-        this._refreshLabels();
-        if (this.forcePreview) {
-          this.renderer.setDebugForceSpriteDir(dir);
-        }
-      });
-    });
   }
 
   _nudgeRot(delta) {
@@ -138,9 +166,6 @@ export class BikeSpriteDebug {
     saveBikeSpriteTuningToStorage();
     this._refreshLabels();
     this._updateExport();
-    if (this.forcePreview) {
-      this.renderer.setDebugForceSpriteDir(this.selectedDir);
-    }
   }
 
   _highlightDirButtons() {
@@ -149,8 +174,17 @@ export class BikeSpriteDebug {
     });
   }
 
+  _highlightBikeButtons() {
+    this.panel.querySelectorAll('[data-bsd-bike]').forEach(btn => {
+      btn.classList.toggle('active', Number(btn.dataset.bsdBike) === this.selectedBikeId);
+    });
+  }
+
   _refreshLabels() {
     const d = this.selectedDir;
+    if (this.bikeLabel) {
+      this.bikeLabel.textContent = this.selectedBikeId === 0 ? 'Ma moto' : 'Adversaire';
+    }
     if (this.dirLabel) {
       this.dirLabel.textContent = BIKE_DIR_LABELS[d];
     }
@@ -165,6 +199,7 @@ export class BikeSpriteDebug {
       this.rotLabel.textContent = parts.join(' · ');
     }
     this._highlightDirButtons();
+    this._highlightBikeButtons();
   }
 
   _updateExport() {
