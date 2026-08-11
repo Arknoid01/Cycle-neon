@@ -4,12 +4,11 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {
   CELL_WALL, TRAIL_BASE, isTrail, CELL_SIZE, WALL_H, TRAIL_H, TRAIL_THICK, PERIM_H,
-  CAM_DIR_ANGLES,
-  BIKE_DIR_ANGLES,
+  CAM_DIR_ANGLES, BIKE_DIR_ANGLES, ARENA_BORDER,
 } from './constants.js';
 import { getRiderDefs } from './cosmetics.js';
 import { gridDimensions } from './grid.js';
-import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
+import { createElectricMaterial, updateElectricMaterial, AXIS_X, AXIS_Y } from './electric-shader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -28,7 +27,8 @@ export class Renderer {
     this.matWall = null;
     this.matMobile = null;
     this.matPerimeter = null;
-    this.panelGeo = null;
+    this.wallPlateGeo = null;
+    this.perimPlateGeo = null;
     this.trailPlateGeo = null;
     this.liveTrailGeo = null;
     this.mobileBurstUntil = 0;
@@ -55,21 +55,22 @@ export class Renderer {
 
     this.scene.add(new THREE.AmbientLight(0x223355, 0.18));
 
-    this.panelGeo = new THREE.BoxGeometry(CELL_SIZE * 0.9, 1, CELL_SIZE * 0.14);
+    this.wallPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, WALL_H, CELL_SIZE * 0.92);
+    this.perimPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, PERIM_H, CELL_SIZE * 0.92);
     this.trailPlateGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, CELL_SIZE * 0.92);
     this.liveTrailGeo = new THREE.BoxGeometry(TRAIL_THICK, TRAIL_H, 1);
 
     this.matWall = createElectricMaterial({
-      color: 0x7c3aed, sparkColor: 0xc4b5fd, speed: 0.5, intensity: 1.15, scale: 1.0, body: 0.2,
-      alongDir: AXIS_Y, acrossDir: AXIS_Z,
+      color: 0x7c3aed, sparkColor: 0xc4b5fd, intensity: 1.0, body: 0.5,
+      acrossDir: AXIS_X,
     });
     this.matMobile = createElectricMaterial({
-      color: 0xff6600, sparkColor: 0xffcc88, speed: 0.75, intensity: 1.25, scale: 1.2, body: 0.22,
-      alongDir: AXIS_Y, acrossDir: AXIS_Z,
+      color: 0xff6600, sparkColor: 0xffcc88, intensity: 1.05, body: 0.55,
+      acrossDir: AXIS_X,
     });
     this.matPerimeter = createElectricMaterial({
-      color: 0x9333ea, sparkColor: 0xddd6fe, speed: 0.4, intensity: 1.05, scale: 0.85, body: 0.24,
-      alongDir: AXIS_Y, acrossDir: AXIS_Z,
+      color: 0x9333ea, sparkColor: 0xddd6fe, intensity: 1.0, body: 0.52,
+      acrossDir: AXIS_X,
     });
     this._rebuildTrailMats();
 
@@ -97,8 +98,8 @@ export class Renderer {
     this.trailMats = list.map(d => {
       const mat = createElectricMaterial({
         color: d.trailGlow, sparkColor: d.trail,
-        speed: 1.0, intensity: 1.5, scale: 1.15, body: 0.2,
-        alongDir: AXIS_Z, acrossDir: AXIS_X,
+        intensity: 1.2, body: 0.55,
+        acrossDir: AXIS_X,
       });
       this._trackElectric(mat);
       return mat;
@@ -172,8 +173,42 @@ export class Renderer {
     return false;
   }
 
-  _trailRotation(dir) {
+  _isWallAt(grid, x, y) {
+    if (!grid.inBounds(x, y)) return true;
+    return grid.get(x, y) === CELL_WALL;
+  }
+
+  _inferWallDir(grid, x, y) {
+    const left = this._isWallAt(grid, x - 1, y);
+    const right = this._isWallAt(grid, x + 1, y);
+    const up = this._isWallAt(grid, x, y - 1);
+    const down = this._isWallAt(grid, x, y + 1);
+    const horiz = (left ? 1 : 0) + (right ? 1 : 0);
+    const vert = (up ? 1 : 0) + (down ? 1 : 0);
+    if (horiz > vert) return 1;
+    if (vert > horiz) return 2;
+    if (grid.isPerimeter(x, y)) {
+      if (y < ARENA_BORDER + 1 || y >= grid.h - ARENA_BORDER - 1) return 1;
+      return 2;
+    }
+    return horiz > 0 ? 1 : 2;
+  }
+
+  _plateRotation(dir) {
     return BIKE_DIR_ANGLES[dir];
+  }
+
+  _addOrientedPlate(x, y, geo, mat, height, dir) {
+    const mesh = new THREE.Mesh(geo, mat);
+    const p = this.gridToWorld(x, y);
+    mesh.position.set(p.x, height / 2, p.z);
+    mesh.rotation.y = this._plateRotation(dir);
+    this.scene.add(mesh);
+    return mesh;
+  }
+
+  _trailRotation(dir) {
+    return this._plateRotation(dir);
   }
 
   _setCellMesh(x, y, type, grid, wallSystem) {
@@ -186,33 +221,29 @@ export class Renderer {
 
     if (isTrail(type)) {
       const mat = this.trailMats[type - TRAIL_BASE];
-      const mesh = new THREE.Mesh(this.trailPlateGeo, mat);
-      const p = this.gridToWorld(x, y);
       const dir = grid.getTrailDir(x, y);
-      mesh.position.set(p.x, TRAIL_H / 2, p.z);
-      mesh.rotation.y = this._trailRotation(dir);
-      this.scene.add(mesh);
+      const mesh = this._addOrientedPlate(x, y, this.trailPlateGeo, mat, TRAIL_H, dir);
       this.cellMeshes.set(key, mesh);
       return;
     }
 
-    let mat, h;
+    let mat, geo, h;
     if (type === CELL_WALL && grid.isPerimeter(x, y)) {
       mat = this.matPerimeter;
+      geo = this.perimPlateGeo;
       h = PERIM_H;
     } else if (type === CELL_WALL && this._isMobileCell(x, y, wallSystem)) {
       mat = this.matMobile;
+      geo = this.wallPlateGeo;
       h = WALL_H;
     } else {
       mat = this.matWall;
+      geo = this.wallPlateGeo;
       h = WALL_H;
     }
 
-    const mesh = new THREE.Mesh(this.panelGeo, mat);
-    const p = this.gridToWorld(x, y);
-    mesh.position.set(p.x, h / 2, p.z);
-    mesh.scale.y = h;
-    this.scene.add(mesh);
+    const dir = this._inferWallDir(grid, x, y);
+    const mesh = this._addOrientedPlate(x, y, geo, mat, h, dir);
     this.cellMeshes.set(key, mesh);
   }
 
@@ -222,44 +253,30 @@ export class Renderer {
 
   syncMobileWarnings(wallSystem, now) {
     const lvl = Math.max(0, ...wallSystem.walls.map(w => w.warningLevel));
-    let speed = this.matMobile.userData.baseSpeed;
     let intensity = this.matMobile.userData.baseIntensity;
 
-    if (lvl === 1) { speed = 1.0; intensity = 0.95; }
+    if (lvl === 1) intensity = 0.95;
     else if (lvl === 2) {
-      speed = 1.5 + Math.sin(now / 60) * 0.5;
-      intensity = 1.1 + Math.sin(now / 45) * 0.25;
+      intensity = 1.1 + Math.sin(now / 45) * 0.2;
     }
     else if (lvl === 3) {
-      speed = 2.2 + Math.sin(now / 28) * 0.7;
-      intensity = 1.25 + Math.sin(now / 22) * 0.35;
+      intensity = 1.25 + Math.sin(now / 22) * 0.3;
     }
 
-    if (now < this.mobileBurstUntil) {
-      speed = 3.5;
-      intensity = 1.5;
-    }
+    if (now < this.mobileBurstUntil) intensity = 1.5;
 
-    updateElectricMaterial(this.matMobile, now * 0.001, { speed, intensity });
-  }
-
-  updateShaders(now) {
-    const t = now * 0.001;
-    for (const mat of this.electricMats) {
-      if (mat === this.matMobile) continue;
-      updateElectricMaterial(mat, t);
-    }
+    updateElectricMaterial(this.matMobile, { intensity });
   }
 
   _buildBike(def) {
     const g = new THREE.Group();
     const roofStripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, speed: 1.5, intensity: 1.0, scale: 3.2, body: 0.35,
-      alongDir: AXIS_X, acrossDir: AXIS_Y,
+      color: def.glow, sparkColor: def.wheel, intensity: 0.9, body: 0.45,
+      acrossDir: AXIS_Y,
     });
     const sideStripMat = createElectricMaterial({
-      color: def.glow, sparkColor: def.wheel, speed: 1.5, intensity: 1.0, scale: 3.2, body: 0.35,
-      alongDir: AXIS_Z, acrossDir: AXIS_X,
+      color: def.glow, sparkColor: def.wheel, intensity: 0.9, body: 0.45,
+      acrossDir: AXIS_X,
     });
     this._trackElectric(roofStripMat);
     this._trackElectric(sideStripMat);
@@ -303,8 +320,8 @@ export class Renderer {
     });
 
     const emitterMat = createElectricMaterial({
-      color: def.trailGlow, sparkColor: def.wheel, speed: 2.0, intensity: 1.2, scale: 4.5, body: 0.4,
-      alongDir: AXIS_Y, acrossDir: AXIS_X,
+      color: def.trailGlow, sparkColor: def.wheel, intensity: 1.0, body: 0.5,
+      acrossDir: AXIS_X,
     });
     this._trackElectric(emitterMat);
     const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.14), emitterMat);
