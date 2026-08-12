@@ -300,7 +300,12 @@ html, body {
 .menu-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px); overflow-y: auto; }
 .menu-screen.hidden { display: none; }
 
-.home-header { text-align: center; margin-bottom: 28px; margin-top: 12px; }
+#home-screen {
+  padding-top: calc(env(safe-area-inset-top, 20px) + 22px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 32px);
+}
+
+.home-header { text-align: center; margin-bottom: 28px; margin-top: 20px; }
 .home-title {
   font-family: 'Orbitron', sans-serif; font-size: 24px; font-weight: 900;
   color: var(--neon-cyan); text-shadow: 0 0 20px rgba(0,238,255,0.35); letter-spacing: 5px;
@@ -310,8 +315,8 @@ html, body {
 .home-champ-best { font-size: 10px; color: rgba(255,220,80,.5); margin-top: 6px; }
 
 .home-progress {
-  width: 100%; max-width: 380px; margin-top: auto; padding-top: 18px;
-  flex-shrink: 0;
+  width: 100%; max-width: 380px; margin-top: auto; margin-bottom: 12px;
+  padding-top: 18px; flex-shrink: 0;
 }
 .home-progress-head {
   display: flex; align-items: baseline; justify-content: space-between;
