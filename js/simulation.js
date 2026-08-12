@@ -4,7 +4,7 @@ import { getRiderDefs } from './cosmetics.js';
 import { chooseBotTurn } from './bots.js';
 import {
   DX, DY, CAM_DIR_ANGLES, BIKE_DIR_ANGLES, trailVal, getTickInterval,
-  ARENA_BORDER, CELL_WALL, KILL_BONUS, WIN_BONUS, NEAR_MISS_BONUS, MULTIPLIER_MAX, COMBO_DECAY_TICKS,
+  ARENA_BORDER, CELL_WALL, KILL_BONUS, WIN_BONUS, NEAR_MISS_BONUS, MULTIPLIER_MAX, COMBO_DECAY_TICKS, isTrail,
   CHAMPIONSHIP_RIDERS,
 } from './constants.js';
 
@@ -323,8 +323,15 @@ export class Simulation {
   }
 
   _adjacentBlocked(rider) {
+    const ownTrail = trailVal(rider.id);
     for (let d = 0; d < 4; d++) {
-      if (this.grid.isBlocked(rider.x + DX[d], rider.y + DY[d])) return true;
+      const cell = this.grid.get(rider.x + DX[d], rider.y + DY[d]);
+      if (cell === CELL_WALL) return true;
+      if (isTrail(cell) && cell !== ownTrail) return true;
+    }
+    for (const r of this.riders) {
+      if (!r.alive || r === rider) continue;
+      if (Math.abs(r.x - rider.x) + Math.abs(r.y - rider.y) === 1) return true;
     }
     return false;
   }
