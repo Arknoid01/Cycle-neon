@@ -10,27 +10,60 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
   <title>Light Cycle Neon</title>
 </head>
 <body>
   <canvas id="game"></canvas>
   <div id="ui">
     <div id="game-hud">
-    <div id="hud-top"><div id="arena-name"></div><div id="timer">T : 0.00</div></div>
-    <div id="score">0</div>
-    <div id="high-score"></div>
-    <div id="rivals"></div>
-    <div id="challenge-hud"></div>
-    <div id="multiplier-hud" class="hidden">×1</div>
-    <div id="champ-hud" class="hidden"></div>
+    <div id="hud-bar" class="hud-bar">
+      <div class="hud-panel hud-panel-left">
+        <div id="arena-name" class="hud-arena"></div>
+        <div id="rivals" class="hud-rivals"></div>
+        <div id="challenge-hud" class="hud-challenge"></div>
+      </div>
+      <div id="score-wrap" class="hud-score-wrap">
+        <div class="hud-score-label">SCORE</div>
+        <div id="score">0</div>
+        <div id="high-score" class="hud-best"></div>
+      </div>
+      <div class="hud-panel hud-panel-right">
+        <div id="timer" class="hud-timer">00:00</div>
+        <div id="combo-meter" class="combo-meter combo-idle" data-level="1">
+          <div class="combo-label">COMBO</div>
+          <div id="combo-value" class="combo-value" data-level="1">×1</div>
+          <div class="combo-track"><div id="combo-fill" class="combo-fill" data-level="1"></div></div>
+        </div>
+        <div id="champ-hud" class="hud-champ hidden"></div>
+      </div>
+    </div>
+    <div id="float-layer"></div>
     <div id="overlay" class="hidden">
-      <div id="overlay-title"></div>
-      <div id="overlay-score"></div>
-      <div id="overlay-best"></div>
-      <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
-      <div id="overlay-challenge" class="hidden"></div>
-      <div id="overlay-next"></div>
-      <div id="overlay-hint">Toucher pour revenir au menu</div>
+      <div class="overlay-card">
+        <div id="overlay-badge" class="overlay-badge hidden"></div>
+        <div id="overlay-title"></div>
+        <div id="overlay-score"></div>
+        <div id="overlay-stats" class="overlay-stats"></div>
+        <div id="overlay-best"></div>
+        <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
+        <div id="overlay-trophies" class="overlay-trophies hidden">
+          <div class="trophy-celebrate-head">
+            <span class="trophy-burst">★</span>
+            <span>TROPHÉES DÉBLOQUÉS</span>
+            <span class="trophy-burst">★</span>
+          </div>
+          <div id="trophy-unlock-list" class="trophy-unlock-list"></div>
+        </div>
+        <div id="overlay-next"></div>
+        <div id="overlay-actions" class="overlay-actions hidden">
+          <button type="button" id="overlay-replay" class="overlay-btn overlay-btn-primary">Rejouer</button>
+          <button type="button" id="overlay-menu" class="overlay-btn">Menu</button>
+        </div>
+        <div id="overlay-hint">Toucher pour continuer</div>
+      </div>
     </div>
 
     <div id="arena-intro" class="hidden">

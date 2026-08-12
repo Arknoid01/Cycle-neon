@@ -100,8 +100,20 @@ function continueChampionship() {
   beginChampionshipRound();
 }
 
+function replayLastRun() {
+  ui.overlay.classList.add('hidden');
+  if (gameMode === 'championship' && championship.active) {
+    beginChampionshipRound();
+  } else {
+    startArena(ui.lastArcadeArenaId);
+  }
+}
+
 function handleEvents(events, now) {
   for (const e of events) {
+    if (!['death', 'victory', 'roundEnd'].includes(e.type)) {
+      ui.onGameEvent(e, sim);
+    }
     switch (e.type) {
       case 'wallMove':
         playWallShift();
@@ -120,6 +132,7 @@ function handleEvents(events, now) {
         break;
       case 'wallNear':
         playNearMissBonus();
+        renderer.flashNearMiss();
         break;
       case 'multiplierUp':
         playMultiplierUp();
@@ -180,7 +193,7 @@ ui.applyScoreColor();
 ui.buildHomeMenu();
 ui.showMenu();
 preloadUnlockedModels();
-ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship);
+ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship, replayLastRun);
 setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => {
   renderer.resize();
