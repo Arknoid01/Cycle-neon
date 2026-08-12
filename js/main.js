@@ -118,7 +118,7 @@ function continueChampionship() {
   beginChampionshipRound();
 }
 
-function continueChampionship() {
+function handleEvents(events, now) {
   for (const e of events) {
     if (!['death', 'victory', 'roundEnd'].includes(e.type)) {
       ui.onGameEvent(e, sim);

@@ -528,19 +528,11 @@ export class UI {
   }
 
   bindMenuNavigation() {
-    if (this._menuNavBound || !this.homeMenu) return;
+    if (this._menuNavBound) return;
     this._menuNavBound = true;
-    this.homeMenu.addEventListener('click', (e) => {
-      const tile = e.target.closest('.menu-tile[data-screen]');
-      if (tile?.dataset.screen) {
-        e.preventDefault();
-        this.showScreen(tile.dataset.screen);
-        return;
-      }
-      if (e.target.closest('[data-back]')) {
-        e.preventDefault();
-        this.showScreen('home');
-      }
+    window.addEventListener('lc-menu-nav', (e) => {
+      const id = e.detail?.id;
+      if (id) this.showScreen(id);
     });
   }
 

@@ -1,0 +1,23 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "Jeu arcade Light Cycle — **Three.js / WebGL**, un seul fichier HTML.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arknoid01/Cycle-neon.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Arknoid01/Cycle-neon/issues"
+  },
+  "homepage": "https://github.com/Arknoid01/Cycle-neon#readme",
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
