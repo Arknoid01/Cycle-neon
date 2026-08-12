@@ -84,3 +84,18 @@ export function checkChallenges(stats) {
   }
   return unlocked;
 }
+
+/** Arène ou mode suggéré pour tenter un défi depuis l'écran Trophées. */
+const CHALLENGE_LAUNCH = {
+  compresseur_30: { mode: 'arcade', arenaId: 'compresseur' },
+  win_classique: { mode: 'arcade', arenaId: 'classique' },
+  win_labyrinthe: { mode: 'arcade', arenaId: 'labyrinthe' },
+  win_duel: { mode: 'arcade', arenaId: 'duel' },
+  win_chaos: { mode: 'arcade', arenaId: 'chaos' },
+  vague_45: { mode: 'arcade', arenaId: 'vague' },
+  champ_win: { mode: 'championship' },
+};
+
+export function getChallengeLaunchConfig(challengeId) {
+  return CHALLENGE_LAUNCH[challengeId] ?? { mode: 'arcade', arenaId: 'classique' };
+}

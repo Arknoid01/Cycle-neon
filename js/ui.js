@@ -1,6 +1,7 @@
-import { ARENAS, ARENA_DESC, ARENA_FAMILIES, loadArenaBest, loadHighScore, saveArenaBest, saveHighScore } from './arenas.js';
-import { CHALLENGES, checkChallenges, loadChallenges } from './challenges.js';
-import { recordRunEnd } from './stats.js';
+import { ARENAS, ARENA_DESC, ARENA_FAMILIES, loadArenaBest, loadHighScore, loadArenaPref, saveArenaBest, saveHighScore } from './arenas.js';
+import { CHALLENGES, checkChallenges, loadChallenges, getChallengeLaunchConfig } from './challenges.js';
+import { recordRunEnd, loadLifetimeStats } from './stats.js';
+import { loadChampBest } from './championship.js';
 import {
   COLOR_PRESETS, BIKE_SKINS, SKIN_TIER_LABELS,
   loadCosmetic, saveCosmetic, loadSkin, saveSkin,
@@ -34,10 +35,16 @@ export class UI {
     this.overlayChallenge = document.getElementById('overlay-challenge');
     this.overlayNext = document.getElementById('overlay-next');
     this.overlayHint = document.getElementById('overlay-hint');
+    this.overlayActions = document.getElementById('overlay-actions');
+    this.overlayReplayBtn = document.getElementById('overlay-replay');
+    this.overlayMenuBtn = document.getElementById('overlay-menu');
     this.homeMenu = document.getElementById('home-menu');
     this.homeBest = document.getElementById('home-best');
+    this.homeChampBest = document.getElementById('home-champ-best');
     this.trophySummary = document.getElementById('trophy-summary');
     this.trophiesProgress = document.getElementById('trophies-progress');
+    this.statsPanel = document.getElementById('stats-panel');
+    this.launchChallengeBtn = document.getElementById('launch-challenge');
     this.arenaList = document.getElementById('arena-list');
     this.arenaRandomBtn = document.getElementById('arena-random');
     this.cosmeticPicker = document.getElementById('cosmetic-picker');
@@ -69,7 +76,10 @@ export class UI {
     this.onShowMenu = null;
     this.onStartChampionship = null;
     this.onContinueChampionship = null;
+    this.onLaunchChallenge = null;
+    this.onReplay = null;
     this.overlayMode = 'menu';
+    this.lastArcadeArenaId = 'classique';
     this.onSettingsChange = null;
   }
 
@@ -87,10 +97,53 @@ export class UI {
 
   updateHomeStats() {
     const { count, total } = this.trophyStats();
+    const stats = loadLifetimeStats();
+    const champBest = loadChampBest();
     this.homeBest.textContent = 'Record global : ' + this.highScore.toLocaleString('fr-FR');
+    if (this.homeChampBest) {
+      this.homeChampBest.textContent = champBest > 0
+        ? 'Record championnat : ' + champBest.toLocaleString('fr-FR') + ' pts'
+        : stats.runs > 0
+          ? stats.wins + ' victoire' + (stats.wins > 1 ? 's' : '') + ' · ' + stats.runs + ' partie' + (stats.runs > 1 ? 's' : '')
+          : '';
+    }
     this.trophySummary.textContent = count + ' / ' + total + ' trophées';
     if (this.trophiesProgress) {
       this.trophiesProgress.textContent = count + ' sur ' + total + ' trophées débloqués';
+    }
+  }
+
+  buildStatsPanel() {
+    if (!this.statsPanel) return;
+    const s = loadLifetimeStats();
+    const champBest = loadChampBest();
+    const rows = [
+      ['Parties', s.runs],
+      ['Victoires', s.wins],
+      ['Éliminations', s.kills],
+      ['Frôlements', s.nearMisses],
+      ['Meilleur combo', '×' + s.bestMultiplier],
+      ['Championnats gagnés', s.championshipsWon],
+      ['Record championnat', champBest > 0 ? champBest + ' pts' : '—'],
+    ];
+    this.statsPanel.innerHTML = rows.map(([label, value]) =>
+      `<div class="stats-row"><span class="stats-label">${label}</span><span class="stats-value">${value}</span></div>`
+    ).join('');
+  }
+
+  updateLaunchChallengeBtn() {
+    if (!this.launchChallengeBtn) return;
+    const ch = this.activeChallengeId
+      ? CHALLENGES.find(c => c.id === this.activeChallengeId) : null;
+    const done = loadChallenges();
+    const show = ch && !done[ch.id];
+    this.launchChallengeBtn.classList.toggle('hidden', !show);
+    if (show) {
+      const cfg = getChallengeLaunchConfig(ch.id);
+      const hint = cfg.mode === 'championship'
+        ? 'Championnat'
+        : (ARENAS.find(a => a.id === cfg.arenaId)?.name ?? cfg.arenaId);
+      this.launchChallengeBtn.textContent = `▶ Lancer « ${ch.name} » (${hint})`;
     }
   }
 
@@ -108,7 +161,10 @@ export class UI {
     } else {
       this.stopBikePreview();
     }
-    if (id === 'trophies') this.buildChallengesList();
+    if (id === 'trophies') {
+      this.buildStatsPanel();
+      this.buildChallengesList();
+    }
     if (id === 'play') this.buildArenaList();
     if (id === 'options') this.syncOptionsUI();
   }
@@ -202,11 +258,13 @@ export class UI {
       }
       this.challengesList.appendChild(el);
     });
+    this.updateLaunchChallengeBtn();
     this.updateHomeStats();
   }
 
   buildArenaList() {
     this.arenaList.innerHTML = '';
+    const lastArena = loadArenaPref();
     let lastFamily = null;
     ARENAS.forEach(a => {
       if (a.family !== lastFamily) {
@@ -218,7 +276,7 @@ export class UI {
       }
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'arena-btn';
+      btn.className = 'arena-btn' + (a.id === lastArena ? ' arena-recent' : '');
       btn.innerHTML =
         `<div class="arena-btn-name">${a.name}</div>` +
         `<div class="arena-btn-desc">${ARENA_DESC[a.id] || ''}</div>` +
@@ -274,6 +332,7 @@ export class UI {
     this.homeMenu.classList.remove('hidden');
     this.overlay.classList.add('hidden');
     this.controls.classList.add('hidden');
+    this.hideGameHud();
   }
 
   showIntro(arena) {
@@ -329,8 +388,15 @@ export class UI {
     }
   }
 
+  setOverlayActions(mode) {
+    const showActions = mode === 'arcadeEnd';
+    this.overlayActions?.classList.toggle('hidden', !showActions);
+    this.overlayHint?.classList.toggle('hidden', showActions);
+  }
+
   showChampionshipRoundResults(championship, roundResults) {
     this.overlayMode = 'champRound';
+    this.setOverlayActions('champ');
     const lines = roundResults.map(r =>
       `${r.place}. ${r.name} +${r.pointsEarned}`
     ).join(' · ');
@@ -350,6 +416,7 @@ export class UI {
 
   showChampionshipFinal(championship) {
     this.overlayMode = 'champFinal';
+    this.setOverlayActions('champ');
     const sorted = championship.getSortedStandings();
     const winner = sorted[0];
     const p = sorted.find(s => s.isPlayer);
@@ -366,6 +433,7 @@ export class UI {
   }
 
   showGameOver(sim, arena, won, now) {
+    this.lastArcadeArenaId = arena.id;
     const time = sim.getElapsedSeconds(now);
     const rank = won ? 1 : 1 + sim.aliveBots().length;
     const rec = sim.score > this.highScore;
@@ -397,20 +465,23 @@ export class UI {
       this.overlayChallenge.classList.add('hidden');
     }
     this.overlayNext.textContent = 'Arène : ' + arena.name;
-    this.overlayMode = 'menu';
-    this.overlayHint.textContent = 'Toucher pour revenir au menu';
+    this.overlayMode = 'arcadeEnd';
+    this.overlayHint.textContent = '';
+    this.setOverlayActions('arcadeEnd');
     this.overlay.classList.remove('hidden');
     this.controls.classList.add('hidden');
     if (this.challengeHudEl) this.challengeHudEl.textContent = '';
     this.multiplierEl?.classList.add('hidden');
   }
 
-  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship) {
+  bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship, onLaunchChallenge, onReplay) {
     this.onStartArena = onStartArena;
     this.onShowMenu = onShowMenu;
     this.onSettingsChange = onSettingsChange;
     this.onStartChampionship = onStartChampionship;
     this.onContinueChampionship = onContinueChampionship;
+    this.onLaunchChallenge = onLaunchChallenge;
+    this.onReplay = onReplay;
 
     document.querySelectorAll('.menu-tile[data-screen]').forEach(btn => {
       btn.addEventListener('click', () => this.showScreen(btn.dataset.screen));
@@ -433,12 +504,25 @@ export class UI {
     bindBtn(this.btnRight, 'right');
 
     this.overlay.addEventListener('pointerdown', e => {
+      if (e.target.closest('#overlay-actions')) return;
       e.preventDefault();
       if (this.overlayMode === 'champRound' || this.overlayMode === 'champFinal') {
         onContinueChampionship?.();
-      } else {
+      } else if (this.overlayMode !== 'arcadeEnd') {
         onShowMenu();
       }
+    });
+    this.overlayReplayBtn?.addEventListener('click', e => {
+      e.stopPropagation();
+      onReplay?.();
+    });
+    this.overlayMenuBtn?.addEventListener('click', e => {
+      e.stopPropagation();
+      onShowMenu();
+    });
+    this.launchChallengeBtn?.addEventListener('click', () => {
+      if (!this.activeChallengeId) return;
+      onLaunchChallenge?.(this.activeChallengeId);
     });
     this.arenaRandomBtn.addEventListener('click', () => onStartArena('random'));
     document.getElementById('start-championship')?.addEventListener('click', () => onStartChampionship?.());

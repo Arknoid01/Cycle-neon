@@ -30,6 +30,10 @@
       <div id="overlay-record" class="hidden">NOUVEAU RECORD !</div>
       <div id="overlay-challenge" class="hidden"></div>
       <div id="overlay-next"></div>
+      <div id="overlay-actions" class="overlay-actions hidden">
+        <button type="button" id="overlay-replay" class="overlay-btn overlay-btn-primary">Rejouer</button>
+        <button type="button" id="overlay-menu" class="overlay-btn">Menu</button>
+      </div>
       <div id="overlay-hint">Toucher pour revenir au menu</div>
     </div>
 
@@ -50,6 +54,7 @@
           <div class="home-title">LIGHT CYCLE</div>
           <div class="home-sub">NEON GRID</div>
           <div id="home-best" class="home-best"></div>
+          <div id="home-champ-best" class="home-champ-best"></div>
         </header>
         <div class="tile-grid">
           <button type="button" class="menu-tile tile-play" data-screen="play">
@@ -108,6 +113,8 @@
         <button type="button" class="menu-back" data-back>← Accueil</button>
         <h2 class="screen-title">Trophées</h2>
         <p class="screen-sub" id="trophies-progress"></p>
+        <div id="stats-panel" class="stats-panel"></div>
+        <button type="button" id="launch-challenge" class="launch-challenge-btn hidden">▶ Lancer ce défi</button>
         <div id="challenges-list"></div>
       </div>
 

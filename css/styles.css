@@ -41,6 +41,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .home-title { font-size: 26px; font-weight: bold; color: #5cc8d4; text-shadow: 0 0 14px rgba(0,180,200,0.3); letter-spacing: 4px; }
 .home-sub { font-size: 11px; color: rgba(255,136,0,.8); letter-spacing: 5px; margin-top: 6px; }
 .home-best { font-size: 11px; color: rgba(0,255,120,.55); margin-top: 14px; }
+.home-champ-best { font-size: 10px; color: rgba(255,220,80,.5); margin-top: 6px; }
 
 .tile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 380px; flex: 1; align-content: center; }
 .menu-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 130px; padding: 18px 12px; border-radius: 16px; border: 1px solid rgba(0,180,200,.16); background: linear-gradient(145deg, rgba(0,180,200,.04) 0%, rgba(0,0,0,.45) 100%); color: rgba(255,255,255,.85); cursor: pointer; touch-action: manipulation; transition: transform .12s, border-color .15s, box-shadow .15s; text-align: center; }
@@ -142,6 +143,43 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .color-swatch:active { transform: scale(.95); }
 
 #challenges-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; }
+
+.stats-panel {
+  width: 100%; max-width: 360px; display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 16px; padding: 14px; border-radius: 14px;
+  border: 1px solid rgba(0,255,255,.15); background: rgba(0,255,255,.04);
+}
+.stats-row { display: flex; flex-direction: column; gap: 2px; }
+.stats-label { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.4); }
+.stats-value { font-size: 15px; font-weight: bold; color: #7df9ff; }
+
+.launch-challenge-btn {
+  width: 100%; max-width: 360px; margin-bottom: 16px; padding: 14px 16px;
+  border-radius: 12px; border: 1px solid rgba(255,220,80,.45);
+  background: rgba(255,220,80,.1); color: #ffdd88; font-family: inherit;
+  font-size: 13px; font-weight: bold; cursor: pointer; touch-action: manipulation;
+  text-align: left; transition: background .15s, transform .1s;
+}
+.launch-challenge-btn:active { background: rgba(255,220,80,.2); transform: scale(.98); }
+.launch-challenge-btn.hidden { display: none; }
+
+.overlay-actions {
+  display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; justify-content: center;
+}
+.overlay-actions.hidden { display: none; }
+.overlay-btn {
+  min-width: 120px; padding: 12px 22px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.85); font-family: inherit; font-size: 14px;
+  font-weight: bold; cursor: pointer; touch-action: manipulation;
+}
+.overlay-btn-primary {
+  border-color: rgba(0,255,255,.45); background: rgba(0,255,255,.12); color: #7df9ff;
+}
+.overlay-btn:active { transform: scale(.96); }
+
+.arena-recent { border-color: rgba(255,136,0,.45) !important; background: rgba(255,136,0,.08) !important; }
+.arena-recent .arena-btn-name::after { content: ' · récent'; font-size: 11px; color: rgba(255,180,80,.75); font-weight: normal; }
 .challenge-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); font-size: 11px; color: rgba(255,255,255,.5); }
 .challenge-item.done { border-color: rgba(255,220,80,.35); background: rgba(255,220,80,.04); color: rgba(255,220,80,.8); }
 .challenge-item.active { border-color: rgba(255,220,80,.5); background: rgba(255,220,80,.08); cursor: pointer; }

@@ -7,7 +7,7 @@ import { getSettings } from './settings.js';
 import { preloadBikeModels } from './bike-model-loader.js';
 import { BIKE_SKINS } from './bike-skins.js';
 import { getUnlockedSkinIds } from './skin-unlocks.js';
-import { checkChallenges } from './challenges.js';
+import { checkChallenges, getChallengeLaunchConfig } from './challenges.js';
 import { recordChampionshipEnd } from './stats.js';
 import {
   initAudio, unlockAudio, updateEngineSound, updateGameplayIntensity, stopEngine, setMasterVolume,
@@ -56,6 +56,24 @@ function preloadUnlockedModels() {
   const ids = new Set(getUnlockedSkinIds());
   const skins = BIKE_SKINS.filter(s => s.model && ids.has(s.id));
   preloadBikeModels(skins);
+}
+
+function replayLastRun() {
+  ui.overlay.classList.add('hidden');
+  if (gameMode === 'championship' && championship.active) {
+    beginChampionshipRound();
+  } else {
+    startArena(ui.lastArcadeArenaId);
+  }
+}
+
+function launchChallenge(challengeId) {
+  const cfg = getChallengeLaunchConfig(challengeId);
+  if (cfg.mode === 'championship') {
+    startChampionship();
+  } else {
+    startArena(cfg.arenaId);
+  }
 }
 
 function startChampionship() {
@@ -180,7 +198,7 @@ ui.applyScoreColor();
 ui.buildHomeMenu();
 ui.showMenu();
 preloadUnlockedModels();
-ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship);
+ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship, launchChallenge, replayLastRun);
 setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => {
   renderer.resize();
