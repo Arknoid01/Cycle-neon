@@ -156,3 +156,8 @@ export function getDefaultSkinId() {
 export function getGltfSkins() {
   return BIKE_SKINS.filter(s => s.model);
 }
+
+/** Les 6 motos de base (Néon Core), utilisées pour l'attribution aléatoire aux bots. */
+export function getBaseColorSkins() {
+  return BIKE_SKINS.filter(s => s.id.startsWith('neon-core-'));
+}

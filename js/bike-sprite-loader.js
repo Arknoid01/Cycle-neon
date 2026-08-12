@@ -91,8 +91,14 @@ const _tmpWorldPos = new THREE.Vector3();
  * À appeler chaque frame pour un rider en sprite : pivote le billboard vers la caméra
  * et choisit la texture (avant/arrière/profil) selon l'angle relatif moto/caméra.
  * `wrapper.rotation.y` doit déjà porter l'angle logique de la moto (comme les autres skins).
+ *
+ * `forceView` fige le choix de texture (ex: 'back' pour le joueur — la caméra de
+ * poursuite reste toujours derrière lui une fois stabilisée, donc faire varier la
+ * vue ne fait que traverser des zones transitoires pendant les virages). Le
+ * billboard continue de pivoter vers la caméra normalement, seule la texture
+ * choisie est figée.
  */
-export function updateSpriteBike(wrapper, cameraPos) {
+export function updateSpriteBike(wrapper, cameraPos, forceView) {
   if (!wrapper?.userData?.isSpriteBike) return;
   const billboard = wrapper.userData.billboard;
 
@@ -102,21 +108,25 @@ export function updateSpriteBike(wrapper, cameraPos) {
     billboard.lookAt(_tmpTarget);
   }
 
-  const wp = wrapper.position;
-  const dx = cameraPos.x - wp.x;
-  const dz = cameraPos.z - wp.z;
-  if (dx * dx + dz * dz > 1e-6) {
-    const toCamAngle = Math.atan2(dx, -dz);
-    const facing = wrapper.rotation.y;
-    const relative = _norm(facing - toCamAngle);
-    const abs = Math.abs(relative);
-    const tex = wrapper.userData.spriteTextures;
-    let chosen;
-    if (abs <= Math.PI / 4) chosen = tex.front;
-    else if (abs >= (3 * Math.PI) / 4) chosen = tex.back;
-    else if (relative > 0) chosen = tex.left;
-    else chosen = tex.right;
-    _applyTexture(wrapper, chosen);
+  const tex = wrapper.userData.spriteTextures;
+  if (forceView && tex[forceView]) {
+    _applyTexture(wrapper, tex[forceView]);
+  } else {
+    const wp = wrapper.position;
+    const dx = cameraPos.x - wp.x;
+    const dz = cameraPos.z - wp.z;
+    if (dx * dx + dz * dz > 1e-6) {
+      const toCamAngle = Math.atan2(dx, -dz);
+      const facing = wrapper.rotation.y;
+      const relative = _norm(facing - toCamAngle);
+      const abs = Math.abs(relative);
+      let chosen;
+      if (abs <= Math.PI / 4) chosen = tex.front;
+      else if (abs >= (3 * Math.PI) / 4) chosen = tex.back;
+      else if (relative > 0) chosen = tex.left;
+      else chosen = tex.right;
+      _applyTexture(wrapper, chosen);
+    }
   }
 
   const plane = wrapper.userData.spritePlane;

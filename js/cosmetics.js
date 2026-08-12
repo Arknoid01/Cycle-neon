@@ -1,5 +1,5 @@
 import { getChassisPreset } from './bike-builder.js';
-import { BIKE_SKINS, getBikeSkin, getDefaultSkinId } from './bike-skins.js';
+import { BIKE_SKINS, getBikeSkin, getDefaultSkinId, getBaseColorSkins } from './bike-skins.js';
 import { isSkinUnlocked, syncEarnedSkins } from './skin-unlocks.js';
 import { CHAMPIONSHIP_BOTS } from './bots.js';
 
@@ -14,6 +14,18 @@ export {
  * trio) à chaque partie plutôt que toujours les deux mêmes adversaires. */
 export function pickRandomBots(n) {
   const pool = [...CHAMPIONSHIP_BOTS];
+  const picked = [];
+  while (picked.length < n && pool.length) {
+    const i = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(i, 1)[0]);
+  }
+  return picked;
+}
+
+/** Tire `n` motos de base distinctes — les bots portent une couleur au
+ * hasard à chaque partie plutôt qu'un skin figé par personnalité. */
+export function pickRandomBaseSkins(n) {
+  const pool = [...getBaseColorSkins()];
   const picked = [];
   while (picked.length < n && pool.length) {
     const i = Math.floor(Math.random() * pool.length);
@@ -80,19 +92,21 @@ export function buildRiderDef(base, skinId) {
 
 export function getRiderDefs() {
   const skin = getActiveSkin();
+  const bots = pickRandomBots(2);
+  const botSkins = pickRandomBaseSkins(bots.length);
   return [
     buildRiderDef({
       key: 'player', name: 'Toi', isPlayer: true,
       ...getRiderColorDef(skin),
     }, skin.id),
-    ...pickRandomBots(2).map((b, i) => buildRiderDef({
+    ...bots.map((b, i) => buildRiderDef({
       key: 'bot' + i,
       name: b.name,
       isPlayer: false,
       personality: b.personality,
       difficulty: b.difficulty,
-      body: b.body, glow: b.glow, wheel: b.wheel, trail: b.trail, trailGlow: b.trailGlow,
-    }, b.skinId)),
+      ...getRiderColorDef(botSkins[i]),
+    }, botSkins[i].id)),
   ];
 }
 

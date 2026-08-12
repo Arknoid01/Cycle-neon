@@ -557,7 +557,9 @@ export class Renderer {
       mesh.rotation.y = r.smoothAngle;
 
       if (mesh.userData.isSpriteBike) {
-        updateSpriteBike(mesh, this.camera.position);
+        // La caméra de poursuite reste toujours derrière le joueur une fois stabilisée :
+        // pas besoin de faire varier sa vue, ça évite le clignotement pendant les virages.
+        updateSpriteBike(mesh, this.camera.position, r.isPlayer ? 'back' : null);
       }
 
       const underKey = this._cellKey(r.x, r.y);
