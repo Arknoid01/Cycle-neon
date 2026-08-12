@@ -129,6 +129,38 @@ export class MovingWall {
     if (this.pattern === PATTERN.CLOSING) return this._occupied;
     return this.computeCells();
   }
+
+  /** Cellules qui deviendront un mur au prochain basculement (sans muter l'état). */
+  previewCells() {
+    if (this.pattern === PATTERN.PINGPONG || this.pattern === PATTERN.WAVE) {
+      let nx = this.x, ny = this.y;
+      if (this.axis === 'x') {
+        nx = this.x + this.direction;
+        if (nx < this.range[0] || nx > this.range[1]) nx = this.x - this.direction;
+      } else {
+        ny = this.y + this.direction;
+        if (ny < this.range[0] || ny > this.range[1]) ny = this.y - this.direction;
+      }
+      return [{ x: nx, y: ny }];
+    }
+    if (this.pattern === PATTERN.GATE) {
+      if (!this.open) return []; // déjà solide, sur le point de s'ouvrir — rien à prévenir
+      const cells = [];
+      for (let y = this.yMin; y <= this.yMax; y++) cells.push({ x: this.x, y });
+      return cells;
+    }
+    if (this.pattern === PATTERN.CLOSING) {
+      const gridW = this._gridW, gridH = this._gridH, border = this._border;
+      const m = this.margin + 1;
+      const lim = Math.floor(Math.min(gridW, gridH) / 2) - border - 4;
+      if (m > lim) return [];
+      const cells = [];
+      for (let x = m; x < gridW - m; x++) cells.push({ x, y: m }, { x, y: gridH - 1 - m });
+      for (let y = m; y < gridH - m; y++) cells.push({ x: m, y }, { x: gridW - 1 - m, y });
+      return cells;
+    }
+    return [];
+  }
 }
 
 export class MovingWallSystem {
@@ -140,9 +172,23 @@ export class MovingWallSystem {
     this.walls = wallConfigs.map((cfg, i) => new MovingWall({ ...cfg, id: i }));
     const now = performance.now();
     for (const w of this.walls) {
+      w._gridW = gridW; w._gridH = gridH; w._border = border;
       w.lastMove = now - (w.waveIndex ?? 0) * (w.interval ?? 4000) * 0.25;
       w.syncOccupied(grid);
     }
+  }
+
+  /** Cellules encore vides qui vont devenir mur bientôt, pour l'aperçu clignotant. */
+  previewCells(grid) {
+    const cells = [];
+    for (const w of this.walls) {
+      if (w.warningLevel < 1) continue;
+      for (const c of w.previewCells()) {
+        if (grid && grid.get(c.x, c.y) !== CELL_EMPTY) continue;
+        cells.push({ x: c.x, y: c.y, level: w.warningLevel });
+      }
+    }
+    return cells;
   }
 
   simulationTick(grid, now, gridW, gridH, border) {

@@ -144,7 +144,7 @@ export class UI {
     }
     const bubblePct = maxed ? 100 : Math.max(8, Math.min(92, pct));
     if (this.homeProgressFill) this.homeProgressFill.style.width = bubblePct + '%';
-    if (this.homeProgressBubble) this.homeProgressBubble.style.left = bubblePct + '%';
+    if (this.homeProgressBubble) this.homeProgressBubble.style.setProperty('--bubble-pct', bubblePct + '%');
     if (this.homeProgressReward) {
       this.homeProgressReward.textContent = maxed
         ? 'Champion · tous les paliers atteints'

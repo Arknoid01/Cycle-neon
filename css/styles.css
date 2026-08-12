@@ -320,7 +320,7 @@ html, body {
 }
 .home-progress-head {
   display: flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 10px; gap: 12px;
+  margin-bottom: 24px; gap: 12px;
 }
 .home-rank-title {
   font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700;
@@ -346,7 +346,8 @@ html, body {
 }
 .home-progress-bubble {
   position: absolute; top: 50%; transform: translate(-50%, -50%);
-  left: 0%; min-width: 132px; max-width: 220px;
+  left: clamp(70px, var(--bubble-pct, 8%), calc(100% - 70px));
+  min-width: 132px; max-width: 220px;
   padding: 7px 10px; border-radius: 12px;
   background: linear-gradient(145deg, rgba(0,40,55,.96), rgba(0,10,20,.98));
   border: 1px solid rgba(0,238,255,.28);

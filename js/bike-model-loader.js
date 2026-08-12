@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildBikeSkin } from './bike-builder.js';
 import { updateElectricMaterial } from './electric-shader.js';
 import { skinUsesSprite, createSpriteBike } from './bike-sprite-loader.js';
+import { BIKE_SCALE } from './constants.js';
 
 const loader = new GLTFLoader();
 const templateCache = new Map();
@@ -199,11 +200,11 @@ export async function preloadBikeModels(skins) {
 
 export function bikeTrailRearWorld(bikeMesh, worldX, worldZ, angle) {
   if (bikeMesh?.userData?.trailAnchorLocal) {
-    const v = bikeMesh.userData.trailAnchorLocal.clone();
+    const v = bikeMesh.userData.trailAnchorLocal.clone().multiplyScalar(BIKE_SCALE);
     v.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     return { x: worldX + v.x, z: worldZ + v.z };
   }
-  const backOff = bikeMesh?.userData?.trailBackOffset ?? 0.38;
+  const backOff = (bikeMesh?.userData?.trailBackOffset ?? 0.38) * BIKE_SCALE;
   const fx = Math.sin(angle);
   const fz = -Math.cos(angle);
   return { x: worldX - fx * backOff, z: worldZ - fz * backOff };

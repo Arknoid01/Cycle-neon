@@ -30,6 +30,7 @@ export class Renderer {
     this.composer = null;
     this.bloomPass = null;
     this.cellMeshes = new Map();
+    this.previewMeshes = new Map();
     this.riderMeshes = new Map();
     this.liveTrails = new Map();
     this.trailMats = [];
@@ -37,6 +38,7 @@ export class Renderer {
     this.explosions = [];
     this.matWall = null;
     this.matMobile = null;
+    this.matPreview = null;
     this.matPerimeter = null;
     this.wallCubeGeo = null;
     this.perimCubeGeo = null;
@@ -76,6 +78,11 @@ export class Renderer {
     this.matWall = this._createWallMat(0x3b0764, 0x7c3aed, 0.95);
     this.matMobile = this._createWallMat(0x7c2d12, 0xff6600, 1.0);
     this.matPerimeter = this._createWallMat(0x4c1d95, 0x9333ea, 1.0);
+    this.matPreview = new THREE.MeshStandardMaterial({
+      color: 0xff6600, emissive: 0xff6600, emissiveIntensity: 0.9,
+      metalness: 0.3, roughness: 0.4,
+      transparent: true, opacity: 0, depthWrite: false,
+    });
     this._rebuildTrailMats();
 
     const floorSize = Math.max(w, h);
@@ -139,6 +146,8 @@ export class Renderer {
   clearAll(riderDefs) {
     this.cellMeshes.forEach(m => this.scene.remove(m));
     this.cellMeshes.clear();
+    this.previewMeshes.forEach(m => this.scene.remove(m));
+    this.previewMeshes.clear();
     this.riderMeshes.forEach(g => {
       if (g.userData.frameMats) {
         for (const m of g.userData.frameMats) {
@@ -436,6 +445,35 @@ export class Renderer {
     if (now < this.mobileBurstUntil) intensity = 1.5;
 
     this.matMobile.emissiveIntensity = intensity;
+  }
+
+  /** Aperçu transparent et clignotant des cellules qui vont bientôt devenir un mur. */
+  syncWallPreviews(wallSystem, grid, now) {
+    const preview = wallSystem.previewCells(grid);
+    const activeKeys = new Set();
+    let maxLevel = 0;
+
+    for (const c of preview) {
+      const key = this._cellKey(c.x, c.y);
+      activeKeys.add(key);
+      if (c.level > maxLevel) maxLevel = c.level;
+      if (!this.previewMeshes.has(key)) {
+        const mesh = this._addWallCube(c.x, c.y, this.wallCubeGeo, this.matPreview);
+        this.previewMeshes.set(key, mesh);
+      }
+    }
+
+    this.previewMeshes.forEach((mesh, key) => {
+      if (activeKeys.has(key)) return;
+      this.scene.remove(mesh);
+      this.previewMeshes.delete(key);
+    });
+
+    let opacity = 0;
+    if (maxLevel === 1) opacity = 0.14 + Math.sin(now / 300) * 0.10;
+    else if (maxLevel === 2) opacity = 0.22 + Math.sin(now / 150) * 0.16;
+    else if (maxLevel === 3) opacity = 0.32 + Math.sin(now / 75) * 0.24;
+    this.matPreview.opacity = Math.max(0, opacity);
   }
 
   _buildBike(def) {

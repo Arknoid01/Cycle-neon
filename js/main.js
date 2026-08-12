@@ -181,6 +181,7 @@ function gameLoop(now) {
     renderer.syncRiders(sim.riders, sim.playing, now, sim.grid, sim.getRenderT(now));
     renderer.updateCamera(sim.getPlayer());
     renderer.syncMobileWarnings(sim.walls, now);
+    renderer.syncWallPreviews(sim.walls, sim.grid, now);
     if (sim.playing) {
       renderer.setBloomIntensity(sim.getIntensity());
       updateGameplayIntensity(sim.multiplier);
