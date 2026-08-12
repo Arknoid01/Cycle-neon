@@ -28,7 +28,7 @@ export const CHAMPIONSHIP_BOTS = [
   },
   {
     id: 'bolt', name: 'Éclair', personality: PERSONALITY.RAPIDE, difficulty: DIFFICULTY.HARD,
-    skinId: 'pulse',
+    skinId: 'neon-core-orange',
     body: 0xcc9944, glow: 0xcc8800, wheel: 0xccaa33, trail: 0x886622, trailGlow: 0xcc6600,
   },
   {

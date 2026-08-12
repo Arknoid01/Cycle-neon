@@ -17,6 +17,33 @@ const NEON_CORE_COLORS = [
   { colorId: 'crimson', name: 'Néon Core Cramoisi', body: 0xcc6666, glow: 0xcc3333, wheel: 0xcc0022, trail: 0x994444, trailGlow: 0xcc0033 },
 ];
 
+function _trophyGoldSprites(stage) {
+  return {
+    front: `assets/bikes/sprites/trophy-gold-${stage}-front.png`,
+    back: `assets/bikes/sprites/trophy-gold-${stage}-back.png`,
+    left: `assets/bikes/sprites/trophy-gold-${stage}-side-left.png`,
+    right: `assets/bikes/sprites/trophy-gold-${stage}-side-right.png`,
+  };
+}
+
+/**
+ * La moto de palier : même moto « trophée » du début à la fin, mais de plus en
+ * plus dorée à chaque rang franchi — jusqu'à l'or massif au palier Champion.
+ * Les id/unlockTier correspondent 1:1 à PROGRESSION_TIERS (progression.js).
+ */
+const TROPHY_GOLD_STAGES = [
+  { stage: 1, id: 'tier-grid-rider', name: 'Trophée Doré I', desc: 'Palier Novice · reflets dorés naissants', color: 0x00aacc, trail: 0x005e70 },
+  { stage: 2, id: 'tier-neon-striker', name: 'Trophée Doré II', desc: 'Palier Initié · l’or gagne du terrain', color: 0x1cadbc, trail: 0x105f67 },
+  { stage: 3, id: 'tier-circuit-wolf', name: 'Trophée Doré III', desc: 'Palier Coureur · les touches dorées se multiplient', color: 0x39b0ac, trail: 0x1f615f },
+  { stage: 4, id: 'tier-void-rider', name: 'Trophée Doré IV', desc: 'Palier Pilote · carrosserie mi-dorée', color: 0x55b29c, trail: 0x2f6256 },
+  { stage: 5, id: 'tier-plasma-knight', name: 'Trophée Doré V', desc: 'Palier As du Grid · plus qu’à moitié dorée', color: 0x71b58c, trail: 0x3e644d },
+  { stage: 6, id: 'tier-grid-phantom', name: 'Trophée Doré VI', desc: 'Palier Néon Rider · l’or domine', color: 0x8eb87c, trail: 0x4e6544 },
+  { stage: 7, id: 'tier-neon-overlord', name: 'Trophée Doré VII', desc: 'Palier Grid Master · à peine un reste de bleu', color: 0xaabb6c, trail: 0x5e673b },
+  { stage: 8, id: 'tier-grid-legend', name: 'Trophée Doré VIII', desc: 'Palier Légende · presque tout en or', color: 0xc6bd5c, trail: 0x6d6833 },
+  { stage: 9, id: 'tier-neon-ascendant', name: 'Trophée Doré IX', desc: 'Palier Mythique · or presque total', color: 0xe3c04c, trail: 0x7d6a2a },
+  { stage: 10, id: 'tier-grid-sovereign', name: 'Trophée Doré X', desc: 'Palier Champion · or massif', color: 0xffc33c, trail: 0x8c6b21 },
+];
+
 /** Catalogue des skins moto — prêt monétisation (free / premium / earn). */
 export const BIKE_SKINS = [
   ...NEON_CORE_COLORS.map(c => ({
@@ -73,17 +100,6 @@ export const BIKE_SKINS = [
     chassisId: 'blade',
   },
   {
-    id: 'pulse',
-    name: 'Pulse',
-    desc: 'Cœur sphérique · lignes douces',
-    tier: 'earn',
-    kit: 'gltf',
-    model: 'assets/bikes/pulse.glb',
-    fallbackKit: 'pulse',
-    chassisId: 'racer',
-    unlockChallenge: 'win_classique',
-  },
-  {
     id: 'inferno',
     name: 'Inferno',
     desc: 'Avant agressif · éclats de feu',
@@ -103,97 +119,23 @@ export const BIKE_SKINS = [
     fallbackKit: 'chrome',
     chassisId: 'classic',
   },
-  // — Véhicules de palier (aperçu 3D branché plus tard) —
-  {
-    id: 'tier-grid-rider',
-    name: 'Grid Rider',
-    desc: 'Châssis palier · Novice',
+  // — Moto de palier : la même moto « trophée », de plus en plus dorée à chaque rang —
+  ...TROPHY_GOLD_STAGES.map(s => ({
+    id: s.id,
+    name: s.name,
+    desc: s.desc,
     tier: 'progression',
-    kit: 'classic',
+    kit: 'sprite',
+    sprites: _trophyGoldSprites(s.stage),
+    fallbackKit: 'pulse',
     chassisId: 'racer',
-    unlockTier: 1,
-  },
-  {
-    id: 'tier-neon-striker',
-    name: 'Neon Striker',
-    desc: 'Châssis palier · Initié',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'blade',
-    unlockTier: 2,
-  },
-  {
-    id: 'tier-circuit-wolf',
-    name: 'Circuit Wolf',
-    desc: 'Châssis palier · Coureur',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'tank',
-    unlockTier: 3,
-  },
-  {
-    id: 'tier-void-rider',
-    name: 'Void Rider',
-    desc: 'Châssis palier · Pilote',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'classic',
-    unlockTier: 4,
-  },
-  {
-    id: 'tier-plasma-knight',
-    name: 'Plasma Knight',
-    desc: 'Châssis palier · As du Grid',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'racer',
-    unlockTier: 5,
-  },
-  {
-    id: 'tier-grid-phantom',
-    name: 'Grid Phantom',
-    desc: 'Châssis palier · Néon Rider',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'blade',
-    unlockTier: 6,
-  },
-  {
-    id: 'tier-neon-overlord',
-    name: 'Neon Overlord',
-    desc: 'Châssis palier · Grid Master',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'tank',
-    unlockTier: 7,
-  },
-  {
-    id: 'tier-grid-legend',
-    name: 'Grid Legend',
-    desc: 'Châssis palier · Légende',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'classic',
-    unlockTier: 8,
-  },
-  {
-    id: 'tier-neon-ascendant',
-    name: 'Neon Ascendant',
-    desc: 'Châssis palier · Mythique',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'racer',
-    unlockTier: 9,
-  },
-  {
-    id: 'tier-grid-sovereign',
-    name: 'Grid Sovereign',
-    desc: 'Châssis palier · Champion',
-    tier: 'progression',
-    kit: 'classic',
-    chassisId: 'blade',
-    unlockTier: 10,
-  },
+    unlockTier: s.stage,
+    body: s.color,
+    glow: s.color,
+    wheel: s.color,
+    trail: s.trail,
+    trailGlow: s.color,
+  })),
 ];
 
 export const SKIN_TIER_LABELS = {

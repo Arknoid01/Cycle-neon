@@ -220,7 +220,9 @@ export class UI {
     syncEarnedSkins();
     const current = loadSkin();
     this.skinPicker.innerHTML = '';
-    BIKE_SKINS.forEach(skin => {
+    BIKE_SKINS
+      .filter(skin => skin.id.startsWith('neon-core-') || skin.tier === 'progression')
+      .forEach(skin => {
       const unlocked = isSkinUnlocked(skin.id);
       const btn = document.createElement('button');
       btn.type = 'button';
