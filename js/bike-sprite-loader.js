@@ -35,14 +35,18 @@ function _norm(a) {
   return a;
 }
 
+/** Anime scale.x vers la largeur cible plutôt que de la caler d'un coup —
+ * sans ça, passer d'une vue de profil (large) à avant/arrière (étroite)
+ * fait "sauter" la taille de la moto pile au moment du changement de texture. */
+const WIDTH_LERP = 0.22;
+
 function _applyTexture(wrapper, tex) {
   const mat = wrapper.userData.spriteMat;
+  const refAspect = wrapper.userData.sideAspect || tex.aspect;
+  wrapper.userData.targetPlaneWidth = SPRITE_HEIGHT * (tex.aspect || refAspect);
   if (mat.map === tex) return;
   mat.map = tex;
   mat.needsUpdate = true;
-  const plane = wrapper.userData.spritePlane;
-  const refAspect = wrapper.userData.sideAspect || tex.aspect;
-  plane.scale.set(SPRITE_HEIGHT * (tex.aspect || refAspect), SPRITE_HEIGHT, 1);
 }
 
 export async function createSpriteBike(skin) {
@@ -76,6 +80,7 @@ export async function createSpriteBike(skin) {
   wrapper.userData.trailBackOffset = SPRITE_SIDE_LENGTH * 0.42;
 
   _applyTexture(wrapper, texFront);
+  plane.scale.set(wrapper.userData.targetPlaneWidth, SPRITE_HEIGHT, 1);
   return wrapper;
 }
 
@@ -100,18 +105,20 @@ export function updateSpriteBike(wrapper, cameraPos) {
   const wp = wrapper.position;
   const dx = cameraPos.x - wp.x;
   const dz = cameraPos.z - wp.z;
-  if (dx * dx + dz * dz < 1e-6) return;
+  if (dx * dx + dz * dz > 1e-6) {
+    const toCamAngle = Math.atan2(dx, -dz);
+    const facing = wrapper.rotation.y;
+    const relative = _norm(facing - toCamAngle);
+    const abs = Math.abs(relative);
+    const tex = wrapper.userData.spriteTextures;
+    let chosen;
+    if (abs <= Math.PI / 4) chosen = tex.front;
+    else if (abs >= (3 * Math.PI) / 4) chosen = tex.back;
+    else if (relative > 0) chosen = tex.left;
+    else chosen = tex.right;
+    _applyTexture(wrapper, chosen);
+  }
 
-  const toCamAngle = Math.atan2(dx, -dz);
-  const facing = wrapper.rotation.y;
-  const relative = _norm(facing - toCamAngle);
-  const abs = Math.abs(relative);
-  const tex = wrapper.userData.spriteTextures;
-  let chosen;
-  if (abs <= Math.PI / 4) chosen = tex.front;
-  else if (abs >= (3 * Math.PI) / 4) chosen = tex.back;
-  else if (relative > 0) chosen = tex.left;
-  else chosen = tex.right;
-
-  _applyTexture(wrapper, chosen);
+  const plane = wrapper.userData.spritePlane;
+  plane.scale.x += (wrapper.userData.targetPlaneWidth - plane.scale.x) * WIDTH_LERP;
 }
