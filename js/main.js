@@ -199,10 +199,10 @@ function gameLoop(now) {
 }
 
 ui.applyScoreColor();
+ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship, launchChallenge, replayLastRun);
 ui.buildHomeMenu();
 ui.showMenu();
 preloadUnlockedModels();
-ui.bind(startArena, showMenu, onTurn, (s) => renderer.setBloomEnabled(s.bloom), startChampionship, continueChampionship, launchChallenge, replayLastRun);
 setMasterVolume(getSettings().volume);
 window.addEventListener('resize', () => {
   renderer.resize();

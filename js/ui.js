@@ -185,6 +185,7 @@ export class UI {
   }
 
   buildCosmeticPicker() {
+    if (!this.cosmeticPicker) return;
     const current = loadCosmetic();
     this.cosmeticPicker.innerHTML = '';
     COLOR_PRESETS.forEach(p => {
@@ -254,6 +255,7 @@ export class UI {
   }
 
   buildChallengesList() {
+    if (!this.challengesList) return;
     syncEarnedSkins();
     const done = loadChallenges();
     this.challengesList.innerHTML = '';
@@ -278,6 +280,7 @@ export class UI {
   }
 
   buildArenaList() {
+    if (!this.arenaList) return;
     this.arenaList.innerHTML = '';
     const lastArena = loadArenaPref();
     let lastFamily = null;
@@ -524,7 +527,25 @@ export class UI {
     this.hudFx.onGameEvent(event, sim);
   }
 
+  bindMenuNavigation() {
+    if (this._menuNavBound || !this.homeMenu) return;
+    this._menuNavBound = true;
+    this.homeMenu.addEventListener('click', (e) => {
+      const tile = e.target.closest('.menu-tile[data-screen]');
+      if (tile?.dataset.screen) {
+        e.preventDefault();
+        this.showScreen(tile.dataset.screen);
+        return;
+      }
+      if (e.target.closest('[data-back]')) {
+        e.preventDefault();
+        this.showScreen('home');
+      }
+    });
+  }
+
   bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship, onLaunchChallenge, onReplay) {
+    this.bindMenuNavigation();
     this.onStartArena = onStartArena;
     this.onShowMenu = onShowMenu;
     this.onSettingsChange = onSettingsChange;
@@ -533,16 +554,10 @@ export class UI {
     this.onLaunchChallenge = onLaunchChallenge;
     this.onReplay = onReplay;
 
-    document.querySelectorAll('.menu-tile[data-screen]').forEach(btn => {
-      btn.addEventListener('click', () => this.showScreen(btn.dataset.screen));
-    });
-    document.querySelectorAll('[data-back]').forEach(btn => {
-      btn.addEventListener('click', () => this.showScreen('home'));
-    });
-
     this.bindOptions();
 
     const bindBtn = (btn, dir) => {
+      if (!btn) return;
       const press = e => { e.preventDefault(); btn.classList.add('pressed'); onTurn(dir); };
       const release = () => btn.classList.remove('pressed');
       btn.addEventListener('pointerdown', press);
@@ -553,7 +568,7 @@ export class UI {
     bindBtn(this.btnLeft, 'left');
     bindBtn(this.btnRight, 'right');
 
-    this.overlay.addEventListener('pointerdown', e => {
+    this.overlay?.addEventListener('pointerdown', e => {
       if (e.target.closest('#overlay-actions')) return;
       e.preventDefault();
       if (this.overlayMode === 'champRound' || this.overlayMode === 'champFinal') {
@@ -574,7 +589,7 @@ export class UI {
       if (!this.activeChallengeId) return;
       onLaunchChallenge?.(this.activeChallengeId);
     });
-    this.arenaRandomBtn.addEventListener('click', () => onStartArena('random'));
+    this.arenaRandomBtn?.addEventListener('click', () => onStartArena('random'));
     document.getElementById('start-championship')?.addEventListener('click', () => onStartChampionship?.());
     window.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') onTurn('left');
