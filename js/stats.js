@@ -12,6 +12,7 @@ const DEFAULTS = {
   bestMultiplier: 1,
   championshipsWon: 0,
   bestChampPoints: 0,
+  totalPoints: 0,
 };
 
 export function loadLifetimeStats() {
@@ -27,13 +28,14 @@ function saveLifetimeStats(s) {
 }
 
 /** À appeler à la fin de chaque run arcade (victoire ou mort). */
-export function recordRunEnd({ won, kills = 0, nearMisses = 0, maxMultiplier = 1 }) {
+export function recordRunEnd({ won, kills = 0, nearMisses = 0, maxMultiplier = 1, score = 0 }) {
   const s = loadLifetimeStats();
   s.runs++;
   if (won) s.wins++;
   s.kills += kills;
   s.nearMisses += nearMisses;
   if (maxMultiplier > s.bestMultiplier) s.bestMultiplier = maxMultiplier;
+  s.totalPoints = (s.totalPoints || 0) + Math.max(0, score);
   saveLifetimeStats(s);
   return s;
 }
@@ -43,6 +45,7 @@ export function recordChampionshipEnd({ won, points = 0 }) {
   const s = loadLifetimeStats();
   if (won) s.championshipsWon++;
   if (points > s.bestChampPoints) s.bestChampPoints = points;
+  s.totalPoints = (s.totalPoints || 0) + Math.max(0, points);
   saveLifetimeStats(s);
   return s;
 }

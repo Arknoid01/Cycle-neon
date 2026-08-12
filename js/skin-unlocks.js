@@ -1,5 +1,6 @@
 import { BIKE_SKINS, getBikeSkin } from './bike-skins.js';
 import { loadChallenges } from './challenges.js';
+import { getTotalPoints, getTierForSkin, formatPoints, TIER_STEP, getUnlockedTierSkinIds, checkTierUnlocks } from './progression.js';
 
 const STORAGE_KEY = 'lc_unlocked_skins';
 
@@ -30,12 +31,18 @@ export function grantSkin(skinId) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...set])); } catch {}
 }
 
+function isProgressionSkinUnlocked(skin) {
+  if (!skin?.unlockTier) return false;
+  return getTotalPoints() >= skin.unlockTier * TIER_STEP;
+}
+
 export function isSkinUnlocked(skinId) {
   const skin = getBikeSkin(skinId);
   if (!skin) return false;
   if (ALL_UNLOCKED_DEV) return true;
   if (skin.tier === 'free') return true;
   if (loadGrantedSkins().includes(skinId)) return true;
+  if (skin.tier === 'progression' && isProgressionSkinUnlocked(skin)) return true;
   if (skin.tier === 'earn' && skin.unlockChallenge) {
     return !!loadChallenges()[skin.unlockChallenge];
   }
@@ -50,6 +57,19 @@ export function syncEarnedSkins() {
       grantSkin(skin.id);
     }
   }
+  syncProgressionSkins();
+}
+
+/** Accorde les véhicules de palier déjà atteints (rattrapage au chargement). */
+export function syncProgressionSkins() {
+  for (const skinId of getUnlockedTierSkinIds()) grantSkin(skinId);
+}
+
+/** Détecte et accorde les paliers franchis depuis la dernière partie. */
+export function applyTierUnlocks(prevTotal, newTotal) {
+  const tiers = checkTierUnlocks(prevTotal, newTotal);
+  for (const t of tiers) if (t.skinId) grantSkin(t.skinId);
+  return tiers;
 }
 
 export function getUnlockedSkinIds() {
@@ -60,6 +80,13 @@ export function getUnlockedSkinIds() {
 export function skinLockHint(skin) {
   if (!skin) return '';
   if (skin.tier === 'premium') return 'Premium — bientôt en boutique';
+  if (skin.tier === 'progression' && skin.unlockTier) {
+    const tier = getTierForSkin(skin.id);
+    const pts = skin.unlockTier * TIER_STEP;
+    return tier
+      ? `Palier ${tier.title} · ${formatPoints(pts)} pts cumulés`
+      : `Palier · ${formatPoints(pts)} pts cumulés`;
+  }
   if (skin.tier === 'earn' && skin.unlockChallenge) return 'Débloque le trophée associé';
   return 'Verrouillé';
 }

@@ -5,7 +5,7 @@ import { loadChampBest } from './championship.js';
 import {
   COLOR_PRESETS, BIKE_SKINS, SKIN_TIER_LABELS,
   loadCosmetic, saveCosmetic, loadSkin, saveSkin,
-  getCosmeticPreset, hexCss, isSkinUnlocked, skinLockHint, syncEarnedSkins,
+  getCosmeticPreset, hexCss, isSkinUnlocked, skinLockHint, syncEarnedSkins, applyTierUnlocks,
 } from './cosmetics.js';
 import { getSettings, saveSettings } from './settings.js';
 import { setMasterVolume } from './audio.js';
@@ -13,6 +13,7 @@ import { BikePreview } from './bike-preview.js';
 import { preloadBikeModels } from './bike-model-loader.js';
 import { getBikeSkin } from './bike-skins.js';
 import { HudFx } from './hud-fx.js';
+import { getTierProgress, getNextRewardLabel, formatPoints } from './progression.js';
 
 const SCREENS = ['home', 'play', 'custom', 'trophies', 'options'];
 
@@ -44,6 +45,12 @@ export class UI {
     this.homeMenu = document.getElementById('home-menu');
     this.homeBest = document.getElementById('home-best');
     this.homeChampBest = document.getElementById('home-champ-best');
+    this.homeRankTitle = document.getElementById('home-rank-title');
+    this.homeTotalPoints = document.getElementById('home-total-points');
+    this.homeProgressFill = document.getElementById('home-progress-fill');
+    this.homeProgressBubble = document.getElementById('home-progress-bubble');
+    this.homeProgressReward = document.getElementById('home-progress-reward');
+    this.homeProgressPts = document.getElementById('home-progress-pts');
     this.trophySummary = document.getElementById('trophy-summary');
     this.trophiesProgress = document.getElementById('trophies-progress');
     this.statsPanel = document.getElementById('stats-panel');
@@ -114,6 +121,7 @@ export class UI {
     const { count, total } = this.trophyStats();
     const stats = loadLifetimeStats();
     const champBest = loadChampBest();
+    syncEarnedSkins();
     this.homeBest.textContent = 'Record global : ' + this.highScore.toLocaleString('fr-FR');
     if (this.homeChampBest) {
       this.homeChampBest.textContent = champBest > 0
@@ -126,6 +134,29 @@ export class UI {
     if (this.trophiesProgress) {
       this.trophiesProgress.textContent = count + ' sur ' + total + ' trophées débloqués';
     }
+    this.updateHomeProgressBar();
+  }
+
+  updateHomeProgressBar() {
+    const progress = getTierProgress();
+    const { current, next, pct, totalPoints, maxed } = progress;
+    if (this.homeRankTitle) this.homeRankTitle.textContent = current.title;
+    if (this.homeTotalPoints) {
+      this.homeTotalPoints.textContent = formatPoints(totalPoints) + ' pts cumulés';
+    }
+    const bubblePct = maxed ? 100 : Math.max(8, Math.min(92, pct));
+    if (this.homeProgressFill) this.homeProgressFill.style.width = bubblePct + '%';
+    if (this.homeProgressBubble) this.homeProgressBubble.style.left = bubblePct + '%';
+    if (this.homeProgressReward) {
+      this.homeProgressReward.textContent = maxed
+        ? 'Champion · tous les paliers atteints'
+        : getNextRewardLabel(totalPoints);
+    }
+    if (this.homeProgressPts) {
+      this.homeProgressPts.textContent = maxed
+        ? formatPoints(totalPoints) + ' pts'
+        : `${formatPoints(totalPoints)} / ${formatPoints(next.threshold)}`;
+    }
   }
 
   buildStatsPanel() {
@@ -133,6 +164,8 @@ export class UI {
     const s = loadLifetimeStats();
     const champBest = loadChampBest();
     const rows = [
+      ['Points cumulés', formatPoints(s.totalPoints || 0)],
+      ['Rang actuel', getTierProgress(s.totalPoints || 0).current.title],
       ['Parties', s.runs],
       ['Victoires', s.wins],
       ['Éliminations', s.kills],
@@ -218,7 +251,8 @@ export class UI {
       btn.className = 'skin-btn' +
         (skin.id === current ? ' selected' : '') +
         (!unlocked ? ' locked' : '') +
-        (skin.tier === 'premium' ? ' tier-premium' : '');
+        (skin.tier === 'premium' ? ' tier-premium' : '') +
+        (skin.tier === 'progression' ? ' tier-progression' : '');
       btn.innerHTML =
         `<span class="skin-tier">${SKIN_TIER_LABELS[skin.tier] || skin.tier}</span>` +
         `<span class="skin-name">${skin.name}</span>` +
@@ -422,20 +456,47 @@ export class UI {
     this.overlay.querySelector('.overlay-card')?.classList.remove('compact');
   }
 
-  showTrophyCelebration(unlocked) {
+  showUnlockCelebration(challenges = [], tiers = []) {
     if (!this.overlayTrophies || !this.trophyUnlockList) return;
-    if (!unlocked.length) {
+    const cards = [
+      ...challenges.map(c => ({
+        star: '★',
+        name: c.name,
+        desc: c.desc,
+      })),
+      ...tiers.map(t => {
+        const skin = t.skinId ? getBikeSkin(t.skinId) : null;
+        return {
+          star: '◈',
+          name: `Palier ${t.title}`,
+          desc: skin ? `Véhicule débloqué · ${skin.name}` : t.title,
+        };
+      }),
+    ];
+    if (!cards.length) {
       this.overlayTrophies.classList.add('hidden');
       this.trophyUnlockList.innerHTML = '';
       return;
     }
     this.overlayTrophies.classList.remove('hidden');
-    this.trophyUnlockList.innerHTML = unlocked.map((c, i) =>
+    const head = this.overlayTrophies.querySelector('.trophy-celebrate-head span:nth-child(2)');
+    if (head) {
+      head.textContent = tiers.length && !challenges.length
+        ? 'PALIER ATTEINT'
+        : tiers.length
+          ? 'RÉCOMPENSES DÉBLOQUÉES'
+          : 'TROPHÉES DÉBLOQUÉS';
+    }
+    this.trophyUnlockList.innerHTML = cards.map((c, i) =>
       `<div class="trophy-unlock-card" style="animation-delay:${i * 130}ms">` +
-      `<span class="trophy-unlock-star">★</span>` +
+      `<span class="trophy-unlock-star">${c.star}</span>` +
       `<div><div class="trophy-unlock-name">${c.name}</div>` +
       `<div class="trophy-unlock-desc">${c.desc}</div></div></div>`
     ).join('');
+  }
+
+  showTrophyCelebration(unlocked) {
+    this.showUnlockCelebration(unlocked, []);
   }
 
   showChampionshipRoundResults(championship, roundResults) {
@@ -489,14 +550,18 @@ export class UI {
     if (rec) { this.highScore = sim.score; saveHighScore(this.highScore); }
     const arenaRec = sim.score > loadArenaBest(arena.id);
     if (arenaRec) saveArenaBest(arena.id, sim.score);
+    const prevTotal = loadLifetimeStats().totalPoints || 0;
     const lifetime = recordRunEnd({
       won, kills: sim.kills, nearMisses: sim.nearMissCount, maxMultiplier: sim.maxMultiplier,
+      score: sim.score,
     });
+    const tierUnlocks = applyTierUnlocks(prevTotal, lifetime.totalPoints || 0);
     const unlocked = checkChallenges({
       won, kills: sim.kills, score: sim.score, time, arenaId: arena.id,
       maxMultiplier: sim.maxMultiplier, nearMisses: sim.nearMissCount, lifetime,
     });
     this.buildChallengesList();
+    this.updateHomeProgressBar();
 
     this.overlayBadge.textContent = won ? 'VICTOIRE' : 'GAME OVER';
     this.overlayBadge.classList.remove('hidden');
@@ -512,8 +577,14 @@ export class UI {
     this.overlayBest.textContent = arenaRec
       ? 'Record arène !' + winTxt
       : 'Record global : ' + this.highScore.toLocaleString('fr-FR') + winTxt;
+    if (lifetime.totalPoints != null) {
+      const gained = Math.max(0, (lifetime.totalPoints || 0) - prevTotal);
+      if (gained > 0) {
+        this.overlayBest.textContent += ` · +${formatPoints(gained)} cumulés`;
+      }
+    }
     this.overlayRecord.classList.toggle('hidden', !rec);
-    this.showTrophyCelebration(unlocked);
+    this.showUnlockCelebration(unlocked, tierUnlocks);
     this.overlayNext.textContent = arena.name;
     this.overlayMode = 'arcadeEnd';
     this.overlayHint.textContent = '';
