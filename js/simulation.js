@@ -4,7 +4,7 @@ import { getRiderDefs } from './cosmetics.js';
 import { chooseBotTurn } from './bots.js';
 import {
   DX, DY, CAM_DIR_ANGLES, BIKE_DIR_ANGLES, trailVal, getTickInterval,
-  ARENA_BORDER, CELL_WALL, KILL_BONUS, WIN_BONUS, NEAR_MISS_BONUS, MULTIPLIER_MAX,
+  ARENA_BORDER, CELL_WALL, KILL_BONUS, WIN_BONUS, NEAR_MISS_BONUS, MULTIPLIER_MAX, COMBO_DECAY_TICKS,
   CHAMPIONSHIP_RIDERS,
 } from './constants.js';
 
@@ -33,6 +33,7 @@ export class Simulation {
     this.roundComplete = false;
     this.nearMissCooldown = 0;
     this.survivalBumpAt = 15;
+    this.comboDecay = 0;
   }
 
   get gridW() { return this.grid?.w ?? 0; }
@@ -72,6 +73,26 @@ export class Simulation {
     this.roundComplete = false;
     this.nearMissCooldown = 0;
     this.survivalBumpAt = 15;
+    this.comboDecay = 0;
+  }
+
+  _resetComboDecay() {
+    this.comboDecay = COMBO_DECAY_TICKS;
+  }
+
+  _tickComboDecay(events) {
+    const p = this.getPlayer();
+    if (!p?.alive || this.multiplier <= 1) return;
+    if (this.comboDecay > 0) {
+      this.comboDecay--;
+      return;
+    }
+    const prev = this.multiplier;
+    this.multiplier = Math.max(1, this.multiplier - 1);
+    if (this.multiplier < prev) {
+      this._resetComboDecay();
+      events.push({ type: 'comboDecay', value: this.multiplier });
+    }
   }
 
   _spawnRiders(gridW, gridH, defs, grid) {
@@ -168,6 +189,7 @@ export class Simulation {
 
     this._tickRiders(events);
     this._checkRiskRewards(events, now);
+    this._tickComboDecay(events);
     this.simTick++;
     this.tickIntervalMs = getTickInterval(this.score);
 
@@ -224,9 +246,10 @@ export class Simulation {
           if (this.mode !== 'championship') this.playing = false;
         } else if (this.getPlayer()?.alive) {
           this.kills++;
-          this.score += KILL_BONUS * this.multiplier;
+          const pts = KILL_BONUS * this.multiplier;
+          this.score += pts;
           this._bumpMultiplier(events, 'kill');
-          events.push({ type: 'kill' });
+          events.push({ type: 'kill', points: pts, multiplier: this.multiplier });
         }
         continue;
       }
@@ -244,8 +267,9 @@ export class Simulation {
       m.rider.x = m.nx;
       m.rider.y = m.ny;
       if (m.rider.isPlayer) {
-        this.score += this.multiplier;
-        events.push({ type: 'scoreTick' });
+        const pts = this.multiplier;
+        this.score += pts;
+        events.push({ type: 'scoreTick', points: pts, multiplier: this.multiplier });
       }
     }
 
@@ -260,6 +284,7 @@ export class Simulation {
     const prev = this.multiplier;
     this.multiplier = Math.min(MULTIPLIER_MAX, this.multiplier + 1);
     if (this.multiplier > this.maxMultiplier) this.maxMultiplier = this.multiplier;
+    this._resetComboDecay();
     if (this.multiplier > prev) events.push({ type: 'multiplierUp', value: this.multiplier, reason });
   }
 
@@ -281,13 +306,19 @@ export class Simulation {
     if (this._adjacentBlocked(p)) {
       this.nearMissCooldown = 10;
       this.nearMissCount++;
-      this.score += NEAR_MISS_BONUS * this.multiplier;
+      const mult = this.multiplier;
+      const pts = NEAR_MISS_BONUS * mult;
+      this.score += pts;
       this._bumpMultiplier(events, 'nearMiss');
-      events.push({ type: 'nearMiss' });
+      events.push({ type: 'nearMiss', points: pts, multiplier: mult, combo: this.multiplier });
     } else if (this.walls.isPlayerNearMobile(p, this.gridW, this.gridH)) {
       this.nearMissCooldown = 14;
-      this.score += Math.floor(NEAR_MISS_BONUS * 0.5) * this.multiplier;
-      events.push({ type: 'wallNear' });
+      this.nearMissCount++;
+      const mult = this.multiplier;
+      const pts = Math.floor(NEAR_MISS_BONUS * 0.5) * mult;
+      this.score += pts;
+      this._bumpMultiplier(events, 'wallNear');
+      events.push({ type: 'wallNear', points: pts, multiplier: mult, combo: this.multiplier });
     }
   }
 

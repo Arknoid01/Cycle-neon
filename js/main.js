@@ -118,8 +118,11 @@ function continueChampionship() {
   beginChampionshipRound();
 }
 
-function handleEvents(events, now) {
+function continueChampionship() {
   for (const e of events) {
+    if (!['death', 'victory', 'roundEnd'].includes(e.type)) {
+      ui.onGameEvent(e, sim);
+    }
     switch (e.type) {
       case 'wallMove':
         playWallShift();
@@ -138,6 +141,7 @@ function handleEvents(events, now) {
         break;
       case 'wallNear':
         playNearMissBonus();
+        renderer.flashNearMiss();
         break;
       case 'multiplierUp':
         playMultiplierUp();

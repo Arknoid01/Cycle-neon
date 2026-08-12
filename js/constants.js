@@ -37,6 +37,8 @@ export const KILL_BONUS = 300;
 export const WIN_BONUS = 500;
 export const NEAR_MISS_BONUS = 50;
 export const MULTIPLIER_MAX = 5;
+/** Ticks sans action combo avant que le multiplicateur baisse d'un cran. */
+export const COMBO_DECAY_TICKS = 38;
 export const CHAMPIONSHIP_ROUNDS = 5;
 export const CHAMPIONSHIP_RIDERS = 6;
 export const CHAMP_POINTS = [10, 7, 5, 3, 2, 1];

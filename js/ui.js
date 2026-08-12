@@ -9,10 +9,10 @@ import {
 } from './cosmetics.js';
 import { getSettings, saveSettings } from './settings.js';
 import { setMasterVolume } from './audio.js';
-import { WIN_BONUS } from './constants.js';
 import { BikePreview } from './bike-preview.js';
 import { preloadBikeModels } from './bike-model-loader.js';
 import { getBikeSkin } from './bike-skins.js';
+import { HudFx } from './hud-fx.js';
 
 const SCREENS = ['home', 'play', 'custom', 'trophies', 'options'];
 
@@ -25,14 +25,17 @@ export class UI {
     this.highScoreEl = document.getElementById('high-score');
     this.rivalsEl = document.getElementById('rivals');
     this.challengeHudEl = document.getElementById('challenge-hud');
-    this.multiplierEl = document.getElementById('multiplier-hud');
     this.champHudEl = document.getElementById('champ-hud');
+    this.scoreWrap = document.getElementById('score-wrap');
     this.overlay = document.getElementById('overlay');
+    this.overlayBadge = document.getElementById('overlay-badge');
     this.overlayTitle = document.getElementById('overlay-title');
     this.overlayScore = document.getElementById('overlay-score');
+    this.overlayStats = document.getElementById('overlay-stats');
     this.overlayBest = document.getElementById('overlay-best');
     this.overlayRecord = document.getElementById('overlay-record');
-    this.overlayChallenge = document.getElementById('overlay-challenge');
+    this.overlayTrophies = document.getElementById('overlay-trophies');
+    this.trophyUnlockList = document.getElementById('trophy-unlock-list');
     this.overlayNext = document.getElementById('overlay-next');
     this.overlayHint = document.getElementById('overlay-hint');
     this.overlayActions = document.getElementById('overlay-actions');
@@ -78,15 +81,27 @@ export class UI {
     this.onContinueChampionship = null;
     this.onLaunchChallenge = null;
     this.onReplay = null;
-    this.overlayMode = 'menu';
     this.lastArcadeArenaId = 'classique';
+    this.overlayMode = 'menu';
     this.onSettingsChange = null;
+    this.hudFx = new HudFx();
+  }
+
+  formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    const cs = Math.floor((seconds % 1) * 100);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
   }
 
   applyScoreColor() {
     const c = getCosmeticPreset();
-    this.scoreEl.style.color = hexCss(c.trailGlow);
-    this.scoreEl.style.textShadow = `0 0 8px ${hexCss(c.trailGlow)}88`;
+    const glow = hexCss(c.trailGlow);
+    if (this.scoreEl) {
+      this.scoreEl.style.color = glow;
+      this.scoreEl.style.textShadow = `0 0 16px ${glow}, 0 0 32px ${glow}66`;
+    }
+    if (this.scoreWrap) this.scoreWrap.style.setProperty('--score-glow', glow);
   }
 
   trophyStats() {
@@ -327,12 +342,12 @@ export class UI {
   showMenu() {
     this.buildHomeMenu();
     if (this.challengeHudEl) this.challengeHudEl.textContent = '';
-    this.multiplierEl?.classList.add('hidden');
     this.champHudEl?.classList.add('hidden');
     this.homeMenu.classList.remove('hidden');
     this.overlay.classList.add('hidden');
     this.controls.classList.add('hidden');
     this.hideGameHud();
+    this.hudFx.reset();
   }
 
   showIntro(arena) {
@@ -353,6 +368,8 @@ export class UI {
 
   showGameHud() {
     this.gameHud?.classList.remove('hidden');
+    this.hudFx.reset();
+    this.applyScoreColor();
   }
 
   showControls() {
@@ -361,30 +378,29 @@ export class UI {
 
   updateHud(sim, arena, now, playing, championship = null) {
     this.arenaNameEl.textContent = arena.name;
-    this.highScoreEl.textContent = 'BEST ' + this.highScore.toLocaleString('fr-FR');
+    this.highScoreEl.textContent = 'REC ' + this.highScore.toLocaleString('fr-FR');
     this.scoreEl.textContent = sim.score.toLocaleString('fr-FR');
     const rivals = sim.aliveRiders().length - (sim.getPlayer()?.alive ? 1 : 0);
     this.rivalsEl.textContent = rivals > 0
-      ? rivals + ' en course'
+      ? rivals + ' rival' + (rivals > 1 ? 's' : '')
       : 'DERNIER EN VIE !';
-    if (playing) this.timerEl.textContent = 'T : ' + sim.getElapsedSeconds(now).toFixed(2);
+    if (playing) this.timerEl.textContent = this.formatTime(sim.getElapsedSeconds(now));
     const ch = this.activeChallengeId
       ? CHALLENGES.find(c => c.id === this.activeChallengeId) : null;
-    if (this.challengeHudEl) this.challengeHudEl.textContent = ch ? 'Défi : ' + ch.name : '';
-
-    if (sim.multiplier > 1 && this.multiplierEl) {
-      this.multiplierEl.classList.remove('hidden');
-      this.multiplierEl.textContent = '×' + sim.multiplier;
-      this.multiplierEl.dataset.level = String(sim.multiplier);
-    } else if (this.multiplierEl) {
-      this.multiplierEl.classList.add('hidden');
+    if (this.challengeHudEl) {
+      this.challengeHudEl.textContent = ch ? '★ ' + ch.name : '';
+      this.challengeHudEl.classList.toggle('hidden', !ch);
     }
+
+    this.hudFx.tick(sim);
 
     if (championship?.active && this.champHudEl) {
       const p = championship.standings.find(s => s.isPlayer);
       this.champHudEl.classList.remove('hidden');
       this.champHudEl.textContent =
-        `Manche ${Math.min(championship.round + 1, championship.totalRounds)}/${championship.totalRounds} · ${p?.points ?? 0} pts`;
+        `M${Math.min(championship.round + 1, championship.totalRounds)}/${championship.totalRounds} · ${p?.points ?? 0} pts`;
+    } else {
+      this.champHudEl?.classList.add('hidden');
     }
   }
 
@@ -394,46 +410,76 @@ export class UI {
     this.overlayHint?.classList.toggle('hidden', showActions);
   }
 
+  resetOverlayCard() {
+    this.overlayTrophies?.classList.add('hidden');
+    this.trophyUnlockList && (this.trophyUnlockList.innerHTML = '');
+    this.overlayStats && (this.overlayStats.innerHTML = '');
+    this.overlayBadge?.classList.add('hidden');
+    this.overlayRecord?.classList.add('hidden');
+    this.overlay.querySelector('.overlay-card')?.classList.remove('compact');
+  }
+
+  showTrophyCelebration(unlocked) {
+    if (!this.overlayTrophies || !this.trophyUnlockList) return;
+    if (!unlocked.length) {
+      this.overlayTrophies.classList.add('hidden');
+      this.trophyUnlockList.innerHTML = '';
+      return;
+    }
+    this.overlayTrophies.classList.remove('hidden');
+    this.trophyUnlockList.innerHTML = unlocked.map((c, i) =>
+      `<div class="trophy-unlock-card" style="animation-delay:${i * 130}ms">` +
+      `<span class="trophy-unlock-star">★</span>` +
+      `<div><div class="trophy-unlock-name">${c.name}</div>` +
+      `<div class="trophy-unlock-desc">${c.desc}</div></div></div>`
+    ).join('');
+  }
+
   showChampionshipRoundResults(championship, roundResults) {
+    this.resetOverlayCard();
     this.overlayMode = 'champRound';
     this.setOverlayActions('champ');
     const lines = roundResults.map(r =>
-      `${r.place}. ${r.name} +${r.pointsEarned}`
-    ).join(' · ');
-    this.overlayTitle.textContent = `Manche ${championship.round}/${championship.totalRounds}`;
+      `${r.place}. ${r.name}  +${r.pointsEarned}`
+    ).join('\n');
+    this.overlayBadge.textContent = 'MANCHE';
+    this.overlayBadge.classList.remove('hidden');
+    this.overlayTitle.textContent = `${championship.round}/${championship.totalRounds}`;
     this.overlayScore.textContent = lines;
     const p = championship.standings.find(s => s.isPlayer);
     this.overlayBest.textContent = 'Total : ' + (p?.points ?? 0) + ' pts';
-    this.overlayRecord.classList.add('hidden');
-    this.overlayChallenge.classList.add('hidden');
     this.overlayNext.textContent = championship.isComplete()
-      ? 'Toucher pour voir le classement final'
-      : 'Toucher pour la manche suivante';
-    this.overlayHint.textContent = this.overlayNext.textContent;
+      ? 'Classement final'
+      : 'Manche suivante';
+    this.overlayHint.textContent = 'Toucher pour continuer';
     this.overlay.classList.remove('hidden');
     this.controls.classList.add('hidden');
+    this.overlay.querySelector('.overlay-card')?.classList.add('compact');
   }
 
   showChampionshipFinal(championship) {
+    this.resetOverlayCard();
     this.overlayMode = 'champFinal';
     this.setOverlayActions('champ');
+    this.overlay.querySelector('.overlay-card')?.classList.add('compact');
     const sorted = championship.getSortedStandings();
     const winner = sorted[0];
     const p = sorted.find(s => s.isPlayer);
-    this.overlayTitle.textContent = winner.isPlayer ? 'CHAMPION !' : winner.name + ' gagne';
+    this.overlayBadge.textContent = winner.isPlayer ? 'CHAMPION' : 'FINAL';
+    this.overlayBadge.classList.remove('hidden');
+    this.overlayTitle.textContent = winner.isPlayer ? 'TU GAGNES !' : winner.name + ' gagne';
     this.overlayScore.textContent = sorted.map((s, i) =>
-      `${i + 1}. ${s.name} — ${s.points} pts`
+      `${i + 1}. ${s.name}  —  ${s.points} pts`
     ).join('\n');
-    this.overlayBest.textContent = p ? `Ta place : ${sorted.indexOf(p) + 1}e · ${p.points} pts` : '';
-    this.overlayRecord.classList.add('hidden');
-    this.overlayChallenge.classList.add('hidden');
-    this.overlayNext.textContent = 'Toucher pour revenir au menu';
+    this.overlayBest.textContent = p ? `${sorted.indexOf(p) + 1}e place · ${p.points} pts` : '';
+    this.overlayNext.textContent = '';
     this.overlayHint.textContent = 'Toucher pour revenir au menu';
     this.overlay.classList.remove('hidden');
   }
 
   showGameOver(sim, arena, won, now) {
     this.lastArcadeArenaId = arena.id;
+    this.resetOverlayCard();
     const time = sim.getElapsedSeconds(now);
     const rank = won ? 1 : 1 + sim.aliveBots().length;
     const rec = sim.score > this.highScore;
@@ -449,29 +495,33 @@ export class UI {
     });
     this.buildChallengesList();
 
-    this.overlayTitle.textContent = won ? 'VICTOIRE !' : arena.name;
+    this.overlayBadge.textContent = won ? 'VICTOIRE' : 'GAME OVER';
+    this.overlayBadge.classList.remove('hidden');
+    this.overlayTitle.textContent = won ? 'DERNIER EN VIE !' : arena.name;
     this.overlayScore.textContent = sim.score.toLocaleString('fr-FR');
-    const rankTxt = won ? '1er — dernier en vie !' : rank + 'e place';
-    const killTxt = sim.kills > 0 ? ' · ' + sim.kills + ' kill' + (sim.kills > 1 ? 's' : '') : '';
-    const winTxt = won ? ' · +' + WIN_BONUS + ' bonus' : '';
+    this.overlayStats.innerHTML =
+      `<span>${won ? '1er' : rank + 'e'}</span>` +
+      `<span>×${sim.maxMultiplier} combo</span>` +
+      `<span>${sim.nearMissCount} frôlements</span>` +
+      (sim.kills ? `<span>${sim.kills} kill${sim.kills > 1 ? 's' : ''}</span>` : '') +
+      `<span>${this.formatTime(time)}</span>`;
+    const winTxt = won ? ' · bonus victoire' : '';
     this.overlayBest.textContent = arenaRec
-      ? 'Record arène : ' + sim.score.toLocaleString('fr-FR') + ' · ' + rankTxt + killTxt + winTxt
-      : 'Record : ' + this.highScore.toLocaleString('fr-FR') + ' · ' + rankTxt + killTxt + winTxt;
+      ? 'Record arène !' + winTxt
+      : 'Record global : ' + this.highScore.toLocaleString('fr-FR') + winTxt;
     this.overlayRecord.classList.toggle('hidden', !rec);
-    if (unlocked.length) {
-      this.overlayChallenge.textContent = 'Trophée débloqué : ' + unlocked.map(c => c.name).join(', ');
-      this.overlayChallenge.classList.remove('hidden');
-    } else {
-      this.overlayChallenge.classList.add('hidden');
-    }
-    this.overlayNext.textContent = 'Arène : ' + arena.name;
+    this.showTrophyCelebration(unlocked);
+    this.overlayNext.textContent = arena.name;
     this.overlayMode = 'arcadeEnd';
     this.overlayHint.textContent = '';
     this.setOverlayActions('arcadeEnd');
     this.overlay.classList.remove('hidden');
     this.controls.classList.add('hidden');
     if (this.challengeHudEl) this.challengeHudEl.textContent = '';
-    this.multiplierEl?.classList.add('hidden');
+  }
+
+  onGameEvent(event, sim) {
+    this.hudFx.onGameEvent(event, sim);
   }
 
   bind(onStartArena, onShowMenu, onTurn, onSettingsChange, onStartChampionship, onContinueChampionship, onLaunchChallenge, onReplay) {
