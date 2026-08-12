@@ -47,6 +47,10 @@ export class BikePreview {
     this.scene.add(this.bike);
     if (this.bike.userData.isSpriteBike) {
       updateSpriteBike(this.bike, this.camera.position);
+      // Aperçu statique (pas de boucle par frame ici) : caler la largeur
+      // directement plutôt que de laisser l'animation à mi-chemin pour toujours.
+      const plane = this.bike.userData.spritePlane;
+      plane.scale.x = this.bike.userData.targetPlaneWidth;
     }
   }
 
