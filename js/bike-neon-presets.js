@@ -1,8 +1,8 @@
 /**
  * Presets de skin néon — couche cosmétique riche, purement additive.
  *
- * Ne remplace PAS COLOR_PRESETS (cosmetics.js), qui reste la source de
- * couleurs active pour le rendu actuel (procédural + GLB via
+ * Ne remplace PAS les couleurs portées par chaque skin (bike-skins.js),
+ * qui restent la source active pour le rendu actuel (procédural + GLB via
  * bike-model-loader.js). Ce fichier prépare les paramètres nécessaires au
  * futur MotoSkinShader (pattern animé, intensité de glow, id de traînée)
  * sans toucher au pipeline de rendu existant.

@@ -1,20 +1,39 @@
+function _neonCoreSprites(colorId) {
+  return {
+    front: `assets/bikes/sprites/${colorId}-front.png`,
+    back: `assets/bikes/sprites/${colorId}-back.png`,
+    left: `assets/bikes/sprites/${colorId}-side-left.png`,
+    right: `assets/bikes/sprites/${colorId}-side-right.png`,
+  };
+}
+
+/** Les 6 motos de base — même châssis, couleur néon différente. */
+const NEON_CORE_COLORS = [
+  { colorId: 'cyan', name: 'Néon Core Cyan', body: 0xccaa33, glow: 0xcc9900, wheel: 0x00aacc, trail: 0x66b8cc, trailGlow: 0x00aacc },
+  { colorId: 'magenta', name: 'Néon Core Magenta', body: 0xcc6699, glow: 0xcc4499, wheel: 0xcc3388, trail: 0x994466, trailGlow: 0xcc0066 },
+  { colorId: 'orange', name: 'Néon Core Orange', body: 0xcc9944, glow: 0xcc8800, wheel: 0xcc6600, trail: 0x996633, trailGlow: 0xcc5500 },
+  { colorId: 'lime', name: 'Néon Core Citron', body: 0x99cc44, glow: 0x77aa00, wheel: 0x44aa33, trail: 0x669944, trailGlow: 0x33aa00 },
+  { colorId: 'violet', name: 'Néon Core Violet', body: 0x9966cc, glow: 0x7744cc, wheel: 0x6633cc, trail: 0x664499, trailGlow: 0x5500cc },
+  { colorId: 'crimson', name: 'Néon Core Cramoisi', body: 0xcc6666, glow: 0xcc3333, wheel: 0xcc0022, trail: 0x994444, trailGlow: 0xcc0033 },
+];
+
 /** Catalogue des skins moto — prêt monétisation (free / premium / earn). */
 export const BIKE_SKINS = [
-  {
-    id: 'neon-core',
-    name: 'Néon Core',
+  ...NEON_CORE_COLORS.map(c => ({
+    id: `neon-core-${c.colorId}`,
+    name: c.name,
     desc: 'Le classique du grid',
     tier: 'free',
     kit: 'sprite',
-    sprites: {
-      front: 'assets/bikes/sprites/neon-core-front.png',
-      back: 'assets/bikes/sprites/neon-core-back.png',
-      left: 'assets/bikes/sprites/neon-core-side-left.png',
-      right: 'assets/bikes/sprites/neon-core-side-right.png',
-    },
+    sprites: _neonCoreSprites(c.colorId),
     fallbackKit: 'classic',
     chassisId: 'classic',
-  },
+    body: c.body,
+    glow: c.glow,
+    wheel: c.wheel,
+    trail: c.trail,
+    trailGlow: c.trailGlow,
+  })),
   {
     id: 'streak',
     name: 'Streak',
@@ -189,7 +208,7 @@ export function getBikeSkin(id) {
 }
 
 export function getDefaultSkinId() {
-  return BIKE_SKINS[0].id;
+  return (BIKE_SKINS.find(s => s.tier === 'free') || BIKE_SKINS[0]).id;
 }
 
 export function getGltfSkins() {

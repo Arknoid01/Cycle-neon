@@ -1,6 +1,6 @@
 import { CHAMPIONSHIP_ROUNDS, CHAMP_POINTS } from './constants.js';
 import { CHAMPIONSHIP_BOTS } from './bots.js';
-import { getCosmeticPreset, getChassisPreset, getActiveSkin } from './cosmetics.js';
+import { getChassisPreset, getActiveSkin, getRiderColorDef } from './cosmetics.js';
 import { getBikeSkin } from './bike-skins.js';
 import { pickArenaByFamily, ARENA_FAMILIES } from './arenas.js';
 
@@ -15,7 +15,6 @@ export class Championship {
   }
 
   start() {
-    const player = getCosmeticPreset();
     this.active = true;
     this.round = 0;
     this.standings = [
@@ -28,12 +27,11 @@ export class Championship {
   }
 
   getRiderDefs() {
-    const c = getCosmeticPreset();
     const playerSkin = getActiveSkin();
     return [
       {
         key: 'player', name: 'Toi', isPlayer: true,
-        body: c.body, glow: c.glow, wheel: c.wheel, trail: c.trail, trailGlow: c.trailGlow,
+        ...getRiderColorDef(playerSkin),
         skinId: playerSkin.id,
         skin: playerSkin,
         chassisId: playerSkin.chassisId,

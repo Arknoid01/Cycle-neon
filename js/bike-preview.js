@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { getCosmeticPreset, getActiveSkin, getRiderColorDef } from './cosmetics.js';
+import { getActiveSkin, getRiderColorDef } from './cosmetics.js';
 import { createBikeMesh, pulseBikeMaterials, disposeBikeMesh } from './bike-model-loader.js';
 import { updateSpriteBike } from './bike-sprite-loader.js';
 import { BIKE_SCALE } from './constants.js';
@@ -16,7 +16,6 @@ export class BikePreview {
     this.composer = null;
     this.bike = null;
     this.electricMats = [];
-    this.angle = 0;
     this.active = false;
     this.raf = 0;
     this._buildGen = 0;
@@ -34,9 +33,8 @@ export class BikePreview {
     if (!this.scene) return;
     const gen = ++this._buildGen;
     this._disposeBike();
-    const colors = getCosmeticPreset();
     const skin = getActiveSkin();
-    const def = { ...getRiderColorDef(colors), skinId: skin.id, skin };
+    const def = { ...getRiderColorDef(skin), skinId: skin.id, skin };
     const bike = await createBikeMesh(def, skin, m => this.electricMats.push(m));
     if (gen !== this._buildGen) {
       disposeBikeMesh(bike);
@@ -44,8 +42,12 @@ export class BikePreview {
     }
     this.bike = bike;
     this.bike.position.y = 0.05;
+    this.bike.rotation.y = 0;
     this.bike.scale.setScalar(BIKE_SCALE);
     this.scene.add(this.bike);
+    if (this.bike.userData.isSpriteBike) {
+      updateSpriteBike(this.bike, this.camera.position);
+    }
   }
 
   async init() {
@@ -57,8 +59,8 @@ export class BikePreview {
     this.scene.background = new THREE.Color(0x02040c);
 
     this.camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 50);
-    this.camera.position.set(2.2 * BIKE_SCALE, 1.6 * BIKE_SCALE, 2.4 * BIKE_SCALE);
-    this.camera.lookAt(0, 0.25 * BIKE_SCALE, 0);
+    this.camera.position.set(1.7 * BIKE_SCALE, 0.55 * BIKE_SCALE, 0);
+    this.camera.lookAt(0, 0.32 * BIKE_SCALE, 0);
 
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true });
     this.renderer.setSize(w, h, false);
@@ -94,12 +96,7 @@ export class BikePreview {
     const tick = (now) => {
       if (!this.active) return;
       this.raf = requestAnimationFrame(tick);
-      this.angle += 0.012;
       if (this.bike) {
-        this.bike.rotation.y = this.angle;
-        if (this.bike.userData.isSpriteBike) {
-          updateSpriteBike(this.bike, this.camera.position);
-        }
         pulseBikeMaterials(this.bike, now);
       }
       this.composer?.render();

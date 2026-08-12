@@ -10,15 +10,6 @@ export {
   applyTierUnlocks,
 } from './skin-unlocks.js';
 
-export const COLOR_PRESETS = [
-  { id: 'cyan', body: 0xccaa33, glow: 0xcc9900, wheel: 0x00aacc, trail: 0x66b8cc, trailGlow: 0x00aacc },
-  { id: 'magenta', body: 0xcc6699, glow: 0xcc4499, wheel: 0xcc3388, trail: 0x994466, trailGlow: 0xcc0066 },
-  { id: 'orange', body: 0xcc9944, glow: 0xcc8800, wheel: 0xcc6600, trail: 0x996633, trailGlow: 0xcc5500 },
-  { id: 'lime', body: 0x99cc44, glow: 0x77aa00, wheel: 0x44aa33, trail: 0x669944, trailGlow: 0x33aa00 },
-  { id: 'violet', body: 0x9966cc, glow: 0x7744cc, wheel: 0x6633cc, trail: 0x664499, trailGlow: 0x5500cc },
-  { id: 'crimson', body: 0xcc6666, glow: 0xcc3333, wheel: 0xcc0022, trail: 0x994444, trailGlow: 0xcc0033 },
-];
-
 /** Tire `n` rivaux distincts parmi le roster nommé — un nouveau duo (ou
  * trio) à chaque partie plutôt que toujours les deux mêmes adversaires. */
 export function pickRandomBots(n) {
@@ -31,21 +22,13 @@ export function pickRandomBots(n) {
   return picked;
 }
 
-export function loadCosmetic() {
-  try { return localStorage.getItem('lc_cosmetic') || 'cyan'; } catch { return 'cyan'; }
-}
-
-export function saveCosmetic(id) {
-  try { localStorage.setItem('lc_cosmetic', id); } catch {}
-}
-
 export function loadSkin() {
   try {
     const skin = localStorage.getItem('lc_skin');
     if (skin) return skin;
     const legacy = localStorage.getItem('lc_chassis');
     if (legacy) {
-      const map = { classic: 'neon-core', racer: 'streak', tank: 'vanguard', blade: 'specter' };
+      const map = { classic: 'neon-core-cyan', racer: 'streak', tank: 'vanguard', blade: 'specter' };
       return map[legacy] || getDefaultSkinId();
     }
     return getDefaultSkinId();
@@ -65,10 +48,6 @@ export function loadChassis() {
 /** @deprecated */
 export function saveChassis() {}
 
-export function getCosmeticPreset() {
-  return COLOR_PRESETS.find(p => p.id === loadCosmetic()) || COLOR_PRESETS[0];
-}
-
 export function getActiveSkin() {
   syncEarnedSkins();
   const id = loadSkin();
@@ -77,13 +56,14 @@ export function getActiveSkin() {
   return getBikeSkin(getDefaultSkinId());
 }
 
-export function getRiderColorDef(preset = getCosmeticPreset()) {
+/** Couleur portée par le skin lui-même (plus de sélecteur de couleur séparé). */
+export function getRiderColorDef(skin = getActiveSkin()) {
   return {
-    body: preset.body,
-    glow: preset.glow,
-    wheel: preset.wheel,
-    trail: preset.trail,
-    trailGlow: preset.trailGlow,
+    body: skin.body,
+    glow: skin.glow,
+    wheel: skin.wheel,
+    trail: skin.trail,
+    trailGlow: skin.trailGlow,
   };
 }
 
@@ -99,12 +79,11 @@ export function buildRiderDef(base, skinId) {
 }
 
 export function getRiderDefs() {
-  const colors = getCosmeticPreset();
   const skin = getActiveSkin();
   return [
     buildRiderDef({
       key: 'player', name: 'Toi', isPlayer: true,
-      ...getRiderColorDef(colors),
+      ...getRiderColorDef(skin),
     }, skin.id),
     ...pickRandomBots(2).map((b, i) => buildRiderDef({
       key: 'bot' + i,

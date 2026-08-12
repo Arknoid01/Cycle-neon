@@ -482,10 +482,6 @@ html, body {
 }
 .chassis-name { font-size: 13px; font-weight: bold; color: #7df9ff; }
 .chassis-desc { font-size: 10px; color: rgba(255,255,255,.45); line-height: 1.3; }
-#cosmetic-picker { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; width: 100%; max-width: 360px; }
-.color-swatch { width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); cursor: pointer; touch-action: manipulation; position: relative; box-shadow: 0 0 6px var(--swatch-glow, #0aa); }
-.color-swatch.selected { border-color: rgba(255,255,255,.7); transform: scale(1.12); box-shadow: 0 0 12px var(--swatch-glow, #0aa); }
-.color-swatch:active { transform: scale(.95); }
 
 #challenges-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; }
 

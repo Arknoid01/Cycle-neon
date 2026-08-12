@@ -3,9 +3,9 @@ import { CHALLENGES, checkChallenges, loadChallenges, getChallengeLaunchConfig }
 import { recordRunEnd, loadLifetimeStats } from './stats.js';
 import { loadChampBest } from './championship.js';
 import {
-  COLOR_PRESETS, BIKE_SKINS, SKIN_TIER_LABELS,
-  loadCosmetic, saveCosmetic, loadSkin, saveSkin,
-  getCosmeticPreset, hexCss, isSkinUnlocked, skinLockHint, syncEarnedSkins, applyTierUnlocks,
+  BIKE_SKINS, SKIN_TIER_LABELS,
+  loadSkin, saveSkin,
+  getActiveSkin, hexCss, isSkinUnlocked, skinLockHint, syncEarnedSkins, applyTierUnlocks,
 } from './cosmetics.js';
 import { getSettings, saveSettings } from './settings.js';
 import { setMasterVolume } from './audio.js';
@@ -57,7 +57,6 @@ export class UI {
     this.launchChallengeBtn = document.getElementById('launch-challenge');
     this.arenaList = document.getElementById('arena-list');
     this.arenaRandomBtn = document.getElementById('arena-random');
-    this.cosmeticPicker = document.getElementById('cosmetic-picker');
     this.challengesList = document.getElementById('challenges-list');
     this.arenaIntro = document.getElementById('arena-intro');
     this.arenaIntroName = document.getElementById('arena-intro-name');
@@ -102,8 +101,7 @@ export class UI {
   }
 
   applyScoreColor() {
-    const c = getCosmeticPreset();
-    const glow = hexCss(c.trailGlow);
+    const glow = hexCss(getActiveSkin().trailGlow);
     if (this.scoreEl) {
       this.scoreEl.style.color = glow;
       this.scoreEl.style.textShadow = `0 0 16px ${glow}, 0 0 32px ${glow}66`;
@@ -203,8 +201,8 @@ export class UI {
     }
     if (id === 'home') this.updateHomeStats();
     if (id === 'custom') {
-      this.buildCosmeticPicker();
       this.buildSkinPicker();
+      this.applyScoreColor();
       this.startBikePreview();
     } else {
       this.stopBikePreview();
@@ -215,28 +213,6 @@ export class UI {
     }
     if (id === 'play') this.buildArenaList();
     if (id === 'options') this.syncOptionsUI();
-  }
-
-  buildCosmeticPicker() {
-    if (!this.cosmeticPicker) return;
-    const current = loadCosmetic();
-    this.cosmeticPicker.innerHTML = '';
-    COLOR_PRESETS.forEach(p => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'color-swatch' + (p.id === current ? ' selected' : '');
-      btn.style.background = `linear-gradient(135deg, ${hexCss(p.body)}, ${hexCss(p.trailGlow)})`;
-      btn.style.setProperty('--swatch-glow', hexCss(p.trailGlow));
-      btn.setAttribute('aria-label', p.id);
-      btn.addEventListener('click', () => {
-        saveCosmetic(p.id);
-        this.buildCosmeticPicker();
-        this.applyScoreColor();
-        this.bikePreview?.refresh();
-      });
-      this.cosmeticPicker.appendChild(btn);
-    });
-    this.applyScoreColor();
   }
 
   buildSkinPicker() {
@@ -267,6 +243,7 @@ export class UI {
         if (skin.model) preloadBikeModels([getBikeSkin(skin.id)]);
         if (this.skinPickerHint) this.skinPickerHint.textContent = '';
         this.buildSkinPicker();
+        this.applyScoreColor();
         this.bikePreview?.refresh();
       });
       this.skinPicker.appendChild(btn);
@@ -339,7 +316,7 @@ export class UI {
   }
 
   buildHomeMenu() {
-    this.buildCosmeticPicker();
+    this.applyScoreColor();
     this.buildChallengesList();
     this.buildArenaList();
     this.syncOptionsUI();
