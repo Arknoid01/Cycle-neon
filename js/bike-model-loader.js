@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildBikeSkin } from './bike-builder.js';
 import { updateElectricMaterial } from './electric-shader.js';
+import { skinUsesSprite, createSpriteBike } from './bike-sprite-loader.js';
 
 const loader = new GLTFLoader();
 const templateCache = new Map();
@@ -22,7 +23,7 @@ const ANCHOR_TRAIL = ['trail_anchor', 'TrailAnchor', 'trail', 'Trail'];
 const ANCHOR_EMITTER = ['emitter', 'Emitter', 'trail_emitter'];
 
 export function skinUsesModel(skin) {
-  return !!(skin?.model || skin?.kit === 'gltf');
+  return !!(skin?.model || skin?.kit === 'gltf' || skinUsesSprite(skin));
 }
 
 export function buildFallbackBike(def, skin, trackElectric) {
@@ -163,6 +164,15 @@ export async function createBikeMesh(def, skin, trackElectric) {
     return buildBikeSkin(def, skin, trackElectric);
   }
 
+  if (skinUsesSprite(skin)) {
+    try {
+      return await createSpriteBike(skin);
+    } catch (err) {
+      console.warn('[bike-sprite] Échec chargement', skin.sprites, err);
+      return buildFallbackBike(def, skin, trackElectric);
+    }
+  }
+
   try {
     const template = await _loadTemplate(skin);
     const wrapper = new THREE.Group();
@@ -179,7 +189,11 @@ export async function createBikeMesh(def, skin, trackElectric) {
 }
 
 export async function preloadBikeModels(skins) {
-  const jobs = skins.filter(skinUsesModel).map(s => _loadTemplate(s).catch(() => null));
+  const jobs = skins.map(s => {
+    if (skinUsesSprite(s)) return createSpriteBike(s).catch(() => null);
+    if (skinUsesModel(s)) return _loadTemplate(s).catch(() => null);
+    return null;
+  }).filter(Boolean);
   await Promise.all(jobs);
 }
 

@@ -5,7 +5,14 @@ export const BIKE_SKINS = [
     name: 'Néon Core',
     desc: 'Le classique du grid',
     tier: 'free',
-    kit: 'classic',
+    kit: 'sprite',
+    sprites: {
+      front: 'assets/bikes/sprites/neon-core-front.png',
+      back: 'assets/bikes/sprites/neon-core-back.png',
+      left: 'assets/bikes/sprites/neon-core-side-left.png',
+      right: 'assets/bikes/sprites/neon-core-side-right.png',
+    },
+    fallbackKit: 'classic',
     chassisId: 'classic',
   },
   {

@@ -19,6 +19,7 @@ import {
   pulseBikeMaterials,
   disposeBikeMesh,
 } from './bike-model-loader.js';
+import { updateSpriteBike } from './bike-sprite-loader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -554,6 +555,10 @@ export class Renderer {
       while (diff < -Math.PI) diff += Math.PI * 2;
       r.smoothAngle += diff * 0.28;
       mesh.rotation.y = r.smoothAngle;
+
+      if (mesh.userData.isSpriteBike) {
+        updateSpriteBike(mesh, this.camera.position);
+      }
 
       const underKey = this._cellKey(r.x, r.y);
       const underMesh = this.cellMeshes.get(underKey);

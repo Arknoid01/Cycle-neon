@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { getCosmeticPreset, getActiveSkin, getRiderColorDef } from './cosmetics.js';
 import { createBikeMesh, pulseBikeMaterials, disposeBikeMesh } from './bike-model-loader.js';
+import { updateSpriteBike } from './bike-sprite-loader.js';
 import { BIKE_SCALE } from './constants.js';
 
 export class BikePreview {
@@ -96,6 +97,9 @@ export class BikePreview {
       this.angle += 0.012;
       if (this.bike) {
         this.bike.rotation.y = this.angle;
+        if (this.bike.userData.isSpriteBike) {
+          updateSpriteBike(this.bike, this.camera.position);
+        }
         pulseBikeMaterials(this.bike, now);
       }
       this.composer?.render();
