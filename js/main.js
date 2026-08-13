@@ -191,7 +191,6 @@ function gameLoop(now) {
   if (!menuVisible && sim.shouldSimTick(now, introUntil)) {
     const { events } = sim.simulationTick(now);
     renderer.syncGrid(sim.grid, sim.walls, sim.riders);
-    renderer.refreshSpriteViews(sim.riders);
     handleEvents(events, now);
     if (sim.playing) {
       ui.updateHud(sim, currentArena, now, true, gameMode === 'championship' ? championship : null);

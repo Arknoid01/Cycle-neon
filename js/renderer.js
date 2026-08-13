@@ -20,7 +20,7 @@ import {
   disposeBikeMesh,
   groundBikeMesh,
 } from './bike-model-loader.js';
-import { updateSpriteBike, refreshOpponentSpriteView } from './bike-sprite-loader.js';
+import { updateSpriteBike } from './bike-sprite-loader.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -589,18 +589,6 @@ export class Renderer {
     return this.riderMeshes.get(rider.id);
   }
 
-  /** Fige la texture (avant/arrière/profil) de chaque adversaire — une fois par
-   * tick de simulation, pas par frame de rendu (voir refreshOpponentSpriteView). */
-  refreshSpriteViews(riders) {
-    for (const r of riders) {
-      if (!r.alive || r.isPlayer) continue;
-      const mesh = this.riderMeshes.get(r.id);
-      if (mesh?.userData?.isSpriteBike) {
-        refreshOpponentSpriteView(mesh, this.camera.position, r.dir);
-      }
-    }
-  }
-
   syncRiders(riders, playing, now = performance.now(), grid = null) {
     for (const m of this.cellMeshes.values()) {
       if (m.userData?.isTrail) m.visible = true;
@@ -626,9 +614,13 @@ export class Renderer {
       r.smoothAngle += diff * 0.28;
 
       if (mesh.userData.isSpriteBike) {
-        mesh.rotation.y = r.isPlayer ? r.smoothAngle : 0;
+        // Le billboard regarde la caméra ; la texture choisie dépend de
+        // l'orientation réelle de la moto, pas d'un ancien tick de simulation.
+        // Cela évite le décalage et les inversions quand la caméra glisse.
+        mesh.rotation.y = 0;
         updateSpriteBike(mesh, this.camera.position, {
           forceView: r.isPlayer ? 'back' : undefined,
+          facingAngle: r.isPlayer ? undefined : r.smoothAngle,
         });
       } else {
         mesh.rotation.y = r.smoothAngle;

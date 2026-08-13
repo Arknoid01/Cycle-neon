@@ -1,6 +1,11 @@
-/** Skins moto en sprite 2D — textures avant/arrière/profils. */
+/**
+ * Skins moto en sprite 2D — 4 vues (avant/arrière/profil gauche/profil droit).
+ *
+ * Important : les bots ne font PAS tourner le PNG. Le plan est un billboard
+ * qui regarde toujours la caméra et on choisit la vue du PNG en fonction de
+ * l'orientation réelle de la moto dans le monde + de la position de la caméra.
+ */
 import * as THREE from 'three';
-import { BIKE_DIR_ANGLES } from './constants.js';
 
 const textureLoader = new THREE.TextureLoader();
 const texturePromises = new Map();
@@ -11,6 +16,10 @@ const SPRITE_SIDE_LENGTH = 0.95;
 /** Vue de profil pour l'aperçu customisation (caméra sur +X). */
 export const PREVIEW_SPRITE_VIEW = 'right';
 export const PREVIEW_SPRITE_VIEW_FLIPPED = 'left';
+
+// 7° d'hystérésis : évite que la texture saute gauche/droite quand la caméra
+// ou la moto est exactement sur une frontière entre deux vues.
+const VIEW_HYSTERESIS = THREE.MathUtils.degToRad(7);
 
 function _loadTexture(path) {
   let p = texturePromises.get(path);
@@ -32,15 +41,19 @@ export function skinUsesSprite(skin) {
   return skin?.kit === 'sprite' && !!skin?.sprites;
 }
 
-const WIDTH_LERP = 0.22;
-
 function _applyTexture(wrapper, tex) {
   const mat = wrapper.userData.spriteMat;
-  const refAspect = wrapper.userData.sideAspect || tex.aspect;
-  wrapper.userData.targetPlaneWidth = SPRITE_HEIGHT * (tex.aspect || refAspect);
-  if (mat.map === tex) return;
-  mat.map = tex;
-  mat.needsUpdate = true;
+  if (!tex) return;
+
+  // Chaque PNG garde son ratio. On modifie uniquement la largeur du plan :
+  // le billboard conserve donc la même hauteur physique quelle que soit la vue.
+  const targetWidth = SPRITE_HEIGHT * (tex.aspect || 1);
+  wrapper.userData.targetPlaneWidth = targetWidth;
+
+  if (mat.map !== tex) {
+    mat.map = tex;
+    mat.needsUpdate = true;
+  }
 }
 
 function _normAngle(a) {
@@ -50,35 +63,84 @@ function _normAngle(a) {
 }
 
 /**
- * Choisit la texture visible depuis la caméra pour un cap donné, à partir de la
- * vraie position de la caméra et du bot (pas juste leurs directions — un bot
- * peut être n'importe où par rapport au joueur, pas seulement pile devant).
+ * Vue brute : angle relatif de la moto par rapport à la caméra.
+ *
+ * facing = direction de l'avant de la moto dans le monde.
+ * toCam  = direction allant de la moto vers la caméra.
+ *
+ * relative = 0       => caméra devant la moto  => front
+ * relative = +PI/2   => caméra à gauche       => side-left
+ * relative = -PI/2   => caméra à droite       => side-right
+ * relative = PI      => caméra derrière       => back
  */
-function _pickViewForFacing(textures, facing, cameraPos, bikePos) {
-  const dx = cameraPos.x - bikePos.x;
-  const dz = cameraPos.z - bikePos.z;
-  if (dx * dx + dz * dz < 1e-6) return textures.back;
-  const toCamAngle = Math.atan2(dx, -dz);
-  const relative = _normAngle(facing - toCamAngle);
+function _pickRawView(textures, relative) {
   const abs = Math.abs(relative);
-  if (abs <= Math.PI / 4) return textures.front;
-  if (abs >= (3 * Math.PI) / 4) return textures.back;
-  return relative > 0 ? textures.left : textures.right;
+  if (abs <= Math.PI / 4) return 'front';
+  if (abs >= (3 * Math.PI) / 4) return 'back';
+  return relative > 0 ? 'left' : 'right';
 }
 
 /**
- * Recalcule et fige la texture d'un adversaire — à appeler une fois par tick de
- * simulation (pas à chaque frame de rendu). La formule ci-dessus est précise
- * mais dépend de la position de la caméra, qui glisse en continu derrière le
- * joueur ; l'appeler à chaque frame fait clignoter/inverser la texture pendant
- * que la caméra pivote alors que le bot n'a pas du tout changé de cap.
+ * Conserve la vue courante tant que l'angle n'a pas suffisamment franchi la
+ * frontière. C'est volontairement fait sur la vue, pas sur la position :
+ * déplacer la caméra ne fait donc pas « trembler » le sprite à la frontière.
  */
-export function refreshOpponentSpriteView(wrapper, cameraPos, dir) {
-  if (!wrapper?.userData?.isSpriteBike || dir == null) return;
-  const tex = wrapper.userData.spriteTextures;
-  const facing = BIKE_DIR_ANGLES[((dir % 4) + 4) % 4];
-  const chosen = _pickViewForFacing(tex, facing, cameraPos, wrapper.position);
-  _applyTexture(wrapper, chosen);
+function _pickStableView(wrapper, textures, relative) {
+  const current = wrapper.userData.spriteView;
+  const raw = _pickRawView(textures, relative);
+
+  if (!current || !textures[current]) {
+    wrapper.userData.spriteView = raw;
+    return raw;
+  }
+
+  if (raw === current) return current;
+
+  let next = current;
+
+  switch (current) {
+    case 'front':
+      if (relative > Math.PI / 4 + VIEW_HYSTERESIS) next = 'left';
+      else if (relative < -Math.PI / 4 - VIEW_HYSTERESIS) next = 'right';
+      break;
+
+    case 'left':
+      if (relative < Math.PI / 4 - VIEW_HYSTERESIS) next = 'front';
+      else if (relative > 3 * Math.PI / 4 + VIEW_HYSTERESIS) next = 'back';
+      break;
+
+    case 'right':
+      if (relative > -Math.PI / 4 + VIEW_HYSTERESIS) next = 'front';
+      else if (relative < -3 * Math.PI / 4 - VIEW_HYSTERESIS) next = 'back';
+      break;
+
+    case 'back':
+      // Autour de ±PI, l'angle est discontinu : le signe dit d'abord de quel
+      // côté (gauche ou droite) on s'approche de la sortie de « back », sinon
+      // le seuil de gauche (positif) engloutit aussi tout le côté négatif.
+      if (relative > 0) {
+        if (relative < 3 * Math.PI / 4 - VIEW_HYSTERESIS) next = 'left';
+      } else {
+        if (relative > -3 * Math.PI / 4 + VIEW_HYSTERESIS) next = 'right';
+      }
+      break;
+  }
+
+  if (next !== current && textures[next]) {
+    wrapper.userData.spriteView = next;
+  }
+  return wrapper.userData.spriteView;
+}
+
+function _pickViewForFacing(textures, facing, cameraPos, bikePos, wrapper) {
+  const dx = cameraPos.x - bikePos.x;
+  const dz = cameraPos.z - bikePos.z;
+  if (dx * dx + dz * dz < 1e-6) return wrapper.userData.spriteView || 'back';
+
+  // Même convention que BIKE_DIR_ANGLES : 0 rad = -Z.
+  const toCamAngle = Math.atan2(dx, -dz);
+  const relative = _normAngle(facing - toCamAngle);
+  return _pickStableView(wrapper, textures, relative);
 }
 
 const _tmpTarget = new THREE.Vector3();
@@ -99,10 +161,16 @@ export async function createSpriteBike(skin) {
   );
 
   const geo = new THREE.PlaneGeometry(1, 1);
+  // Les PNG sont dessinés avec leur face utile vers l'écran ; cette rotation
+  // conserve la convention utilisée par les sprites existants.
   geo.rotateY(Math.PI);
 
   const mat = new THREE.MeshBasicMaterial({
-    map: texFront, transparent: true, alphaTest: 0.08, side: THREE.DoubleSide, depthWrite: true,
+    map: texFront,
+    transparent: true,
+    alphaTest: 0.08,
+    side: THREE.DoubleSide,
+    depthWrite: true,
   });
 
   const plane = new THREE.Mesh(geo, mat);
@@ -118,8 +186,13 @@ export async function createSpriteBike(skin) {
   wrapper.userData.billboard = billboard;
   wrapper.userData.spriteMat = mat;
   wrapper.userData.spritePlane = plane;
-  wrapper.userData.sideAspect = texLeft.aspect;
-  wrapper.userData.spriteTextures = { front: texFront, back: texBack, left: texLeft, right: texRight };
+  wrapper.userData.spriteTextures = {
+    front: texFront,
+    back: texBack,
+    left: texLeft,
+    right: texRight,
+  };
+  wrapper.userData.spriteView = 'front';
   wrapper.userData.spritePreviewFlip = !!skin.spritePreviewFlip;
   wrapper.userData.trailBackOffset = SPRITE_SIDE_LENGTH * 0.5;
   wrapper.userData.trailAnchorLocal = new THREE.Vector3(0, plane.position.y, SPRITE_SIDE_LENGTH * 0.5);
@@ -130,15 +203,16 @@ export async function createSpriteBike(skin) {
 }
 
 /**
- * Billboards toujours face caméra (évite le côté plat en virage).
- * - preview : profil fixe, même sens pour toutes les motos
- * - forceView : joueur (toujours « back »)
- * - adversaires : la texture est fixée par refreshOpponentSpriteView (une fois
- *   par tick) — ici on ne fait que billboarder et lisser la largeur du plan.
+ * Met à jour un sprite.
+ *
+ * Pour un adversaire, passer facingAngle. Le calcul est fait à CHAQUE frame,
+ * après la mise à jour de la caméra, donc il n'y a plus de décalage d'un tick
+ * entre la trajectoire du bot et la vue affichée.
  */
 export function updateSpriteBike(wrapper, cameraPos, options = {}) {
   if (!wrapper?.userData?.isSpriteBike) return;
-  const { forceView, preview } = options;
+
+  const { forceView, preview, facingAngle } = options;
   const billboard = wrapper.userData.billboard;
   const tex = wrapper.userData.spriteTextures;
   const plane = wrapper.userData.spritePlane;
@@ -157,7 +231,20 @@ export function updateSpriteBike(wrapper, cameraPos, options = {}) {
 
   if (forceView && tex[forceView]) {
     _applyTexture(wrapper, tex[forceView]);
+  } else if (facingAngle != null) {
+    const viewKey = _pickViewForFacing(
+      tex,
+      facingAngle,
+      cameraPos,
+      wrapper.position,
+      wrapper,
+    );
+    _applyTexture(wrapper, tex[viewKey]);
   }
 
-  plane.scale.x += (wrapper.userData.targetPlaneWidth - plane.scale.x) * WIDTH_LERP;
+  // Pas de lerp de largeur : lors d'un changement de vue, le plan prend
+  // immédiatement le bon ratio. Cela supprime l'effet de texture qui « glisse »
+  // ou se déforme pendant quelques frames.
+  plane.scale.x = wrapper.userData.targetPlaneWidth;
+  plane.scale.y = SPRITE_HEIGHT;
 }
