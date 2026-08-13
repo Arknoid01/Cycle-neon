@@ -595,13 +595,17 @@ export class Renderer {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       r.smoothAngle += diff * 0.28;
-      mesh.rotation.y = r.smoothAngle;
 
       if (mesh.userData.isSpriteBike) {
-        updateSpriteBike(mesh, this.camera.position, {
-          forceView: r.isPlayer ? 'back' : undefined,
-          dir: r.dir,
-        });
+        if (r.isPlayer) {
+          mesh.rotation.y = r.smoothAngle;
+          updateSpriteBike(mesh, this.camera.position, { forceView: 'back' });
+        } else {
+          mesh.rotation.y = 0;
+          updateSpriteBike(mesh, this.camera.position, { dir: r.dir });
+        }
+      } else {
+        mesh.rotation.y = r.smoothAngle;
       }
 
       const underKey = this._cellKey(r.x, r.y);
