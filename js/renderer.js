@@ -174,7 +174,7 @@ export class Renderer {
     this.camReady = false;
   }
 
-  syncGrid(grid, wallSystem) {
+  syncGrid(grid, wallSystem, riders = []) {
     const toRemove = [];
     this.cellMeshes.forEach((mesh, key) => {
       const [x, y] = key.split(',').map(Number);
@@ -185,12 +185,30 @@ export class Renderer {
       this.cellMeshes.delete(key);
     });
 
+    // A trail cell whose "ahead" cell is an alive rider's current position is the
+    // segment that rider just vacated this tick — it hasn't fully cleared yet. Its
+    // solid plate is held back one tick (see _setCellMesh) so the wall never looks
+    // like it spawns right on top of the bike; the live trail beam bridges the gap.
+    this._pendingRiderCells = null;
+    if (riders.length) {
+      const riderCells = new Set();
+      for (const r of riders) {
+        if (r.alive) riderCells.add(this._cellKey(r.x, r.y));
+      }
+      this._pendingRiderCells = riderCells;
+    }
+
     for (let y = 0; y < grid.h; y++) {
       for (let x = 0; x < grid.w; x++) {
         const val = grid.get(x, y);
         const key = this._cellKey(x, y);
         if (val === 0) continue;
         if (isTrail(val)) {
+          if (this._isPendingTrailCell(x, y, grid)) {
+            const existing = this.cellMeshes.get(key);
+            if (existing) { this.scene.remove(existing); this.cellMeshes.delete(key); }
+            continue;
+          }
           const existing = this.cellMeshes.get(key);
           if (existing?.userData?.isTrail) {
             const inDir = grid.getTrailInDir(x, y);
@@ -205,6 +223,13 @@ export class Renderer {
         this._setCellMesh(x, y, val, grid, wallSystem);
       }
     }
+  }
+
+  _isPendingTrailCell(x, y, grid) {
+    if (!this._pendingRiderCells) return false;
+    const outDir = grid.getTrailDir(x, y);
+    const aheadKey = this._cellKey(x + DX[outDir], y + DY[outDir]);
+    return this._pendingRiderCells.has(aheadKey);
   }
 
   _createTrailCellGroup(x, y) {
@@ -399,6 +424,8 @@ export class Renderer {
       this.cellMeshes.delete(key);
     }
 
+    if (isTrail(type) && this._isPendingTrailCell(x, y, grid)) return;
+
     if (isTrail(type)) {
       const outDir = grid.getTrailDir(x, y);
       const inDir = grid.getTrailInDir(x, y);
@@ -526,27 +553,17 @@ export class Renderer {
 
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
-    const angle = bikeMesh?.rotation.y ?? rider.smoothAngle;
-    return bikeTrailRearWorld(bikeMesh, p.x, p.z, angle);
+    // rider.smoothAngle tracks the rider's real facing for everyone; bikeMesh.rotation.y
+    // is unusable here for sprite bots (kept at 0, orientation conveyed via billboard+texture).
+    return bikeTrailRearWorld(bikeMesh, p.x, p.z, rider.smoothAngle);
   }
 
-  _updateLiveTrail(lt, rider, bikeMesh, grid, renderT = 1) {
+  _updateLiveTrail(lt, rider, bikeMesh, grid) {
     const dir = grid?.getTrailDir(rider.prevX, rider.prevY) ?? rider.dir;
-    const endJoin = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2, grid);
-    let join = endJoin;
-    if (grid && renderT < 1 && (rider.prevX !== rider.x || rider.prevY !== rider.y)) {
-      const bx = rider.prevX - DX[dir];
-      const by = rider.prevY - DY[dir];
-      if (grid.inBounds(bx, by) && isTrail(grid.get(bx, by))) {
-        const backDir = grid.getTrailDir(bx, by);
-        const startJoin = this._plateFrontEdge(bx, by, backDir, this._worldPos, grid);
-        const st = renderT;
-        join = {
-          x: startJoin.x + (endJoin.x - startJoin.x) * st,
-          z: startJoin.z + (endJoin.z - startJoin.z) * st,
-        };
-      }
-    }
+    // rider.prevX/prevY's own plate is held back one tick (see syncGrid): this join
+    // point is its near edge, so the live beam stops there rather than papering over
+    // the still-empty cell — the solid wall visibly lags the bike by one cell.
+    const join = this._plateFrontEdge(rider.prevX, rider.prevY, dir, this._worldPos2, grid);
     const rear = this._bikeRearWorld(rider, bikeMesh, this._worldPos);
     const seg = lt.userData.segment;
     const dx = join.x - rear.x;
@@ -572,10 +589,13 @@ export class Renderer {
     return this.riderMeshes.get(rider.id);
   }
 
-  syncRiders(riders, playing, now = performance.now(), grid = null, renderT = 1) {
+  syncRiders(riders, playing, now = performance.now(), grid = null) {
     for (const m of this.cellMeshes.values()) {
       if (m.userData?.isTrail) m.visible = true;
     }
+
+    const player = riders.find(r => r.isPlayer);
+    const camDir = player?.dir ?? 0;
 
     for (const r of riders) {
       if (!r.alive) {
@@ -601,6 +621,7 @@ export class Renderer {
         updateSpriteBike(mesh, this.camera.position, {
           forceView: r.isPlayer ? 'back' : undefined,
           dir: r.isPlayer ? undefined : r.dir,
+          camDir: r.isPlayer ? undefined : camDir,
         });
       } else {
         mesh.rotation.y = r.smoothAngle;
@@ -617,7 +638,7 @@ export class Renderer {
           this.scene.add(lt);
           this.liveTrails.set(r.id, lt);
         }
-        this._updateLiveTrail(lt, r, mesh, grid, renderT);
+        this._updateLiveTrail(lt, r, mesh, grid);
       }
 
       if (r.isPlayer) pulseBikeMaterials(mesh, now);

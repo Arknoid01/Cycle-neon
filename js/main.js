@@ -178,7 +178,7 @@ function handleEvents(events, now) {
 function gameLoop(now) {
   if (renderer.scene && !menuVisible) {
     sim.updateRenderPositions(now);
-    renderer.syncRiders(sim.riders, sim.playing, now, sim.grid, sim.getRenderT(now));
+    renderer.syncRiders(sim.riders, sim.playing, now, sim.grid);
     renderer.updateCamera(sim.getPlayer());
     renderer.syncMobileWarnings(sim.walls, now);
     renderer.syncWallPreviews(sim.walls, sim.grid, now);
@@ -190,7 +190,7 @@ function gameLoop(now) {
 
   if (!menuVisible && sim.shouldSimTick(now, introUntil)) {
     const { events } = sim.simulationTick(now);
-    renderer.syncGrid(sim.grid, sim.walls);
+    renderer.syncGrid(sim.grid, sim.walls, sim.riders);
     handleEvents(events, now);
     if (sim.playing) {
       ui.updateHud(sim, currentArena, now, true, gameMode === 'championship' ? championship : null);
