@@ -1,5 +1,6 @@
 /** Skins moto en sprite 2D (billboard) — découpage pixel-art avant/arrière/profils. */
 import * as THREE from 'three';
+import { BIKE_DIR_ANGLES } from './constants.js';
 
 const textureLoader = new THREE.TextureLoader();
 const texturePromises = new Map();
@@ -8,6 +9,9 @@ const texturePromises = new Map();
 const SPRITE_HEIGHT = 0.52;
 /** Longueur cible (bord à bord) visée pour la vue de profil, alignée sur BIKE_MODEL_TARGET_LENGTH des .glb. */
 const SPRITE_SIDE_LENGTH = 0.95;
+
+/** Vue sprite figée par direction logique (évite les inversions caméra sur les bots). */
+export const BIKE_SPRITE_VIEW_BY_DIR = ['back', 'right', 'front', 'left'];
 
 function _loadTexture(path) {
   let p = texturePromises.get(path);
@@ -27,12 +31,6 @@ function _loadTexture(path) {
 
 export function skinUsesSprite(skin) {
   return skin?.kit === 'sprite' && !!skin?.sprites;
-}
-
-function _norm(a) {
-  while (a > Math.PI) a -= Math.PI * 2;
-  while (a < -Math.PI) a += Math.PI * 2;
-  return a;
 }
 
 /** Anime scale.x vers la largeur cible plutôt que de la caler d'un coup —
@@ -63,7 +61,8 @@ export async function createSpriteBike(skin) {
   });
 
   const plane = new THREE.Mesh(geo, mat);
-  plane.position.y = SPRITE_HEIGHT / 2;
+  // Légèrement sous le centre : compense le padding transparent bas des sprites.
+  plane.position.y = SPRITE_HEIGHT * 0.46;
 
   const billboard = new THREE.Group();
   billboard.add(plane);
@@ -77,7 +76,8 @@ export async function createSpriteBike(skin) {
   wrapper.userData.spritePlane = plane;
   wrapper.userData.sideAspect = texLeft.aspect;
   wrapper.userData.spriteTextures = { front: texFront, back: texBack, left: texLeft, right: texRight };
-  wrapper.userData.trailBackOffset = SPRITE_SIDE_LENGTH * 0.42;
+  wrapper.userData.trailBackOffset = SPRITE_SIDE_LENGTH * 0.5;
+  wrapper.userData.trailAnchorLocal = new THREE.Vector3(0, plane.position.y, SPRITE_SIDE_LENGTH * 0.5);
 
   _applyTexture(wrapper, texFront);
   plane.scale.set(wrapper.userData.targetPlaneWidth, SPRITE_HEIGHT, 1);
@@ -88,18 +88,12 @@ const _tmpTarget = new THREE.Vector3();
 const _tmpWorldPos = new THREE.Vector3();
 
 /**
- * À appeler chaque frame pour un rider en sprite : pivote le billboard vers la caméra
- * et choisit la texture (avant/arrière/profil) selon l'angle relatif moto/caméra.
- * `wrapper.rotation.y` doit déjà porter l'angle logique de la moto (comme les autres skins).
- *
- * `forceView` fige le choix de texture (ex: 'back' pour le joueur — la caméra de
- * poursuite reste toujours derrière lui une fois stabilisée, donc faire varier la
- * vue ne fait que traverser des zones transitoires pendant les virages). Le
- * billboard continue de pivoter vers la caméra normalement, seule la texture
- * choisie est figée.
+ * Pivot billboard vers la caméra ; texture choisie par direction logique
+ * (ou forceView pour le joueur — toujours « back » en caméra de poursuite).
  */
-export function updateSpriteBike(wrapper, cameraPos, forceView) {
+export function updateSpriteBike(wrapper, cameraPos, options = {}) {
   if (!wrapper?.userData?.isSpriteBike) return;
+  const { forceView, dir } = options;
   const billboard = wrapper.userData.billboard;
 
   billboard.getWorldPosition(_tmpWorldPos);
@@ -109,16 +103,22 @@ export function updateSpriteBike(wrapper, cameraPos, forceView) {
   }
 
   const tex = wrapper.userData.spriteTextures;
-  if (forceView && tex[forceView]) {
-    _applyTexture(wrapper, tex[forceView]);
-  } else {
-    const wp = wrapper.position;
-    const dx = cameraPos.x - wp.x;
-    const dz = cameraPos.z - wp.z;
+  let viewKey = forceView;
+  if (!viewKey && dir != null) {
+    viewKey = BIKE_SPRITE_VIEW_BY_DIR[dir] || 'back';
+  }
+  if (viewKey && tex[viewKey]) {
+    _applyTexture(wrapper, tex[viewKey]);
+  } else if (dir != null) {
+    // Secours : angle cible discret (pas l'angle lissé) si pas de forceView.
+    const facing = BIKE_DIR_ANGLES[dir];
+    const dx = cameraPos.x - wrapper.position.x;
+    const dz = cameraPos.z - wrapper.position.z;
     if (dx * dx + dz * dz > 1e-6) {
       const toCamAngle = Math.atan2(dx, -dz);
-      const facing = wrapper.rotation.y;
-      const relative = _norm(facing - toCamAngle);
+      let relative = facing - toCamAngle;
+      while (relative > Math.PI) relative -= Math.PI * 2;
+      while (relative < -Math.PI) relative += Math.PI * 2;
       const abs = Math.abs(relative);
       let chosen;
       if (abs <= Math.PI / 4) chosen = tex.front;

@@ -20,8 +20,8 @@ const TINT_SLOTS = {
   trail: ['trail', 'emitter', 'trail_glow', 'exhaust'],
 };
 
-const ANCHOR_TRAIL = ['trail_anchor', 'TrailAnchor', 'trail', 'Trail'];
-const ANCHOR_EMITTER = ['emitter', 'Emitter', 'trail_emitter'];
+const ANCHOR_TRAIL = ['trail_anchor', 'TrailAnchor', 'Trail_Anchor'];
+const ANCHOR_EMITTER = ['emitter', 'Emitter', 'trail_emitter', 'TrailEmitter'];
 
 export function skinUsesModel(skin) {
   return !!(skin?.model || skin?.kit === 'gltf' || skinUsesSprite(skin));
@@ -128,7 +128,7 @@ function _applyAnchors(model, wrapper) {
     wrapper.worldToLocal(pos);
     wrapper.userData.trailAnchorLocal = pos;
   } else {
-    wrapper.userData.trailBackOffset = 0.38;
+    wrapper.userData.trailBackOffset = 0.46;
   }
 
   const emitterObj = _findByNames(model, ANCHOR_EMITTER);
@@ -198,16 +198,25 @@ export async function preloadBikeModels(skins) {
   await Promise.all(jobs);
 }
 
+export function groundBikeMesh(root) {
+  if (!root) return;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  if (Number.isFinite(box.min.y) && Math.abs(box.min.y) > 1e-4) {
+    root.position.y -= box.min.y;
+  }
+}
+
 export function bikeTrailRearWorld(bikeMesh, worldX, worldZ, angle) {
   if (bikeMesh?.userData?.trailAnchorLocal) {
     const v = bikeMesh.userData.trailAnchorLocal.clone().multiplyScalar(BIKE_SCALE);
     v.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     return { x: worldX + v.x, z: worldZ + v.z };
   }
-  const backOff = (bikeMesh?.userData?.trailBackOffset ?? 0.38) * BIKE_SCALE;
+  const backOff = (bikeMesh?.userData?.trailBackOffset ?? 0.46) * BIKE_SCALE;
   const fx = Math.sin(angle);
   const fz = -Math.cos(angle);
-  return { x: worldX - fx * backOff, z: worldZ - fz * backOff };
+  return { x: worldX + fx * backOff, z: worldZ + fz * backOff };
 }
 
 export function pulseBikeMaterials(mesh, now) {

@@ -18,6 +18,7 @@ import {
   bikeTrailRearWorld,
   pulseBikeMaterials,
   disposeBikeMesh,
+  groundBikeMesh,
 } from './bike-model-loader.js';
 import { updateSpriteBike } from './bike-sprite-loader.js';
 
@@ -479,6 +480,7 @@ export class Renderer {
   _buildBike(def) {
     const mesh = buildFallbackBike(def, def.skin, m => this._trackElectric(m));
     mesh.scale.setScalar(BIKE_SCALE);
+    groundBikeMesh(mesh);
     return mesh;
   }
 
@@ -508,6 +510,7 @@ export class Renderer {
         return;
       }
       mesh.scale.setScalar(BIKE_SCALE);
+      groundBikeMesh(mesh);
       this._replaceRiderMesh(rider.id, mesh);
     });
   }
@@ -552,7 +555,7 @@ export class Renderer {
     if (dist > 0.02) {
       seg.visible = true;
       seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
-      seg.rotation.y = bikeMesh?.rotation.y ?? this._trailRotation(dir);
+      seg.rotation.y = this._trailRotation(dir);
       seg.scale.set(1, 1, dist);
     } else {
       seg.visible = false;
@@ -595,9 +598,10 @@ export class Renderer {
       mesh.rotation.y = r.smoothAngle;
 
       if (mesh.userData.isSpriteBike) {
-        // La caméra de poursuite reste toujours derrière le joueur une fois stabilisée :
-        // pas besoin de faire varier sa vue, ça évite le clignotement pendant les virages.
-        updateSpriteBike(mesh, this.camera.position, r.isPlayer ? 'back' : null);
+        updateSpriteBike(mesh, this.camera.position, {
+          forceView: r.isPlayer ? 'back' : undefined,
+          dir: r.dir,
+        });
       }
 
       const underKey = this._cellKey(r.x, r.y);
