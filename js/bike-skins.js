@@ -130,6 +130,7 @@ export const BIKE_SKINS = [
     fallbackKit: 'pulse',
     chassisId: 'racer',
     unlockTier: s.stage,
+    spritePreviewFlip: true,
     body: s.color,
     glow: s.color,
     wheel: s.color,
