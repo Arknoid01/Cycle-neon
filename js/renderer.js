@@ -597,13 +597,11 @@ export class Renderer {
       r.smoothAngle += diff * 0.28;
 
       if (mesh.userData.isSpriteBike) {
-        if (r.isPlayer) {
-          mesh.rotation.y = r.smoothAngle;
-          updateSpriteBike(mesh, this.camera.position, { forceView: 'back' });
-        } else {
-          mesh.rotation.y = 0;
-          updateSpriteBike(mesh, this.camera.position, { dir: r.dir });
-        }
+        mesh.rotation.y = r.isPlayer ? r.smoothAngle : 0;
+        updateSpriteBike(mesh, this.camera.position, {
+          forceView: r.isPlayer ? 'back' : undefined,
+          dir: r.isPlayer ? undefined : r.dir,
+        });
       } else {
         mesh.rotation.y = r.smoothAngle;
       }
