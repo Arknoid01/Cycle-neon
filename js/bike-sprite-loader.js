@@ -1,4 +1,4 @@
-/** Skins moto en sprite 2D (billboard) — découpage pixel-art avant/arrière/profils. */
+/** Skins moto en sprite 2D — textures avant/arrière/profils. */
 import * as THREE from 'three';
 import { BIKE_DIR_ANGLES } from './constants.js';
 
@@ -7,11 +7,18 @@ const texturePromises = new Map();
 
 /** Hauteur fixe (unités grille) ; la largeur s'adapte au ratio de chaque vue. */
 const SPRITE_HEIGHT = 0.52;
-/** Longueur cible (bord à bord) visée pour la vue de profil, alignée sur BIKE_MODEL_TARGET_LENGTH des .glb. */
+/** Longueur cible (bord à bord) visée pour la vue de profil. */
 const SPRITE_SIDE_LENGTH = 0.95;
 
-/** Vue sprite figée par direction logique (évite les inversions caméra sur les bots). */
+/** Texture par direction de déplacement (0=haut, 1=droite, 2=bas, 3=gauche). */
 export const BIKE_SPRITE_VIEW_BY_DIR = ['back', 'right', 'front', 'left'];
+
+/** Rotation extra du plan pour que la face soit visible (profil droit). */
+export const BIKE_SPRITE_FLIP = [false, true, false, false];
+
+/** Aperçu customisation : profil droit, nez vers la gauche de l'écran. */
+export const PREVIEW_SPRITE_VIEW = 'right';
+export const PREVIEW_SPRITE_Y = BIKE_DIR_ANGLES[1] + Math.PI;
 
 function _loadTexture(path) {
   let p = texturePromises.get(path);
@@ -33,9 +40,6 @@ export function skinUsesSprite(skin) {
   return skin?.kit === 'sprite' && !!skin?.sprites;
 }
 
-/** Anime scale.x vers la largeur cible plutôt que de la caler d'un coup —
- * sans ça, passer d'une vue de profil (large) à avant/arrière (étroite)
- * fait "sauter" la taille de la moto pile au moment du changement de texture. */
 const WIDTH_LERP = 0.22;
 
 function _applyTexture(wrapper, tex) {
@@ -54,14 +58,13 @@ export async function createSpriteBike(skin) {
   );
 
   const geo = new THREE.PlaneGeometry(1, 1);
-  geo.rotateY(Math.PI); // aligne la face texturée sur la convention "nez = -Z" du moteur
+  geo.rotateY(Math.PI);
 
   const mat = new THREE.MeshBasicMaterial({
     map: texFront, transparent: true, alphaTest: 0.08, side: THREE.DoubleSide, depthWrite: true,
   });
 
   const plane = new THREE.Mesh(geo, mat);
-  // Légèrement sous le centre : compense le padding transparent bas des sprites.
   plane.position.y = SPRITE_HEIGHT * 0.46;
 
   const billboard = new THREE.Group();
@@ -87,48 +90,43 @@ export async function createSpriteBike(skin) {
 const _tmpTarget = new THREE.Vector3();
 const _tmpWorldPos = new THREE.Vector3();
 
+function _spriteAngleForDir(dir) {
+  const d = ((dir % 4) + 4) % 4;
+  return BIKE_DIR_ANGLES[d] + (BIKE_SPRITE_FLIP[d] ? Math.PI : 0);
+}
+
 /**
- * Pivot billboard vers la caméra ; texture choisie par direction logique
- * (ou forceView pour le joueur — toujours « back » en caméra de poursuite).
+ * - preview : profil fixe (customisation)
+ * - forceView + billboard : joueur (toujours « back », face caméra)
+ * - dir sans billboard : adversaires alignés sur leur cap
  */
 export function updateSpriteBike(wrapper, cameraPos, options = {}) {
   if (!wrapper?.userData?.isSpriteBike) return;
-  const { forceView, dir } = options;
+  const { forceView, dir, preview } = options;
   const billboard = wrapper.userData.billboard;
-
-  billboard.getWorldPosition(_tmpWorldPos);
-  _tmpTarget.set(cameraPos.x, _tmpWorldPos.y, cameraPos.z);
-  if (_tmpTarget.distanceToSquared(_tmpWorldPos) > 1e-6) {
-    billboard.lookAt(_tmpTarget);
-  }
-
   const tex = wrapper.userData.spriteTextures;
-  let viewKey = forceView;
-  if (!viewKey && dir != null) {
-    viewKey = BIKE_SPRITE_VIEW_BY_DIR[dir] || 'back';
-  }
-  if (viewKey && tex[viewKey]) {
-    _applyTexture(wrapper, tex[viewKey]);
-  } else if (dir != null) {
-    // Secours : angle cible discret (pas l'angle lissé) si pas de forceView.
-    const facing = BIKE_DIR_ANGLES[dir];
-    const dx = cameraPos.x - wrapper.position.x;
-    const dz = cameraPos.z - wrapper.position.z;
-    if (dx * dx + dz * dz > 1e-6) {
-      const toCamAngle = Math.atan2(dx, -dz);
-      let relative = facing - toCamAngle;
-      while (relative > Math.PI) relative -= Math.PI * 2;
-      while (relative < -Math.PI) relative += Math.PI * 2;
-      const abs = Math.abs(relative);
-      let chosen;
-      if (abs <= Math.PI / 4) chosen = tex.front;
-      else if (abs >= (3 * Math.PI) / 4) chosen = tex.back;
-      else if (relative > 0) chosen = tex.left;
-      else chosen = tex.right;
-      _applyTexture(wrapper, chosen);
-    }
+  const plane = wrapper.userData.spritePlane;
+
+  if (preview) {
+    if (tex[PREVIEW_SPRITE_VIEW]) _applyTexture(wrapper, tex[PREVIEW_SPRITE_VIEW]);
+    billboard.rotation.set(0, PREVIEW_SPRITE_Y, 0);
+    plane.scale.x = wrapper.userData.targetPlaneWidth;
+    return;
   }
 
-  const plane = wrapper.userData.spritePlane;
+  if (forceView && tex[forceView]) {
+    _applyTexture(wrapper, tex[forceView]);
+    billboard.getWorldPosition(_tmpWorldPos);
+    _tmpTarget.set(cameraPos.x, _tmpWorldPos.y, cameraPos.z);
+    if (_tmpTarget.distanceToSquared(_tmpWorldPos) > 1e-6) {
+      billboard.lookAt(_tmpTarget);
+    }
+  } else if (dir != null) {
+    const d = ((dir % 4) + 4) % 4;
+    const viewKey = BIKE_SPRITE_VIEW_BY_DIR[d] || 'back';
+    if (tex[viewKey]) _applyTexture(wrapper, tex[viewKey]);
+    billboard.rotation.set(0, _spriteAngleForDir(d), 0);
+  }
+
   plane.scale.x += (wrapper.userData.targetPlaneWidth - plane.scale.x) * WIDTH_LERP;
 }
