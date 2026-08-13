@@ -1,5 +1,6 @@
 /** Skins moto en sprite 2D — textures avant/arrière/profils. */
 import * as THREE from 'three';
+import { BIKE_DIR_ANGLES } from './constants.js';
 
 const textureLoader = new THREE.TextureLoader();
 const texturePromises = new Map();
@@ -42,18 +43,42 @@ function _applyTexture(wrapper, tex) {
   mat.needsUpdate = true;
 }
 
-/**
- * Choisit la texture selon le cap du bot relatif au cap du joueur (caméra de
- * poursuite = toujours dans le dos du joueur). Basé sur les directions de
- * grille discrètes (pas l'angle caméra lissé en continu) pour que la vue ne
- * change qu'aux virages réels, jamais frame par frame pendant que la caméra
- * pivote — sinon la texture clignote et la moto semble changer de sens.
- */
-const VIEW_BY_RELATIVE_DIR = ['back', 'right', 'front', 'left'];
+function _normAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
 
-function _pickViewForDir(textures, botDir, camDir) {
-  const relative = (((botDir - camDir) % 4) + 4) % 4;
-  return textures[VIEW_BY_RELATIVE_DIR[relative]];
+/**
+ * Choisit la texture visible depuis la caméra pour un cap donné, à partir de la
+ * vraie position de la caméra et du bot (pas juste leurs directions — un bot
+ * peut être n'importe où par rapport au joueur, pas seulement pile devant).
+ */
+function _pickViewForFacing(textures, facing, cameraPos, bikePos) {
+  const dx = cameraPos.x - bikePos.x;
+  const dz = cameraPos.z - bikePos.z;
+  if (dx * dx + dz * dz < 1e-6) return textures.back;
+  const toCamAngle = Math.atan2(dx, -dz);
+  const relative = _normAngle(facing - toCamAngle);
+  const abs = Math.abs(relative);
+  if (abs <= Math.PI / 4) return textures.front;
+  if (abs >= (3 * Math.PI) / 4) return textures.back;
+  return relative > 0 ? textures.left : textures.right;
+}
+
+/**
+ * Recalcule et fige la texture d'un adversaire — à appeler une fois par tick de
+ * simulation (pas à chaque frame de rendu). La formule ci-dessus est précise
+ * mais dépend de la position de la caméra, qui glisse en continu derrière le
+ * joueur ; l'appeler à chaque frame fait clignoter/inverser la texture pendant
+ * que la caméra pivote alors que le bot n'a pas du tout changé de cap.
+ */
+export function refreshOpponentSpriteView(wrapper, cameraPos, dir) {
+  if (!wrapper?.userData?.isSpriteBike || dir == null) return;
+  const tex = wrapper.userData.spriteTextures;
+  const facing = BIKE_DIR_ANGLES[((dir % 4) + 4) % 4];
+  const chosen = _pickViewForFacing(tex, facing, cameraPos, wrapper.position);
+  _applyTexture(wrapper, chosen);
 }
 
 const _tmpTarget = new THREE.Vector3();
@@ -108,12 +133,12 @@ export async function createSpriteBike(skin) {
  * Billboards toujours face caméra (évite le côté plat en virage).
  * - preview : profil fixe, même sens pour toutes les motos
  * - forceView : joueur (toujours « back »)
- * - dir + camDir : adversaires — texture selon cap relatif au joueur (stable,
- *   ne change qu'aux virages, pas à chaque frame de pivot caméra)
+ * - adversaires : la texture est fixée par refreshOpponentSpriteView (une fois
+ *   par tick) — ici on ne fait que billboarder et lisser la largeur du plan.
  */
 export function updateSpriteBike(wrapper, cameraPos, options = {}) {
   if (!wrapper?.userData?.isSpriteBike) return;
-  const { forceView, dir, camDir, preview } = options;
+  const { forceView, preview } = options;
   const billboard = wrapper.userData.billboard;
   const tex = wrapper.userData.spriteTextures;
   const plane = wrapper.userData.spritePlane;
@@ -132,11 +157,6 @@ export function updateSpriteBike(wrapper, cameraPos, options = {}) {
 
   if (forceView && tex[forceView]) {
     _applyTexture(wrapper, tex[forceView]);
-  } else if (dir != null) {
-    const d = ((dir % 4) + 4) % 4;
-    const cd = ((camDir ?? 0) % 4 + 4) % 4;
-    const chosen = _pickViewForDir(tex, d, cd);
-    _applyTexture(wrapper, chosen);
   }
 
   plane.scale.x += (wrapper.userData.targetPlaneWidth - plane.scale.x) * WIDTH_LERP;
