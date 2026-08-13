@@ -80,10 +80,27 @@ function _pickRawView(textures, relative) {
   return relative > 0 ? 'left' : 'right';
 }
 
+// Ordre du cycle des vues quand l'angle augmente : front(0°) -> left(90°) ->
+// back(180°) -> right(-90°/270°) -> front. Utilisé pour avancer d'un cran à
+// la fois plutôt que de sauter directement à la vue "brute".
+const VIEW_CYCLE = ['front', 'left', 'back', 'right'];
+const VIEW_CENTER = { front: 0, left: Math.PI / 2, back: Math.PI, right: -Math.PI / 2 };
+
+function _nextView(current, step) {
+  const idx = VIEW_CYCLE.indexOf(current);
+  return VIEW_CYCLE[(idx + step + VIEW_CYCLE.length) % VIEW_CYCLE.length];
+}
+
 /**
  * Conserve la vue courante tant que l'angle n'a pas suffisamment franchi la
  * frontière. C'est volontairement fait sur la vue, pas sur la position :
  * déplacer la caméra ne fait donc pas « trembler » le sprite à la frontière.
+ *
+ * L'écart est mesuré par rapport au centre de la vue COURANTE (via _normAngle,
+ * donc toujours le chemin le plus court) plutôt que par des seuils bruts sur
+ * `relative` : ça évite les faux sauts quand l'angle passe par ±180°, où une
+ * moto strictement alignée avec la caméra peut faire osciller `relative`
+ * entre tout juste sous +180° et tout juste sous -180° d'une frame à l'autre.
  */
 function _pickStableView(wrapper, textures, relative) {
   const current = wrapper.userData.spriteView;
@@ -96,35 +113,10 @@ function _pickStableView(wrapper, textures, relative) {
 
   if (raw === current) return current;
 
+  const offset = _normAngle(relative - VIEW_CENTER[current]);
   let next = current;
-
-  switch (current) {
-    case 'front':
-      if (relative > Math.PI / 4 + VIEW_HYSTERESIS) next = 'left';
-      else if (relative < -Math.PI / 4 - VIEW_HYSTERESIS) next = 'right';
-      break;
-
-    case 'left':
-      if (relative < Math.PI / 4 - VIEW_HYSTERESIS) next = 'front';
-      else if (relative > 3 * Math.PI / 4 + VIEW_HYSTERESIS) next = 'back';
-      break;
-
-    case 'right':
-      if (relative > -Math.PI / 4 + VIEW_HYSTERESIS) next = 'front';
-      else if (relative < -3 * Math.PI / 4 - VIEW_HYSTERESIS) next = 'back';
-      break;
-
-    case 'back':
-      // Autour de ±PI, l'angle est discontinu : le signe dit d'abord de quel
-      // côté (gauche ou droite) on s'approche de la sortie de « back », sinon
-      // le seuil de gauche (positif) engloutit aussi tout le côté négatif.
-      if (relative > 0) {
-        if (relative < 3 * Math.PI / 4 - VIEW_HYSTERESIS) next = 'left';
-      } else {
-        if (relative > -3 * Math.PI / 4 + VIEW_HYSTERESIS) next = 'right';
-      }
-      break;
-  }
+  if (offset > Math.PI / 4 + VIEW_HYSTERESIS) next = _nextView(current, 1);
+  else if (offset < -Math.PI / 4 - VIEW_HYSTERESIS) next = _nextView(current, -1);
 
   if (next !== current && textures[next]) {
     wrapper.userData.spriteView = next;
