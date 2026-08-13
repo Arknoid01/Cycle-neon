@@ -151,6 +151,7 @@ function _addClassicCore(g, def, c, mats, track, opts = {}) {
   const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.16), emitterMat);
   emitter.position.set(0, 0.28, c.chassisZ * 0.46);
   g.add(emitter);
+  g.userData.trailAnchorLocal = new THREE.Vector3(0, 0.28, c.chassisZ * 0.46);
   return emitterMat;
 }
 
