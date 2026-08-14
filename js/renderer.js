@@ -66,15 +66,9 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.94;
+    this.renderer.toneMappingExposure = 0.88;
 
-    this.scene.add(new THREE.AmbientLight(0x223355, 0.28));
-    const keyLight = new THREE.DirectionalLight(0x7df9ff, 0.44);
-    keyLight.position.set(2, 5, 3);
-    this.scene.add(keyLight);
-    const fillLight = new THREE.DirectionalLight(0x334466, 0.16);
-    fillLight.position.set(-3, 3, -2);
-    this.scene.add(fillLight);
+    this.scene.add(new THREE.AmbientLight(0x223355, 0.16));
 
     this.wallCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, WALL_H, WALL_CUBE_SIZE);
     this.perimCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, PERIM_H, WALL_CUBE_SIZE);
@@ -647,7 +641,7 @@ export class Renderer {
         this._updateLiveTrail(lt, r, mesh, grid);
       }
 
-      if (r.isPlayer) pulseBikeMaterials(mesh, now);
+      pulseBikeMaterials(mesh, now);
     }
   }
 

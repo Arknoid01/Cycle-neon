@@ -124,22 +124,77 @@ function _rearAnchorFromBounds(model) {
   return new THREE.Vector3(0, (box.min.y + box.max.y) * 0.5, box.max.z);
 }
 
-function _boostPrebakedMaterials(root) {
+function _meshNeonKind(name) {
+  const n = (name || '').toLowerCase();
+  if (/liseret|neon|strip|glow|emiss/.test(n)) return 'neon';
+  if (/poignee|handle|accent|wheel|roue/.test(n)) return 'accent';
+  if (/motorcycle|body|chassis|frame|hull|carrosserie/.test(n)) return 'body';
+  return 'other';
+}
+
+function _stylePrebakedBike(root, def) {
   const pulseMats = [];
   root.traverse(child => {
     if (!child.isMesh) return;
+    const kind = _meshNeonKind(child.name);
     const materials = Array.isArray(child.material) ? child.material : [child.material];
+
     materials.forEach(mat => {
       if (!mat.emissive) mat.emissive = new THREE.Color(0x000000);
-      const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
-      if (lum < 0.12) {
-        mat.emissive.copy(mat.color);
-        mat.emissiveIntensity = 0.42;
-      } else {
-        mat.emissiveIntensity = Math.max(mat.emissiveIntensity ?? 0, 0.55);
+
+      if (kind === 'neon') {
+        mat.emissive.setHex(def.trailGlow);
+        mat.color.setHex(def.trailGlow);
+        mat.emissiveIntensity = 2.4;
+        mat.metalness = 0.15;
+        mat.roughness = 0.35;
+        mat.toneMapped = false;
+        mat.polygonOffset = true;
+        mat.polygonOffsetFactor = -1;
+        mat.polygonOffsetUnits = -1;
+        mat.userData.baseEmissive = mat.emissiveIntensity;
+        mat.userData.isNeonStrip = true;
+        pulseMats.push(mat);
+        child.renderOrder = 2;
+        return;
       }
-      mat.userData.baseEmissive = mat.emissiveIntensity;
-      pulseMats.push(mat);
+
+      if (kind === 'accent') {
+        mat.emissive.setHex(def.wheel);
+        mat.color.setHex(def.wheel);
+        mat.emissiveIntensity = 1.35;
+        mat.metalness = 0.45;
+        mat.roughness = 0.3;
+        mat.toneMapped = false;
+        mat.userData.baseEmissive = mat.emissiveIntensity;
+        pulseMats.push(mat);
+        return;
+      }
+
+      if (kind === 'body') {
+        mat.emissive.setHex(def.glow);
+        mat.emissiveIntensity = 0.5;
+        mat.metalness = 0.65;
+        mat.roughness = 0.36;
+        mat.toneMapped = true;
+        mat.userData.baseEmissive = mat.emissiveIntensity;
+        pulseMats.push(mat);
+        return;
+      }
+
+      const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
+      if (lum > 0.45) {
+        mat.emissive.copy(mat.color);
+        mat.emissiveIntensity = 1.6;
+        mat.toneMapped = false;
+        mat.userData.baseEmissive = mat.emissiveIntensity;
+        pulseMats.push(mat);
+      } else {
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+        mat.metalness = 0.65;
+        mat.roughness = 0.4;
+      }
     });
   });
   return pulseMats;
@@ -206,7 +261,7 @@ export async function createBikeMesh(def, skin, trackElectric) {
     const model = template.clone(true);
     wrapper.add(model);
     const pulseMats = skin.prebakedColors
-      ? _boostPrebakedMaterials(model)
+      ? _stylePrebakedBike(model, def)
       : _tintMeshTree(model, def, trackElectric);
     _applyAnchors(model, wrapper);
     wrapper.userData.skinId = skin.id;
@@ -267,16 +322,18 @@ export function bikeTrailRearWorld(bikeMesh, worldX, worldZ, angle) {
 
 export function pulseBikeMaterials(mesh, now) {
   if (!mesh) return;
-  const pulse = 0.92 + Math.sin(now / 120) * 0.08;
+  const pulse = 0.88 + Math.sin(now / 110) * 0.12;
 
   if (mesh.userData.emitterMat?.uniforms) {
-    updateElectricMaterial(mesh.userData.emitterMat, { intensity: pulse });
+    updateElectricMaterial(mesh.userData.emitterMat, { intensity: pulse * 1.15 });
     return;
   }
 
   for (const mat of mesh.userData.pulseMats || []) {
     if (mat.emissiveIntensity !== undefined) {
-      mat.emissiveIntensity = pulse * (mat.userData.baseEmissive ?? 1);
+      const base = mat.userData.baseEmissive ?? 1;
+      const neonBoost = mat.userData.isNeonStrip ? 1.08 : 1;
+      mat.emissiveIntensity = pulse * base * neonBoost;
     }
   }
 }
