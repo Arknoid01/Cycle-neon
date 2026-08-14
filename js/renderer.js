@@ -16,6 +16,7 @@ import {
   buildFallbackBike,
   createBikeMesh,
   bikeTrailRearWorld,
+  bikeCellAlignOffset,
   pulseBikeMaterials,
   disposeBikeMesh,
   groundBikeMesh,
@@ -65,9 +66,15 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.88;
+    this.renderer.toneMappingExposure = 0.94;
 
-    this.scene.add(new THREE.AmbientLight(0x223355, 0.18));
+    this.scene.add(new THREE.AmbientLight(0x223355, 0.28));
+    const keyLight = new THREE.DirectionalLight(0x7df9ff, 0.44);
+    keyLight.position.set(2, 5, 3);
+    this.scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0x334466, 0.16);
+    fillLight.position.set(-3, 3, -2);
+    this.scene.add(fillLight);
 
     this.wallCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, WALL_H, WALL_CUBE_SIZE);
     this.perimCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, PERIM_H, WALL_CUBE_SIZE);
@@ -553,9 +560,8 @@ export class Renderer {
 
   _bikeRearWorld(rider, bikeMesh, out) {
     const p = this.gridToWorld(rider.renderX, rider.renderY, out);
-    // rider.smoothAngle tracks the rider's real facing for everyone; bikeMesh.rotation.y
-    // is unusable here for sprite bots (kept at 0, orientation conveyed via billboard+texture).
-    return bikeTrailRearWorld(bikeMesh, p.x, p.z, rider.smoothAngle);
+    const off = bikeCellAlignOffset(bikeMesh, rider.smoothAngle);
+    return bikeTrailRearWorld(bikeMesh, p.x + off.x, p.z + off.z, rider.smoothAngle);
   }
 
   _updateLiveTrail(lt, rider, bikeMesh, grid) {
@@ -605,7 +611,8 @@ export class Renderer {
       const mesh = this.ensureRiderMesh(r);
       mesh.visible = true;
       const p = this.gridToWorld(r.renderX, r.renderY, this._worldPos);
-      mesh.position.set(p.x, 0, p.z);
+      const align = bikeCellAlignOffset(mesh, r.smoothAngle);
+      mesh.position.set(p.x + align.x, 0, p.z + align.z);
 
       const targetAngle = BIKE_DIR_ANGLES[r.dir];
       let diff = targetAngle - r.smoothAngle;
