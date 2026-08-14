@@ -1,10 +1,5 @@
-function _neonCoreSprites(colorId) {
-  return {
-    front: `assets/bikes/sprites/${colorId}-front.png`,
-    back: `assets/bikes/sprites/${colorId}-back.png`,
-    left: `assets/bikes/sprites/${colorId}-side-left.png`,
-    right: `assets/bikes/sprites/${colorId}-side-right.png`,
-  };
+function _neonCoreModel(colorId) {
+  return `assets/bikes/neon-core-${colorId}.glb`;
 }
 
 /** Les 6 motos de base — même châssis, couleur néon différente. */
@@ -51,10 +46,11 @@ export const BIKE_SKINS = [
     name: c.name,
     desc: 'Le classique du grid',
     tier: 'free',
-    kit: 'sprite',
-    sprites: _neonCoreSprites(c.colorId),
+    kit: 'gltf',
+    model: _neonCoreModel(c.colorId),
     fallbackKit: 'classic',
     chassisId: 'classic',
+    prebakedColors: true,
     body: c.body,
     glow: c.glow,
     wheel: c.wheel,

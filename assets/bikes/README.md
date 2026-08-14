@@ -53,4 +53,22 @@ assets/bikes/chrome.glb
 assets/bikes/pulse.glb
 ```
 
+## Néon Core (6 couleurs de base)
+
+Générés via l'assembleur [3D-editor](https://github.com/Arknoid01/3D-editor) :
+
+```bash
+# Clone 3D-editor, puis :
+npm run generate:neon-bikes
+```
+
+```
+assets/bikes/neon-core-cyan.glb
+assets/bikes/neon-core-magenta.glb
+assets/bikes/neon-core-orange.glb
+assets/bikes/neon-core-lime.glb
+assets/bikes/neon-core-violet.glb
+assets/bikes/neon-core-crimson.glb
+```
+
 Tant qu’un `.glb` manque, le skin utilise le **kit procédural de secours** (`fallbackKit` dans `bike-skins.js`).

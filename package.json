@@ -4,6 +4,7 @@
   "description": "Jeu arcade Light Cycle — **Three.js / WebGL**, un seul fichier HTML.",
   "main": "index.js",
   "scripts": {
+    "generate:neon-bikes": "node tools/generate-neon-core-glbs.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,5 +20,8 @@
   "homepage": "https://github.com/Arknoid01/Cycle-neon#readme",
   "dependencies": {
     "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.7.0"
   }
 }

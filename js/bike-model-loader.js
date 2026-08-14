@@ -179,7 +179,9 @@ export async function createBikeMesh(def, skin, trackElectric) {
     const wrapper = new THREE.Group();
     const model = template.clone(true);
     wrapper.add(model);
-    const pulseMats = _tintMeshTree(model, def, trackElectric);
+    const pulseMats = skin.prebakedColors
+      ? []
+      : _tintMeshTree(model, def, trackElectric);
     _applyAnchors(model, wrapper);
     wrapper.userData.skinId = skin.id;
     wrapper.userData.pulseMats = pulseMats;
