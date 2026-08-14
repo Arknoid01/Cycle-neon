@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildBikeSkin } from './bike-builder.js';
 import { updateElectricMaterial } from './electric-shader.js';
 import { skinUsesSprite, createSpriteBike } from './bike-sprite-loader.js';
-import { BIKE_SCALE } from './constants.js';
+import { BIKE_SCALE, CELL_SIZE } from './constants.js';
 
 const loader = new GLTFLoader();
 const templateCache = new Map();
@@ -119,6 +119,32 @@ function _findByNames(root, names) {
   return null;
 }
 
+function _rearAnchorFromBounds(model) {
+  const box = new THREE.Box3().setFromObject(model);
+  return new THREE.Vector3(0, (box.min.y + box.max.y) * 0.5, box.max.z);
+}
+
+function _boostPrebakedMaterials(root) {
+  const pulseMats = [];
+  root.traverse(child => {
+    if (!child.isMesh) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach(mat => {
+      if (!mat.emissive) mat.emissive = new THREE.Color(0x000000);
+      const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
+      if (lum < 0.12) {
+        mat.emissive.copy(mat.color);
+        mat.emissiveIntensity = 0.42;
+      } else {
+        mat.emissiveIntensity = Math.max(mat.emissiveIntensity ?? 0, 0.55);
+      }
+      mat.userData.baseEmissive = mat.emissiveIntensity;
+      pulseMats.push(mat);
+    });
+  });
+  return pulseMats;
+}
+
 function _applyAnchors(model, wrapper) {
   wrapper.updateMatrixWorld(true);
   const trail = _findByNames(model, ANCHOR_TRAIL);
@@ -128,7 +154,7 @@ function _applyAnchors(model, wrapper) {
     wrapper.worldToLocal(pos);
     wrapper.userData.trailAnchorLocal = pos;
   } else {
-    wrapper.userData.trailBackOffset = 0.46;
+    wrapper.userData.trailAnchorLocal = _rearAnchorFromBounds(model);
   }
 
   const emitterObj = _findByNames(model, ANCHOR_EMITTER);
@@ -180,7 +206,7 @@ export async function createBikeMesh(def, skin, trackElectric) {
     const model = template.clone(true);
     wrapper.add(model);
     const pulseMats = skin.prebakedColors
-      ? []
+      ? _boostPrebakedMaterials(model)
       : _tintMeshTree(model, def, trackElectric);
     _applyAnchors(model, wrapper);
     wrapper.userData.skinId = skin.id;
@@ -209,16 +235,34 @@ export function groundBikeMesh(root) {
   }
 }
 
-export function bikeTrailRearWorld(bikeMesh, worldX, worldZ, angle) {
+/** Distance pivot → arrière (unités monde, inclut l'échelle du mesh). */
+export function getBikeRearExtent(bikeMesh) {
+  const scale = bikeMesh?.scale?.x ?? BIKE_SCALE;
   if (bikeMesh?.userData?.trailAnchorLocal) {
-    const v = bikeMesh.userData.trailAnchorLocal.clone().multiplyScalar(BIKE_SCALE);
+    return Math.max(bikeMesh.userData.trailAnchorLocal.z, 0) * scale;
+  }
+  return (bikeMesh?.userData?.trailBackOffset ?? 0.46) * scale;
+}
+
+/** Décale la moto pour aligner l'arrière sur le bord arrière de la case. */
+export function bikeCellAlignOffset(bikeMesh, angle) {
+  const shift = CELL_SIZE * 0.5 - getBikeRearExtent(bikeMesh);
+  const rx = -Math.sin(angle);
+  const rz = Math.cos(angle);
+  return { x: rx * shift, z: rz * shift };
+}
+
+export function bikeTrailRearWorld(bikeMesh, worldX, worldZ, angle) {
+  const scale = bikeMesh?.scale?.x ?? BIKE_SCALE;
+  if (bikeMesh?.userData?.trailAnchorLocal) {
+    const v = bikeMesh.userData.trailAnchorLocal.clone().multiplyScalar(scale);
     v.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     return { x: worldX + v.x, z: worldZ + v.z };
   }
-  const backOff = (bikeMesh?.userData?.trailBackOffset ?? 0.46) * BIKE_SCALE;
+  const backOff = (bikeMesh?.userData?.trailBackOffset ?? 0.46) * scale;
   const fx = Math.sin(angle);
   const fz = -Math.cos(angle);
-  return { x: worldX + fx * backOff, z: worldZ + fz * backOff };
+  return { x: worldX - fx * backOff, z: worldZ - fz * backOff };
 }
 
 export function pulseBikeMaterials(mesh, now) {
