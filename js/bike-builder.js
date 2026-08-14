@@ -59,7 +59,7 @@ function _createBikeMats(def, chassis, track) {
       acrossDir: AXIS_Z,
     }),
     bodyMat: new THREE.MeshStandardMaterial({
-      color: def.body, emissive: def.glow, emissiveIntensity: 0.85,
+      color: def.body, emissive: def.glow, emissiveIntensity: 0.32,
       metalness: 0.55, roughness: 0.28,
     }),
     darkMat: new THREE.MeshStandardMaterial({
@@ -88,7 +88,7 @@ function _addClassicCore(g, def, c, mats, track, opts = {}) {
   if (metalBody) {
     mats.bodyMat.metalness = 0.92;
     mats.bodyMat.roughness = 0.08;
-    mats.bodyMat.emissiveIntensity = 0.45;
+    mats.bodyMat.emissiveIntensity = 0.18;
   }
 
   const chassisMesh = new THREE.Mesh(

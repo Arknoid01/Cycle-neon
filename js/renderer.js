@@ -59,16 +59,24 @@ export class Renderer {
     const { w, h } = gridDimensions();
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x010108);
-    this.scene.fog = new THREE.FogExp2(0x010108, 0.045);
+    this.scene.fog = new THREE.FogExp2(0x010108, 0.045 / CELL_SIZE);
 
-    this.camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 200 * CELL_SIZE);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.056;
 
-    this.scene.add(new THREE.AmbientLight(0x223355, 0.192));
+    this.scene.add(new THREE.AmbientLight(0x223355, 0.38));
+    // Lumière directionnelle « normale » — sans elle les motos ne sont visibles
+    // que par leur propre émissif et tout prend la teinte du skin.
+    const keyLight = new THREE.DirectionalLight(0x9fd8ff, 1.7);
+    keyLight.position.set(6, 10, 4);
+    this.scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0x334466, 0.7);
+    fillLight.position.set(-5, 6, -3);
+    this.scene.add(fillLight);
 
     this.wallCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, WALL_H, WALL_CUBE_SIZE);
     this.perimCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, PERIM_H, WALL_CUBE_SIZE);
@@ -87,8 +95,8 @@ export class Renderer {
     });
     this._rebuildTrailMats();
 
-    const floorSize = Math.max(w, h);
-    const floor = new THREE.GridHelper(floorSize, w, 0x006644, 0x002211);
+    const floorCells = Math.max(w, h);
+    const floor = new THREE.GridHelper(floorCells * CELL_SIZE, floorCells, 0x006644, 0x002211);
     floor.position.y = 0.005;
     floor.material.transparent = true;
     floor.material.opacity = 0.312;
@@ -696,6 +704,7 @@ export class Renderer {
     if (!player?.alive) return;
     const p = this.gridToWorld(player.renderX, player.renderY, this._worldPos);
     const targetAngle = CAM_DIR_ANGLES[player.dir];
+    // Cadrage relatif à la taille de la moto (BIKE_SCALE), pas à CELL_SIZE.
     const dist = 17, height = 15, lookAhead = 5.3;
 
     if (!this.camReady) {

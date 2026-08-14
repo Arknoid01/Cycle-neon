@@ -97,7 +97,7 @@ function _tintMeshTree(root, def, trackElectric) {
       mat.color.setHex(hex);
       if (mat.emissive) {
         mat.emissive.setHex(slot === 'body' ? def.glow : hex);
-        mat.emissiveIntensity = slot === 'trail' ? 1.2 : slot === 'body' ? 0.85 : 1.0;
+        mat.emissiveIntensity = slot === 'trail' ? 1.2 : slot === 'body' ? 0.32 : 1.0;
         mat.userData.baseEmissive = mat.emissiveIntensity;
         pulseMats.push(mat);
       }
@@ -177,8 +177,12 @@ function _stylePrebakedBike(root, def) {
       }
 
       if (kind === 'body') {
+        // Couleur réelle du skin sur l'albédo (pas seulement l'émissif) : la
+        // carrosserie garde son relief/ombrage sous l'éclairage de la scène au
+        // lieu d'un aplat uni de la teinte du skin.
+        mat.color.setHex(def.body);
         mat.emissive.setHex(def.glow);
-        mat.emissiveIntensity = 0.9;
+        mat.emissiveIntensity = 0.32;
         mat.metalness = 0.65;
         mat.roughness = 0.36;
         mat.toneMapped = true;
@@ -190,8 +194,8 @@ function _stylePrebakedBike(root, def) {
       const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
       if (lum > 0.45) {
         mat.emissive.copy(mat.color);
-        mat.emissiveIntensity = 1.6;
-        mat.toneMapped = false;
+        mat.emissiveIntensity = 0.4;
+        mat.toneMapped = true;
         mat.userData.baseEmissive = mat.emissiveIntensity;
         pulseMats.push(mat);
       } else {
