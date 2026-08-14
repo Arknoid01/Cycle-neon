@@ -66,9 +66,9 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.88;
+    this.renderer.toneMappingExposure = 1.056;
 
-    this.scene.add(new THREE.AmbientLight(0x223355, 0.16));
+    this.scene.add(new THREE.AmbientLight(0x223355, 0.192));
 
     this.wallCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, WALL_H, WALL_CUBE_SIZE);
     this.perimCubeGeo = new THREE.BoxGeometry(WALL_CUBE_SIZE, PERIM_H, WALL_CUBE_SIZE);
@@ -91,7 +91,7 @@ export class Renderer {
     const floor = new THREE.GridHelper(floorSize, w, 0x006644, 0x002211);
     floor.position.y = 0.005;
     floor.material.transparent = true;
-    floor.material.opacity = 0.26;
+    floor.material.opacity = 0.312;
     this.scene.add(floor);
 
     this.composer = new EffectComposer(this.renderer);

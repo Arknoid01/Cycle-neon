@@ -136,6 +136,11 @@ function _stylePrebakedBike(root, def) {
   const pulseMats = [];
   root.traverse(child => {
     if (!child.isMesh) return;
+    // Strip latéral de l'assembleur — bande colorée visible sur le flanc gauche.
+    if (child.name === 'liseret') {
+      child.visible = false;
+      return;
+    }
     const kind = _meshNeonKind(child.name);
     const materials = Array.isArray(child.material) ? child.material : [child.material];
 
@@ -173,7 +178,7 @@ function _stylePrebakedBike(root, def) {
 
       if (kind === 'body') {
         mat.emissive.setHex(def.glow);
-        mat.emissiveIntensity = 0.5;
+        mat.emissiveIntensity = 0.9;
         mat.metalness = 0.65;
         mat.roughness = 0.36;
         mat.toneMapped = true;
