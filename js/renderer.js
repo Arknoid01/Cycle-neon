@@ -324,24 +324,15 @@ export class Renderer {
   /** Front edge of a trail plate on (gx, gy), for linking live segments. */
   _plateFrontEdge(gx, gy, dir, out, grid = null) {
     const p = this.gridToWorld(gx, gy, out);
-    if (grid) {
-      const outDir = grid.getTrailDir(gx, gy);
-      const inDir = grid.getTrailInDir(gx, gy);
-      if (inDir !== outDir) {
-        p.x += DX[outDir] * CELL_SIZE * 0.5;
-        p.z += DY[outDir] * CELL_SIZE * 0.5;
-        return p;
-      }
-      if (this._isPreCornerCell(grid, gx, gy, outDir) || this._isPostCornerCell(grid, gx, gy, outDir)) {
-        p.x += DX[outDir] * CELL_SIZE * 0.5;
-        p.z += DY[outDir] * CELL_SIZE * 0.5;
-        return p;
-      }
-    }
-    const shift = this._plateShiftBack(dir);
-    const half = TRAIL_PLATE_LEN * 0.5;
-    p.x += shift.x + DX[dir] * half;
-    p.z += shift.z + DY[dir] * half;
+    const outDir = grid ? grid.getTrailDir(gx, gy) : dir;
+    // Le vrai bord géométrique de la case dans le sens de sortie — même en
+    // ligne droite. L'ancienne formule (basée sur TRAIL_PLATE_LEN, pensée
+    // pour le léger débord visuel des plaques) ne couvrait qu'une fraction
+    // de la case : le faisceau qui relie la moto à sa traînée restait
+    // bloqué à mi-case au lieu de s'étirer sur toute la case, ce qui
+    // ressemblait à une demi-tuile en permanence collée à l'arrière.
+    p.x += DX[outDir] * CELL_SIZE * 0.5;
+    p.z += DY[outDir] * CELL_SIZE * 0.5;
     return p;
   }
 
@@ -446,9 +437,11 @@ export class Renderer {
       mesh.userData.trailIn = inDir;
       mesh.userData.trailOut = outDir;
       this.cellMeshes.set(key, mesh);
-      // Une case tout juste posée grossit depuis son centre au lieu de
-      // surgir d'un coup — sans ça l'apparition des plaques est saccadée.
-      if (isNewTile) this._spawnTrailAnim(mesh);
+      // Une case tout juste posée apparaît en fondu au lieu de surgir d'un
+      // coup — sans ça l'apparition des plaques est saccadée. On anime
+      // l'opacité (pas l'échelle) pour ne jamais créer de trou géométrique
+      // dans le mur pendant la transition.
+      if (isNewTile) this._spawnTrailFade(mesh, this.trailMats[type - TRAIL_BASE]);
       if (refreshNeighbors) this._refreshTrailNeighbors(x, y, grid, wallSystem);
       return;
     }
@@ -469,19 +462,23 @@ export class Renderer {
     this.cellMeshes.set(key, mesh);
   }
 
-  _spawnTrailAnim(mesh) {
-    mesh.scale.setScalar(0.001);
-    this.spawningTrails.push({ mesh, start: performance.now() });
+  _spawnTrailFade(mesh, shared) {
+    // Un clone dédié à cette plaque : on peut faire varier son opacité sans
+    // toucher au matériau partagé par tout le reste de la traînée du rider.
+    if (!shared?.uniforms) return;
+    const clone = shared.clone();
+    clone.uniforms.uOpacity.value = 0;
+    mesh.traverse(child => { if (child.isMesh) child.material = clone; });
+    this.spawningTrails.push({ mat: clone, start: performance.now() });
   }
 
-  /** Anime la croissance des plaques de traînée fraîchement posées. */
+  /** Fait apparaître en fondu les plaques de traînée fraîchement posées. */
   updateTrailSpawnAnims(now) {
     if (!this.spawningTrails.length) return;
-    const DURATION = 140;
+    const DURATION = 220;
     this.spawningTrails = this.spawningTrails.filter(s => {
       const t = Math.min(1, (now - s.start) / DURATION);
-      const eased = 1 - (1 - t) * (1 - t) * (1 - t);
-      s.mesh.scale.setScalar(t >= 1 ? 1 : Math.max(eased, 0.001));
+      s.mat.uniforms.uOpacity.value = t * TRAIL_OPACITY;
       return t < 1;
     });
   }

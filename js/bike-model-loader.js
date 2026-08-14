@@ -4,7 +4,7 @@ import { buildBikeSkin } from './bike-builder.js';
 import { updateElectricMaterial } from './electric-shader.js';
 import { skinUsesSprite, createSpriteBike } from './bike-sprite-loader.js';
 import { BIKE_SCALE, CELL_SIZE } from './constants.js';
-import { neutralizeBodyColor } from './color-utils.js';
+import { NEUTRAL_BODY } from './color-utils.js';
 
 const loader = new GLTFLoader();
 const templateCache = new Map();
@@ -95,10 +95,22 @@ function _tintMeshTree(root, def, trackElectric) {
         return;
       }
 
-      mat.color.setHex(slot === 'body' ? neutralizeBodyColor(hex) : hex);
+      // La carrosserie garde sa couleur/texture native (pas de teinte du
+      // skin) — juste un léger glow neutre pour rester lisible. L'identité
+      // du skin reste portée par les accents (roues, néons).
+      if (slot === 'body') {
+        if (mat.emissive) {
+          mat.emissive.setHex(NEUTRAL_BODY);
+          mat.emissiveIntensity = 0.3;
+          mat.userData.baseEmissive = mat.emissiveIntensity;
+        }
+        return;
+      }
+
+      mat.color.setHex(hex);
       if (mat.emissive) {
-        mat.emissive.setHex(slot === 'body' ? neutralizeBodyColor(def.glow) : hex);
-        mat.emissiveIntensity = slot === 'trail' ? 1.2 : slot === 'body' ? 0.22 : 1.0;
+        mat.emissive.setHex(hex);
+        mat.emissiveIntensity = slot === 'trail' ? 1.2 : 1.0;
         mat.userData.baseEmissive = mat.emissiveIntensity;
         pulseMats.push(mat);
       }
@@ -178,19 +190,17 @@ function _stylePrebakedBike(root, def) {
       }
 
       if (kind === 'body') {
-        // Couleur du skin très désaturée sur l'albédo (pas juste l'émissif) :
-        // la carrosserie garde son relief/ombrage sous l'éclairage de la scène
-        // au lieu d'un aplat uni et saturé de la teinte du skin.
-        mat.color.setHex(neutralizeBodyColor(def.body));
-        // L'émissif aussi désaturé : en additif il redonnait un aplat saturé
-        // même une fois l'albédo atténué.
-        mat.emissive.setHex(neutralizeBodyColor(def.glow));
-        mat.emissiveIntensity = 0.22;
+        // Pas de teinte du skin sur la carrosserie : on garde sa
+        // texture/couleur native et on ajoute juste un léger glow neutre
+        // (gris-bleu, pas la couleur du skin) pour qu'elle reste lisible
+        // même dans les scènes peu éclairées. L'identité du skin reste
+        // portée par les accents (roues, poignées, liserés néon).
+        mat.emissive.setHex(NEUTRAL_BODY);
+        mat.emissiveIntensity = 0.3;
         mat.metalness = 0.65;
         mat.roughness = 0.36;
         mat.toneMapped = true;
         mat.userData.baseEmissive = mat.emissiveIntensity;
-        pulseMats.push(mat);
         return;
       }
 

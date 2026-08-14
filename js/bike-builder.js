@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 import { getBikeSkin } from './bike-skins.js';
-import { neutralizeBodyColor } from './color-utils.js';
+import { neutralizeBodyColor, NEUTRAL_BODY } from './color-utils.js';
 
 export const CHASSIS_PRESETS = [
   {
@@ -59,8 +59,12 @@ function _createBikeMats(def, chassis, track) {
       color: def.trailGlow, sparkColor: def.wheel, intensity: 0.75 * si, body: 0.35, opacity: 0.85,
       acrossDir: AXIS_Z,
     }),
+    // Ces carrosseries n'ont pas de texture propre (juste des blocs) : on ne
+    // peut pas retirer complètement la teinte comme sur les modèles GLTF
+    // sans perdre toute identité visuelle — on la pousse juste très loin
+    // vers un gris neutre.
     bodyMat: new THREE.MeshStandardMaterial({
-      color: neutralizeBodyColor(def.body), emissive: neutralizeBodyColor(def.glow), emissiveIntensity: 0.22,
+      color: neutralizeBodyColor(def.body, 0.85), emissive: NEUTRAL_BODY, emissiveIntensity: 0.3,
       metalness: 0.55, roughness: 0.28,
     }),
     darkMat: new THREE.MeshStandardMaterial({
@@ -89,7 +93,6 @@ function _addClassicCore(g, def, c, mats, track, opts = {}) {
   if (metalBody) {
     mats.bodyMat.metalness = 0.92;
     mats.bodyMat.roughness = 0.08;
-    mats.bodyMat.emissiveIntensity = 0.18;
   }
 
   const chassisMesh = new THREE.Mesh(
