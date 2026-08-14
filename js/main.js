@@ -198,6 +198,7 @@ function gameLoop(now) {
   }
 
   renderer.updateExplosions();
+  renderer.updateTrailSpawnAnims(now);
   renderer.render();
   requestAnimationFrame(gameLoop);
 }

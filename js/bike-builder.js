@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createElectricMaterial, AXIS_X, AXIS_Y, AXIS_Z } from './electric-shader.js';
 import { getBikeSkin } from './bike-skins.js';
+import { neutralizeBodyColor } from './color-utils.js';
 
 export const CHASSIS_PRESETS = [
   {
@@ -59,7 +60,7 @@ function _createBikeMats(def, chassis, track) {
       acrossDir: AXIS_Z,
     }),
     bodyMat: new THREE.MeshStandardMaterial({
-      color: def.body, emissive: def.glow, emissiveIntensity: 0.32,
+      color: neutralizeBodyColor(def.body), emissive: neutralizeBodyColor(def.glow), emissiveIntensity: 0.22,
       metalness: 0.55, roughness: 0.28,
     }),
     darkMat: new THREE.MeshStandardMaterial({

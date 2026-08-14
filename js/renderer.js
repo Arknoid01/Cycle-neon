@@ -35,6 +35,7 @@ export class Renderer {
     this.previewMeshes = new Map();
     this.riderMeshes = new Map();
     this.liveTrails = new Map();
+    this.spawningTrails = [];
     this.trailMats = [];
     this.electricMats = [];
     this.explosions = [];
@@ -171,6 +172,7 @@ export class Renderer {
     this.riderMeshes.clear();
     this.liveTrails.forEach(g => this.scene.remove(g));
     this.liveTrails.clear();
+    this.spawningTrails = [];
     this.explosions.forEach(e => {
       this.scene.remove(e.points);
       e.points.geometry.dispose();
@@ -428,6 +430,7 @@ export class Renderer {
   _setCellMesh(x, y, type, grid, wallSystem, refreshNeighbors = true) {
     const key = this._cellKey(x, y);
     const existing = this.cellMeshes.get(key);
+    const isNewTile = !existing;
     if (existing) {
       this.scene.remove(existing);
       this.cellMeshes.delete(key);
@@ -443,6 +446,9 @@ export class Renderer {
       mesh.userData.trailIn = inDir;
       mesh.userData.trailOut = outDir;
       this.cellMeshes.set(key, mesh);
+      // Une case tout juste posée grossit depuis son centre au lieu de
+      // surgir d'un coup — sans ça l'apparition des plaques est saccadée.
+      if (isNewTile) this._spawnTrailAnim(mesh);
       if (refreshNeighbors) this._refreshTrailNeighbors(x, y, grid, wallSystem);
       return;
     }
@@ -461,6 +467,23 @@ export class Renderer {
 
     const mesh = this._addWallCube(x, y, geo, mat);
     this.cellMeshes.set(key, mesh);
+  }
+
+  _spawnTrailAnim(mesh) {
+    mesh.scale.setScalar(0.001);
+    this.spawningTrails.push({ mesh, start: performance.now() });
+  }
+
+  /** Anime la croissance des plaques de traînée fraîchement posées. */
+  updateTrailSpawnAnims(now) {
+    if (!this.spawningTrails.length) return;
+    const DURATION = 140;
+    this.spawningTrails = this.spawningTrails.filter(s => {
+      const t = Math.min(1, (now - s.start) / DURATION);
+      const eased = 1 - (1 - t) * (1 - t) * (1 - t);
+      s.mesh.scale.setScalar(t >= 1 ? 1 : Math.max(eased, 0.001));
+      return t < 1;
+    });
   }
 
   triggerMobileBurst(now) {
