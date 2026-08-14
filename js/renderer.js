@@ -378,10 +378,6 @@ export class Renderer {
     return g;
   }
 
-  _trailRotation(dir) {
-    return this._plateRotation(dir);
-  }
-
   _buildTrailMesh(x, y, grid, type) {
     const mat = this.trailMats[type - TRAIL_BASE];
     const outDir = grid.getTrailDir(x, y);
@@ -605,7 +601,12 @@ export class Renderer {
     if (dist > 0.02) {
       seg.visible = true;
       seg.position.set((join.x + rear.x) / 2, TRAIL_H / 2, (join.z + rear.z) / 2);
-      seg.rotation.y = this._trailRotation(dir);
+      // Orienté selon le vecteur réel arrière→jonction, pas la direction de
+      // grille cible : pendant un virage, l'arrière de la moto suit son
+      // smoothAngle (lissé, visuel) alors que la direction de grille a déjà
+      // changé — utiliser cette dernière tournait le faisceau dans le mauvais
+      // sens et il ne reliait plus visuellement la moto à sa traînée.
+      seg.rotation.y = Math.atan2(dx, dz);
       seg.scale.set(1, 1, dist);
     } else {
       seg.visible = false;
@@ -637,15 +638,21 @@ export class Renderer {
       }
       const mesh = this.ensureRiderMesh(r);
       mesh.visible = true;
-      const p = this.gridToWorld(r.renderX, r.renderY, this._worldPos);
-      const align = bikeCellAlignOffset(mesh, r.smoothAngle);
-      mesh.position.set(p.x + align.x, 0, p.z + align.z);
 
+      // L'angle doit être mis à jour AVANT de calculer position/faisceau :
+      // sinon la moto se positionne avec l'angle de la frame précédente
+      // pendant qu'elle tourne, mais le faisceau de traînée (calculé après)
+      // utilise déjà le nouvel angle — décalage visible entre la moto et
+      // sa traînée pendant les virages (ressemblait à un trou/tuile isolée).
       const targetAngle = BIKE_DIR_ANGLES[r.dir];
       let diff = targetAngle - r.smoothAngle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       r.smoothAngle += diff * 0.28;
+
+      const p = this.gridToWorld(r.renderX, r.renderY, this._worldPos);
+      const align = bikeCellAlignOffset(mesh, r.smoothAngle);
+      mesh.position.set(p.x + align.x, 0, p.z + align.z);
 
       if (mesh.userData.isSpriteBike) {
         // Le billboard regarde la caméra ; la texture choisie dépend de
@@ -743,8 +750,16 @@ export class Renderer {
     while (diff < -Math.PI) diff += Math.PI * 2;
     this.smoothCamAngle += diff * 0.1;
 
-    const offX = -Math.cos(this.smoothCamAngle) * dist;
-    const offZ = -Math.sin(this.smoothCamAngle) * dist;
+    // Léger décalage latéral : une caméra pile dans l'axe de la trajectoire
+    // regarde une ligne droite quasiment par la tranche — la traînée
+    // (très fine) en devient presque invisible sur les longs segments
+    // droits, jusqu'au prochain virage. Un angle "par-dessus l'épaule"
+    // évite ce cas de vue en bout quasi parfait.
+    const lateral = 3.4;
+    const perpX = -Math.sin(this.smoothCamAngle) * lateral;
+    const perpZ = Math.cos(this.smoothCamAngle) * lateral;
+    const offX = -Math.cos(this.smoothCamAngle) * dist + perpX;
+    const offZ = -Math.sin(this.smoothCamAngle) * dist + perpZ;
     this.camera.position.set(this.smoothCamX + offX, height, this.smoothCamZ + offZ);
     this.camera.lookAt(
       this.smoothCamX + Math.cos(this.smoothCamAngle) * lookAhead,

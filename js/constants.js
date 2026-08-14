@@ -21,7 +21,7 @@ export const CELL_SIZE = 2.6;
 export const BIKE_SCALE = 2.72;
 export const WALL_H = CELL_SIZE * 2.1;
 export const TRAIL_H = CELL_SIZE * 0.89;
-export const TRAIL_THICK = CELL_SIZE * 0.06;
+export const TRAIL_THICK = CELL_SIZE * 0.4;
 /** Plate length along travel axis — slight overlap to hide gaps between cells. */
 export const TRAIL_PLATE_LEN = CELL_SIZE * 1.1;
 export const TRAIL_ARM_LEN = CELL_SIZE * 0.54;
