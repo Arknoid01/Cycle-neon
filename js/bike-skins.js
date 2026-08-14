@@ -4,7 +4,7 @@ function _neonCoreModel(colorId) {
 
 /** Les 6 motos de base — même châssis, couleur néon différente. */
 const NEON_CORE_COLORS = [
-  { colorId: 'cyan', name: 'Néon Core Cyan', body: 0xccaa33, glow: 0xcc9900, wheel: 0x00aacc, trail: 0x66b8cc, trailGlow: 0x00aacc },
+  { colorId: 'cyan', name: 'Néon Core Cyan', body: 0x44bbdd, glow: 0x00c8e6, wheel: 0x00aacc, trail: 0x66b8cc, trailGlow: 0x00aacc },
   { colorId: 'magenta', name: 'Néon Core Magenta', body: 0xcc6699, glow: 0xcc4499, wheel: 0xcc3388, trail: 0x994466, trailGlow: 0xcc0066 },
   { colorId: 'orange', name: 'Néon Core Orange', body: 0xcc9944, glow: 0xcc8800, wheel: 0xcc6600, trail: 0x996633, trailGlow: 0xcc5500 },
   { colorId: 'lime', name: 'Néon Core Citron', body: 0x99cc44, glow: 0x77aa00, wheel: 0x44aa33, trail: 0x669944, trailGlow: 0x33aa00 },

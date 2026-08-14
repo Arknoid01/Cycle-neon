@@ -136,8 +136,8 @@ function _stylePrebakedBike(root, def) {
   const pulseMats = [];
   root.traverse(child => {
     if (!child.isMesh) return;
-    // Strip latéral de l'assembleur — bande colorée visible sur le flanc gauche.
-    if (child.name === 'liseret') {
+    // Strips latéraux de l'assembleur — bandes colorées non désirées sur les flancs.
+    if (child.name === 'liseret' || child.name === 'liseretAr') {
       child.visible = false;
       return;
     }
