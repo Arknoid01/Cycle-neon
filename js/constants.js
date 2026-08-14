@@ -17,7 +17,7 @@ export const SIM_MIN_INTERVAL = 62;
 
 export const CELL_SIZE = 1;
 /** Échelle globale appliquée à chaque moto (procédurale et GLB) après création. */
-export const BIKE_SCALE = 3.28;
+export const BIKE_SCALE = 2.72;
 export const WALL_H = 2.1;
 export const TRAIL_H = 0.89;
 export const TRAIL_THICK = 0.06;
