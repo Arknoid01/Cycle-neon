@@ -172,11 +172,13 @@ function _stylePrebakedBike(root, def) {
       }
 
       if (kind === 'body') {
-        mat.emissive.setHex(0x000000);
-        mat.emissiveIntensity = 0;
-        mat.metalness = 0.72;
-        mat.roughness = 0.38;
+        mat.emissive.setHex(def.glow);
+        mat.emissiveIntensity = 0.5;
+        mat.metalness = 0.65;
+        mat.roughness = 0.36;
         mat.toneMapped = true;
+        mat.userData.baseEmissive = mat.emissiveIntensity;
+        pulseMats.push(mat);
         return;
       }
 
