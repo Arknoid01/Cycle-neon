@@ -101,7 +101,7 @@ function _tintMeshTree(root, def, trackElectric) {
       if (slot === 'body') {
         if (mat.emissive) {
           mat.emissive.setHex(NEUTRAL_BODY);
-          mat.emissiveIntensity = 0.3;
+          mat.emissiveIntensity = 0.5;
           mat.userData.baseEmissive = mat.emissiveIntensity;
         }
         return;
@@ -196,7 +196,7 @@ function _stylePrebakedBike(root, def) {
         // même dans les scènes peu éclairées. L'identité du skin reste
         // portée par les accents (roues, poignées, liserés néon).
         mat.emissive.setHex(NEUTRAL_BODY);
-        mat.emissiveIntensity = 0.3;
+        mat.emissiveIntensity = 0.5;
         mat.metalness = 0.65;
         mat.roughness = 0.36;
         mat.toneMapped = true;

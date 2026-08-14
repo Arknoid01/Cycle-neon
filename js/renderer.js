@@ -477,7 +477,12 @@ export class Renderer {
     if (!this.spawningTrails.length) return;
     const DURATION = 220;
     this.spawningTrails = this.spawningTrails.filter(s => {
-      const t = Math.min(1, (now - s.start) / DURATION);
+      // now vient du timestamp de rAF en début de frame ; s.start est pris
+      // via performance.now() plus tard dans la même frame (au moment où la
+      // tuile est créée), donc légèrement postérieur — sans ce clamp, t peut
+      // être négatif au tout premier appel et rendre l'opacité négative
+      // (glitch de blending visible comme une tache brune sur la moto).
+      const t = Math.max(0, Math.min(1, (now - s.start) / DURATION));
       s.mat.uniforms.uOpacity.value = t * TRAIL_OPACITY;
       return t < 1;
     });

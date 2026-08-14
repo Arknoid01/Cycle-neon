@@ -64,7 +64,7 @@ function _createBikeMats(def, chassis, track) {
     // sans perdre toute identité visuelle — on la pousse juste très loin
     // vers un gris neutre.
     bodyMat: new THREE.MeshStandardMaterial({
-      color: neutralizeBodyColor(def.body, 0.85), emissive: NEUTRAL_BODY, emissiveIntensity: 0.3,
+      color: neutralizeBodyColor(def.body, 0.85), emissive: NEUTRAL_BODY, emissiveIntensity: 0.5,
       metalness: 0.55, roughness: 0.28,
     }),
     darkMat: new THREE.MeshStandardMaterial({
